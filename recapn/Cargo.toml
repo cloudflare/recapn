@@ -1,0 +1,19 @@
+[package]
+name = "recapn"
+version = "0.1.0"
+authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
+edition = "2018"
+
+[[bin]]
+name = "capnpc-rust"
+required-features = ["compiler"]
+
+[features]
+default = ["std"]
+std = []
+compiler = []
+compat = ["rpc"]
+rpc = []
+
+[dependencies]
+thiserror = "1.0"
