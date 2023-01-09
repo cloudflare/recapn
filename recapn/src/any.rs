@@ -1,9 +1,8 @@
 use crate::internal::Sealed;
-use crate::ptr::{Capable, CapableBuilder, CapableReader, PtrType};
-use crate::rpc::{Empty, Table};
-use crate::ty;
-use crate::{Error, Family, Result};
-use core::convert::{TryFrom, TryInto};
+use crate::ptr::{Capable, CapableBuilder, CapableReader};
+use crate::rpc::{self, Empty, PipelineBuilder, Pipelined, Table};
+use crate::{list, ty, IntoFamily};
+use crate::{Family, Result};
 
 pub mod ptr {
     pub use crate::ptr::{
@@ -11,13 +10,23 @@ pub mod ptr {
     };
 }
 
+pub use crate::ptr::PtrType;
+
 /// A safe wrapper around any pointer type.
 ///
 /// You probably don't want to name this type this directly. Use one of the ptr
 /// type aliases instead (e.g. [`any::PtrReader`](PtrReader)).
+#[derive(Clone, Debug)]
 pub struct AnyPtr<T = Family> {
-    repr: T,
+    pub(crate) repr: T,
 }
+
+/// A safe reader for a pointer of any type
+pub type PtrReader<'a, T = Empty> = AnyPtr<ptr::PtrReader<'a, T>>;
+/// A safe builder for a pointer of any type
+pub type PtrBuilder<'a, T = Empty> = AnyPtr<ptr::PtrBuilder<'a, T>>;
+/// A safe pipeline builder for a pointer of any type
+pub type PtrPipeline<P> = AnyPtr<rpc::Pipeline<P>>;
 
 impl<T: Capable> Capable for AnyPtr<T> {
     type Table = T::Table;
@@ -44,10 +53,13 @@ impl<T: CapableBuilder> CapableBuilder for AnyPtr<T> {
     }
 }
 
-/// A safe reader for a pointer of any type
-pub type PtrReader<'a, T = Empty> = AnyPtr<ptr::PtrReader<'a, T>>;
-/// A safe builder for a pointer of any type
-pub type PtrBuilder<'a, T = Empty> = AnyPtr<ptr::PtrBuilder<'a, T>>;
+impl Sealed for AnyPtr {}
+impl ty::Value for AnyPtr {
+    type Default = PtrReader<'static, Empty>;
+}
+impl ty::ListValue for AnyPtr {
+    const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
+}
 
 impl<'a, T: Table> PtrReader<'a, T> {
     #[inline]
@@ -57,7 +69,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
 
     #[inline]
     pub fn ptr_type(&self) -> Result<PtrType> {
-        todo!()
+        self.repr.ptr_type()
     }
 
     #[inline]
@@ -79,16 +91,6 @@ impl<'a, T: Table> PtrReader<'a, T> {
     pub fn is_capability(&self) -> bool {
         matches!(self.ptr_type(), Ok(PtrType::Capability))
     }
-
-    /// Attempts to resolve the pointer as the specified type. If an error occurs while reading,
-    /// this returns the error. If the pointer is null, this returns Ok(None).
-    #[inline]
-    pub fn try_read_into_option<U>(self) -> Result<Option<U>>
-    where
-        Option<U>: TryFrom<ptr::PtrReader<'a, T>, Error = Error>,
-    {
-        self.repr.try_into()
-    }
 }
 
 impl<'a> Default for PtrReader<'a, Empty> {
@@ -108,6 +110,10 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         AnyPtr {
             repr: self.repr.as_reader(),
         }
+    }
+
+    pub fn by_ref(&mut self) -> PtrBuilder<T> {
+        PtrBuilder { repr: self.repr.by_ref() }
     }
 
     #[inline]
@@ -152,6 +158,12 @@ impl<'a, T: Table> From<ptr::PtrBuilder<'a, T>> for PtrBuilder<'a, T> {
     }
 }
 
+impl<'a, T: Table> From<PtrBuilder<'a, T>> for ptr::PtrBuilder<'a, T> {
+    fn from(value: PtrBuilder<'a, T>) -> Self {
+        value.repr
+    }
+}
+
 impl<'a, 'b, T: Table> From<&'b PtrBuilder<'a, T>> for PtrReader<'b, T> {
     fn from(builder: &'b PtrBuilder<'a, T>) -> Self {
         Self {
@@ -160,8 +172,44 @@ impl<'a, 'b, T: Table> From<&'b PtrBuilder<'a, T>> for PtrReader<'b, T> {
     }
 }
 
+impl<P: Pipelined + PipelineBuilder<AnyPtr>> PtrPipeline<P> {
+    pub fn new(pipeline: rpc::Pipeline<P>) -> Self {
+        Self { repr: pipeline }
+    }
+    pub fn push(self, op: P::Operation) -> Self {
+        Self {
+            repr: self.repr.push(op),
+        }
+    }
+    pub fn into_cap(self) -> P::Cap {
+        self.repr.into_cap()
+    }
+    pub fn to_cap(self) -> P::Cap
+    where
+        P: Clone,
+    {
+        self.repr.to_cap()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct AnyStruct<T = Family> {
-    repr: T,
+    pub(crate) repr: T,
+}
+
+pub type StructReader<'a, T = Empty> = AnyStruct<ptr::StructReader<'a, T>>;
+pub type StructBuilder<'a, T = Empty> = AnyStruct<ptr::StructBuilder<'a, T>>;
+pub type StructPipeline<P> = AnyStruct<rpc::Pipeline<P>>;
+
+impl<T> Sealed for AnyStruct<T> {}
+impl ty::Value for AnyStruct {
+    type Default = StructReader<'static, Empty>;
+}
+// Note: AnyStruct does not implement ty::ListValue since the size the user wants for the structs
+// is unknown at compile time
+
+impl<T> IntoFamily for AnyStruct<T> {
+    type Family = AnyStruct;
 }
 
 impl<T: Capable> Capable for AnyStruct<T> {
@@ -189,22 +237,101 @@ impl<T: CapableBuilder> CapableBuilder for AnyStruct<T> {
     }
 }
 
-impl<T> Sealed for AnyStruct<T> {}
+impl<'a, T: Table> ty::StructReader for StructReader<'a, T> {
+    type Ptr = ptr::StructReader<'a, Self::Table>;
 
-pub type StructReader<'a, T = Empty> = AnyStruct<ptr::StructReader<'a, T>>;
-pub type StructBuilder<'a, T = Empty> = AnyStruct<ptr::StructBuilder<'a, T>>;
-
-impl<'a, T: Table> ty::StructReader<'a> for StructReader<'a, T> {
-    fn from_ptr(ptr: crate::ptr::StructReader<'a, Self::Table>) -> Self {
+    fn from_ptr(ptr: ptr::StructReader<'a, Self::Table>) -> Self {
         Self { repr: ptr }
+    }
+    fn as_ptr(&self) -> &ptr::StructReader<'a, Self::Table> {
+        &self.repr
+    }
+    fn into_ptr(self) -> crate::ptr::StructReader<'a, Self::Table> {
+        self.repr
     }
 }
 
+impl<P: Pipelined + PipelineBuilder<AnyStruct>> StructPipeline<P> {
+    pub fn new(pipeline: rpc::Pipeline<P>) -> Self {
+        Self { repr: pipeline }
+    }
+    pub fn push(self, op: P::Operation) -> Self {
+        Self {
+            repr: self.repr.push(op),
+        }
+    }
+    pub fn into_cap(self) -> P::Cap {
+        self.repr.into_cap()
+    }
+    pub fn to_cap(self) -> P::Cap
+    where
+        P: Clone,
+    {
+        self.repr.to_cap()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct AnyList<T = Family> {
-    repr: T,
+    pub(crate) repr: T,
+}
+
+impl<T: Capable> Capable for AnyList<T> {
+    type Table = T::Table;
+    type Imbued<T2: Table> = AnyList<T::Imbued<T2>>;
+}
+
+impl<T: CapableReader> CapableReader for AnyList<T> {
+    fn imbue_release<T2: Table>(
+        self,
+        new_table: T2::Reader,
+    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Reader) {
+        let (new_ptr, old_table) = self.repr.imbue_release(new_table);
+        (AnyList { repr: new_ptr }, old_table)
+    }
+}
+
+impl<T: CapableBuilder> CapableBuilder for AnyList<T> {
+    fn imbue_release<T2: Table>(
+        self,
+        new_table: T2::Builder,
+    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Builder) {
+        let (new_ptr, old_table) = self.repr.imbue_release(new_table);
+        (AnyList { repr: new_ptr }, old_table)
+    }
 }
 
 impl<T> Sealed for AnyList<T> {}
 
 pub type ListReader<'a, T = Empty> = AnyList<ptr::ListReader<'a, T>>;
 pub type ListBuilder<'a, T = Empty> = AnyList<ptr::ListBuilder<'a, T>>;
+
+impl<'a, T: Table> ListReader<'a, T> {
+    pub fn new(ptr: ptr::ListReader<'a, T>) -> Self {
+        Self { repr: ptr }
+    }
+    pub fn into_inner(self) -> ptr::ListReader<'a, T> {
+        self.repr
+    }
+}
+
+impl<'a, T: Table> ListBuilder<'a, T> {
+    pub fn new(ptr: ptr::ListBuilder<'a, T>) -> Self {
+        Self { repr: ptr }
+    }
+    pub fn into_inner(self) -> ptr::ListBuilder<'a, T> {
+        self.repr
+    }
+}
+
+impl<'a, T: Table> AsRef<ptr::ListBuilder<'a, T>> for ListBuilder<'a, T> {
+    fn as_ref(&self) -> &ptr::ListBuilder<'a, T> {
+        &self.repr
+    }
+}
+
+impl<'a, T: Table> AsMut<ptr::ListBuilder<'a, T>> for ListBuilder<'a, T> {
+    fn as_mut(&mut self) -> &mut ptr::ListBuilder<'a, T> {
+        &mut self.repr
+    }
+}

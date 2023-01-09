@@ -87,17 +87,12 @@
 //! }
 //! ```
 
-use core::convert::{Infallible, TryFrom};
 use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
 
 use crate::internal::Sealed;
-use crate::list::{self, List};
-use crate::ptr::{Capable, StructBuilder, StructReader};
-use crate::rpc::{Empty, Table};
+use crate::list;
+use crate::rpc::Empty;
 use crate::ty::{self, ListValue, Value};
-
-use self::internal::{PtrAccessable, PtrAccessableMut};
 
 /// A wrapper type used to implement methods for struct fields.
 pub struct Struct<S: ty::Struct> {
@@ -106,7 +101,7 @@ pub struct Struct<S: ty::Struct> {
 
 impl<S: ty::Struct> Sealed for Struct<S> {}
 impl<S: ty::Struct> Value for Struct<S> {
-    type Default = StructReader<'static, Empty>;
+    type Default = S::Reader<'static, Empty>;
 }
 impl<S: ty::Struct> ListValue for Struct<S> {
     const ELEMENT_SIZE: list::ElementSize = list::ElementSize::InlineComposite(S::SIZE);
@@ -263,8 +258,8 @@ pub trait FieldGroup {
 /// Describes a value in a "slot" in a struct. This does not include groups or void, which don't
 /// have an associated default value or slot.
 pub struct FieldInfo<V: ty::Value> {
-    pub slot: usize,
-    pub default: V::Default,
+    slot: usize,
+    default: V::Default,
 }
 
 /// Describes a type that can be a field in a Cap'n Proto struct type.
@@ -380,19 +375,22 @@ pub struct VariantField<'a, G: FieldGroup, V: FieldType, Repr: Viewable> {
     repr: Repr,
 }
 
-impl<'a, G, V, Repr> VariantField<'a, G, V, Repr>
+impl<'a, G, V, Repr> VariantField<'a, G, V, &'a Repr>
 where
     G: FieldGroup,
-    V: AccessableField<Repr::Target>,
-    Repr: Viewable,
-    Repr::Target: Accessable,
+    V: AccessableField<Repr>,
+    Repr: Accessable,
 {
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
     pub fn is_set(&self) -> bool {
         let variant = &self.descriptor.variant;
         unsafe { self.repr.data(variant.slot, 0) == variant.case }
     }
 
-    pub fn field(&self) -> Option<Accessor<'_, Repr::Target, V>> {
+    /// Returns the underlying accessor for this field, or None if the field isn't set.
+    #[inline]
+    pub fn field(&self) -> Option<Accessor<'a, Repr, V>> {
         if self.is_set() {
             unsafe { Some(self.field_unchecked()) }
         } else {
@@ -400,19 +398,55 @@ where
         }
     }
 
-    pub unsafe fn field_unchecked(&self) -> Accessor<'_, Repr::Target, V> {
+    /// Returns the underlying accessor for this field without checking if the field is set
+    #[inline]
+    pub unsafe fn field_unchecked(&self) -> Accessor<'a, Repr, V> {
         V::get(&*self.repr, &self.descriptor.field)
     }
 }
 
-impl<'a, G, V, Repr> VariantField<'a, G, V, Repr>
+impl<'a, G, V, Repr> VariantField<'a, G, V, &'a mut Repr>
 where
     G: FieldGroup,
-    V: AccessableField<Repr::Target>,
-    Repr: Viewable + DerefMut,
-    Repr::Target: AccessableMut,
+    V: AccessableField<Repr>,
+    Repr: AccessableMut,
 {
-    pub fn field_mut(&mut self) -> Option<AccessorMut<'_, Repr::Target, V>> {
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        let variant = &self.descriptor.variant;
+        unsafe { self.repr.data(variant.slot, 0) == variant.case }
+    }
+
+    /// Returns the underlying accessor for this field, or None if the field isn't set.
+    #[inline]
+    pub fn field(&self) -> Option<Accessor<'_, Repr, V>> {
+        if self.is_set() {
+            unsafe { Some(self.field_unchecked()) }
+        } else {
+            None
+        }
+    }
+
+    /// Returns the underlying accessor for this field without checking if the field is set
+    #[inline]
+    pub unsafe fn field_unchecked(&self) -> Accessor<'_, Repr, V> {
+        V::get(&*self.repr, &self.descriptor.field)
+    }
+
+    /// Borrows the variant field by reference, allowing the use of multiple builder methods
+    /// without consuming the variant accessor.
+    #[inline]
+    pub fn by_ref<'b>(&'b mut self) -> VariantField<'b, G, V, &'b mut Repr> {
+        VariantField {
+            a: PhantomData,
+            descriptor: self.descriptor,
+            repr: &mut *self.repr,
+        }
+    }
+
+    #[inline]
+    pub fn field_mut(self) -> Option<AccessorMut<'a, Repr, V>> {
         if self.is_set() {
             unsafe { Some(self.field_mut_unchecked()) }
         } else {
@@ -421,12 +455,14 @@ where
     }
 
     /// Returns a field accessor for the field without checking if it's already set.
-    pub unsafe fn field_mut_unchecked(&mut self) -> AccessorMut<'_, Repr::Target, V> {
+    #[inline]
+    pub unsafe fn field_mut_unchecked(self) -> AccessorMut<'a, Repr, V> {
         V::get_mut(&mut *self.repr, &self.descriptor.field)
     }
 
     /// Clears the union and sets it to this variant, returning an accessor to mutate the field
-    pub fn init(&mut self) -> AccessorMut<'_, Repr::Target, V> {
+    #[inline]
+    pub fn init(self) -> AccessorMut<'a, Repr, V> {
         G::init(&mut *self.repr);
         unsafe {
             let variant = &self.descriptor.variant;
@@ -436,7 +472,8 @@ where
     }
 
     /// Returns the field if it's set, or inits it if it's not set.
-    pub fn field_or_init(&mut self) -> AccessorMut<'_, Repr::Target, V> {
+    #[inline]
+    pub fn field_or_init(self) -> AccessorMut<'a, Repr, V> {
         if self.is_set() {
             unsafe { self.field_mut_unchecked() }
         } else {
@@ -445,15 +482,15 @@ where
     }
 }
 
-impl<'a, G, Repr> VariantField<'a, G, (), Repr>
+impl<'a, G, Repr> VariantField<'a, G, (), &'a mut Repr>
 where
     G: FieldGroup,
-    Repr: Viewable + DerefMut,
-    Repr::Target: AccessableMut,
+    Repr: AccessableMut,
 {
     /// An alias for `init()`.
+    #[inline]
     pub fn set(&mut self) {
-        self.init()
+        self.by_ref().init()
     }
 }
 
@@ -473,46 +510,60 @@ macro_rules! data_accessable {
             }
 
             impl<T: Accessable> AccessableField<T> for $ty {
+                #[inline]
                 unsafe fn get<'a>(repr: &'a T, descriptor: &'a Self::Descriptor) -> Self::Ref<'a, T> {
                     repr.data(descriptor.slot, descriptor.default)
                 }
+                #[inline]
                 unsafe fn get_mut<'a>(repr: &'a mut T, descriptor: &'a Self::Descriptor) -> Self::Mut<'a, T> {
                     Field { a: PhantomData, repr, descriptor }
                 }
             }
 
             impl<'a, T: AccessableMut> Field<'a, $ty, &'a mut T> {
+                #[inline]
                 pub fn get(&self) -> $ty {
                     unsafe { self.repr.data(self.descriptor.slot, self.descriptor.default) }
                 }
+                #[inline]
                 pub fn set(&mut self, value: $ty) {
                     unsafe { self.repr.set_data(self.descriptor.slot, value, self.descriptor.default) }
                 }
             }
 
-            impl<'a, G, Repr> VariantField<'a, G, $ty, Repr>
+            impl<'a, G, Repr> VariantField<'a, G, $ty, &'a Repr>
             where
                 G: FieldGroup,
-                Repr: Viewable,
-                Repr::Target: Accessable,
+                Repr: Accessable,
             {
+                #[inline]
                 pub fn get(&self) -> $ty {
                     self.field().unwrap_or(self.descriptor.field.default)
                 }
                 /// An alias for `field()`
+                #[inline]
                 pub fn get_option(&self) -> Option<$ty> {
                     self.field()
                 }
             }
 
-            impl<'a, G, Repr> VariantField<'a, G, $ty, Repr>
+            impl<'a, G, Repr> VariantField<'a, G, $ty, &'a mut Repr>
             where
                 G: FieldGroup,
-                Repr: Viewable + DerefMut,
-                Repr::Target: AccessableMut,
+                Repr: AccessableMut,
             {
+                #[inline]
+                pub fn get(&self) -> $ty {
+                    self.field().unwrap_or(self.descriptor.field.default)
+                }
+                /// An alias for `field()`
+                #[inline]
+                pub fn get_option(&self) -> Option<$ty> {
+                    self.field()
+                }
+                #[inline]
                 pub fn set(&mut self, value: $ty) {
-                    self.init().set(value)
+                    self.by_ref().init().set(value)
                 }
             }
         )+
@@ -534,10 +585,12 @@ impl<E: ty::Enum> FieldType for Enum<E> {
 }
 
 impl<T: Accessable, E: ty::Enum> AccessableField<T> for Enum<E> {
+    #[inline]
     unsafe fn get<'a>(repr: &'a T, descriptor: &'a Self::Descriptor) -> Self::Ref<'a, T> {
         repr.data::<u16>(descriptor.slot, descriptor.default.into())
             .into()
     }
+    #[inline]
     unsafe fn get_mut<'a>(repr: &'a mut T, descriptor: &'a Self::Descriptor) -> Self::Mut<'a, T> {
         Field {
             a: PhantomData,
@@ -548,6 +601,7 @@ impl<T: Accessable, E: ty::Enum> AccessableField<T> for Enum<E> {
 }
 
 impl<'a, T: AccessableMut, E: ty::Enum> Field<'a, Enum<E>, &'a mut T> {
+    #[inline]
     pub fn get(&self) -> E {
         unsafe {
             self.repr
@@ -555,36 +609,47 @@ impl<'a, T: AccessableMut, E: ty::Enum> Field<'a, Enum<E>, &'a mut T> {
                 .into()
         }
     }
+    #[inline]
     pub fn set(&mut self, value: E) {
         let (value, default) = (value.into(), self.descriptor.default.into());
         unsafe { self.repr.set_data(self.descriptor.slot, value, default) }
     }
 }
 
-impl<'a, G, E, Repr> VariantField<'a, G, Enum<E>, Repr>
+impl<'a, G, E, Repr> VariantField<'a, G, Enum<E>, &'a Repr>
 where
     G: FieldGroup,
     E: ty::Enum,
-    Repr: Viewable,
-    Repr::Target: Accessable,
+    Repr: Accessable,
 {
+    #[inline]
     pub fn get(&self) -> E {
         self.field().unwrap_or(self.descriptor.field.default)
     }
     /// An alias for field()
+    #[inline]
     pub fn get_option(&self) -> Option<E> {
         self.field()
     }
 }
 
-impl<'a, G, E, Repr> VariantField<'a, G, Enum<E>, Repr>
+impl<'a, G, E, Repr> VariantField<'a, G, Enum<E>, &'a mut Repr>
 where
     G: FieldGroup,
     E: ty::Enum,
-    Repr: Viewable + DerefMut,
-    Repr::Target: AccessableMut,
+    Repr: AccessableMut,
 {
+    #[inline]
+    pub fn get(&self) -> E {
+        self.field().unwrap_or(self.descriptor.field.default)
+    }
+    /// An alias for field()
+    #[inline]
+    pub fn get_option(&self) -> Option<E> {
+        self.field()
+    }
+    #[inline]
     pub fn set(&mut self, value: E) {
-        self.init().set(value)
+        self.by_ref().init().set(value)
     }
 }

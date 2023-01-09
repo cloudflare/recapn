@@ -1,5 +1,6 @@
 use alloc_crate::alloc::{self, Layout};
 use core::cmp;
+use core::fmt::{self, Debug};
 use core::marker::PhantomData;
 use core::mem;
 use core::num::NonZeroU32;
@@ -7,7 +8,7 @@ use core::ops::Range;
 use core::ptr::{self, NonNull};
 
 /// An aligned 64-bit word type.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Word(pub u64);
 
@@ -46,6 +47,12 @@ impl Word {
     #[inline]
     pub const fn round_up_byte_count(bytes: u32) -> u32 {
         (bytes + 7) / 8
+    }
+}
+
+impl Debug for Word {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#016X}", self.0)
     }
 }
 
@@ -185,7 +192,11 @@ impl From<u29> for i30 {
 }
 
 pub type ObjectLen = u29;
+pub type ObjectLenBytes = u32;
+
 pub type SegmentOffset = u29;
+pub type SegmentOffsetBytes = u32;
+
 pub type ElementCount = u29;
 
 /// A 30 bit signed integer describing the offset of data in a segment in words.
@@ -231,6 +242,12 @@ impl From<u16> for i30 {
     }
 }
 
+impl From<i16> for i30 {
+    fn from(v: i16) -> Self {
+        Self(v as i32)
+    }
+}
+
 /// A segment of Words. All segments contain at least one Word.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
@@ -254,11 +271,6 @@ impl Segment {
         let start = self.data.as_ptr() as *const Word;
         let end = unsafe { start.add(self.len.get() as usize) };
         start..end
-    }
-
-    #[inline]
-    pub const unsafe fn add_offset(&self, offset: SegmentOffset) -> NonNull<Word> {
-        NonNull::new_unchecked(self.data.as_ptr().add(offset.get() as usize))
     }
 
     #[inline]
@@ -330,7 +342,7 @@ unsafe impl Alloc for Global {
     }
     #[inline]
     unsafe fn dealloc(&mut self, segment: Segment) {
-        let layout = Layout::from_size_align(segment.len().get() as usize, mem::align_of::<Word>())
+        let layout = Layout::array::<Word>(segment.len().get() as usize)
             .expect("Segment too large!");
         alloc::dealloc(segment.data.as_ptr().cast(), layout)
     }

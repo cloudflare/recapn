@@ -4,7 +4,8 @@ use crate::alloc::{
 };
 use crate::ptr::{PtrBuilder, PtrReader};
 use crate::rpc::Empty;
-use core::cell::UnsafeCell;
+use crate::any;
+use core::cell::{Cell, UnsafeCell};
 use core::convert::TryInto;
 use core::fmt;
 use core::iter;
@@ -12,17 +13,65 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::ptr::NonNull;
 use core::slice;
-use core::sync::atomic::{AtomicU64, Ordering};
 
 pub type SegmentId = u32;
 
 pub(crate) mod internal {
-    use crate::alloc::SignedSegmentOffset;
+    use core::fmt::Debug;
+
+    use crate::alloc::{SignedSegmentOffset, NonZeroU29};
 
     use super::*;
 
-    /// A reference to a location in a segment.
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    /// An unchecked pointer into a segment. This can't be derefed normally. It must be checked and
+    /// turned into a `SegmentRef`.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct SegmentPtr<'a> {
+        a: PhantomData<&'a Word>,
+        ptr: *mut Word,
+    }
+
+    impl<'a> SegmentPtr<'a> {
+        pub const fn null() -> Self {
+            Self::new(core::ptr::null_mut())
+        }
+
+        pub const fn new(ptr: *mut Word) -> Self {
+            Self {
+                a: PhantomData,
+                ptr,
+            }
+        }
+
+        pub const fn as_ptr(self) -> *const Word {
+            self.ptr.cast_const()
+        }
+
+        pub const fn as_ptr_mut(self) -> *mut Word {
+            self.ptr
+        }
+
+        pub const fn offset(self, offset: SegmentOffset) -> Self {
+            Self::new(self.ptr.wrapping_add(offset.get() as usize))
+        }
+
+        pub const fn signed_offset(self, offset: SignedSegmentOffset) -> Self {
+            Self::new(self.ptr.wrapping_offset(offset.get() as isize))
+        }
+
+        pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> Self {
+            const ONE: SignedSegmentOffset = SignedSegmentOffset::new(1).unwrap();
+
+            self.signed_offset(ONE).signed_offset(offset)
+        }
+
+        pub const unsafe fn as_ref_unchecked(self) -> SegmentRef<'a> {
+            SegmentRef { a: PhantomData, ptr: NonNull::new_unchecked(self.ptr) }
+        }
+    }
+
+    /// A checked reference to a location in a segment. This cannot be null.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct SegmentRef<'a> {
         a: PhantomData<&'a Word>,
         ptr: NonNull<Word>,
@@ -31,41 +80,66 @@ pub(crate) mod internal {
     impl<'a> SegmentRef<'a> {
         /// Creates a dangling ref. This does not refer to any valid word, so it must not be
         /// derefed. Useful for zero-sized types such as empty lists or empty structs.
+        #[inline]
         pub const unsafe fn dangling() -> Self {
-            Self::from_ptr(NonNull::dangling())
+            Self::new_unchecked(NonNull::dangling())
         }
 
-        pub const unsafe fn from_ptr(ptr: NonNull<Word>) -> Self {
+        #[inline]
+        pub const unsafe fn new_unchecked(ptr: NonNull<Word>) -> Self {
             Self {
                 a: PhantomData,
                 ptr,
             }
         }
 
-        pub fn as_ptr(&self) -> *const Word {
+        #[inline]
+        pub const fn as_segment_ptr(self) -> SegmentPtr<'a> {
+            SegmentPtr::new(self.as_ptr_mut())
+        }
+
+        #[inline]
+        pub const fn as_ptr(self) -> *const Word {
             self.ptr.as_ptr().cast_const()
         }
 
-        pub fn as_ptr_mut(&self) -> *mut Word {
+        #[inline]
+        pub const fn as_ptr_mut(self) -> *mut Word {
             self.ptr.as_ptr()
         }
 
-        pub fn as_nonnull(&self) -> NonNull<Word> {
+        #[inline]
+        pub const fn as_inner(self) -> NonNull<Word> {
             self.ptr
         }
 
-        pub const unsafe fn offset(self, offset: SignedSegmentOffset) -> Self {
-            Self::from_ptr(NonNull::new_unchecked(
-                self.ptr.as_ptr().offset(offset.get() as isize),
-            ))
+        #[inline]
+        pub const fn offset(self, offset: SegmentOffset) -> SegmentPtr<'a> {
+            self.as_segment_ptr().offset(offset)
         }
 
-        pub unsafe fn offset_from_end(self, offset: SignedSegmentOffset) -> Self {
-            self.offset(1.into()).offset(offset)
+        #[inline]
+        pub const fn signed_offset(self, offset: SignedSegmentOffset) -> SegmentPtr<'a> {
+            self.as_segment_ptr().signed_offset(offset)
         }
 
-        pub unsafe fn deref(&self) -> &'a Word {
-            self.ptr.as_ref()
+        #[inline]
+        pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> SegmentPtr<'a> {
+            self.as_segment_ptr().signed_offset_from_end(offset)
+        }
+    }
+
+    impl AsRef<Word> for SegmentRef<'_> {
+        #[inline]
+        fn as_ref(&self) -> &Word {
+            unsafe { self.as_inner().as_ref() }
+        }
+    }
+
+    impl From<SegmentRef<'_>> for SegmentPtr<'_> {
+        #[inline]
+        fn from(value: SegmentRef<'_>) -> Self {
+            Self::new(value.as_ptr_mut())
         }
     }
 
@@ -81,9 +155,13 @@ pub(crate) mod internal {
                     let segments = segments.as_ref()?;
                     let segment = match id {
                         0 => &segments.first,
-                        id => segments.tail.get((id - 1) as usize)?,
+                        id => unsafe {
+                            let tail = &*segments.tail.get();
+                            tail.get((id - 1) as usize)?.as_ref()
+
+                        },
                     }
-                    .used_segment()?;
+                    .used_segment();
 
                     Some(SegmentReader::new(*self, segment))
                 }
@@ -98,6 +176,7 @@ pub(crate) mod internal {
     }
 
     impl<'a> SegmentReader<'a> {
+        #[inline]
         pub fn new(arena: ArenaReader<'a>, segment: Segment) -> Self {
             Self { arena, segment }
         }
@@ -111,46 +190,54 @@ pub(crate) mod internal {
             }
         }
 
+        /// A pointer to just beyond the end of the segment.
         #[inline]
-        fn contains_ref(&self, r: SegmentRef) -> bool {
-            self.contains(r.ptr.as_ptr().cast_const(), ObjectLen::new(1).unwrap())
-        }
-
-        #[inline]
-        pub fn deref_word<'b>(&self, r: SegmentRef<'b>) -> &'b Word {
-            debug_assert!(self.contains_ref(r));
-            unsafe { r.ptr.as_ref() }
-        }
-
-        #[inline]
-        pub fn try_offset_from<'b>(
-            &self,
-            r: SegmentRef<'b>,
-            offset: SignedSegmentOffset,
-            len: ObjectLen,
-        ) -> Option<SegmentRef<'b>> {
-            debug_assert!(self.contains_ref(r));
-
-            let ptr = r.ptr.as_ptr().cast_const();
-            let offset_ptr = ptr.wrapping_offset(offset.get() as isize);
-            self.contains(offset_ptr, len).then(|| SegmentRef {
-                a: PhantomData,
-                ptr: unsafe { NonNull::new_unchecked(offset_ptr.cast_mut()) },
+        pub fn end(&self) -> SegmentPtr<'a> {
+            SegmentPtr::new(unsafe {
+                self.segment
+                    .data()
+                    .as_ptr()
+                    .add(self.segment.len().get() as usize)
             })
         }
 
-        /// Gets a segment reader for the segment with the specified ID, or None
-        /// if the segment doesn't exist.
         #[inline]
-        pub fn segment(&self, id: SegmentId) -> Option<SegmentReader<'a>> {
-            self.arena.get(id)
+        fn contains(&self, ptr: SegmentPtr<'a>) -> bool {
+            let start = self.start().as_segment_ptr();
+            let end = self.end();
+
+            start <= ptr && ptr < end
+        }
+
+        /// Checks if the pointer is a valid location in this segment, and if so,
+        /// returns a ref for it.
+        #[inline]
+        pub fn try_get(&self, ptr: SegmentPtr<'a>) -> Option<SegmentRef<'a>> {
+            if self.contains(ptr) {
+                Some(unsafe { ptr.as_ref_unchecked() })
+            } else {
+                None
+            }
         }
 
         #[inline]
-        pub fn contains(&self, ptr: *const Word, len: ObjectLen) -> bool {
-            let range = self.segment.to_ptr_range();
-            let end = ptr.wrapping_offset(len.get() as isize);
-            range.contains(&ptr) && range.contains(&end)
+        pub fn try_get_section(
+            &self,
+            start: SegmentPtr<'a>,
+            len: ObjectLen,
+        ) -> Option<SegmentRef<'a>> {
+            let end = start.offset(len);
+            if end < start {
+                // the pointer wrapped around the address space? should only happen on 32 bit
+                return None;
+            }
+
+            if end > self.end() {
+                // the pointer went beyond the end of the segment
+                return None;
+            }
+
+            self.try_get(start)
         }
 
         #[inline]
@@ -159,20 +246,26 @@ pub(crate) mod internal {
             offset: SegmentOffset,
             len: ObjectLen,
         ) -> Option<SegmentRef<'a>> {
-            // find out where the end off the section is supposed to be and make sure it's not beyond
-            // the length of the segment
-            let end_offset = offset
-                .get()
-                .checked_add(len.get())
-                .and_then(SegmentOffset::new)?;
-            if end_offset > self.segment.len() {
-                return None;
-            }
+            let start = self.start().offset(offset);
+            self.try_get_section(start, len)
+        }
 
-            Some(SegmentRef {
-                a: PhantomData,
-                ptr: unsafe { self.segment.add_offset(offset) },
-            })
+        /// In release mode, converts a ptr to ref without checking if it's contained in this
+        /// segment.
+        ///
+        /// In debug mode, this will assert that the ptr is contained in this segment.
+        #[inline]
+        pub unsafe fn get_unchecked(&self, ptr: SegmentPtr<'a>) -> SegmentRef<'a> {
+            debug_assert!(self.contains(ptr));
+
+            ptr.as_ref_unchecked()
+        }
+
+        /// Gets a segment reader for the segment with the specified ID, or None
+        /// if the segment doesn't exist.
+        #[inline]
+        pub fn segment(&self, id: SegmentId) -> Option<SegmentReader<'a>> {
+            self.arena.get(id)
         }
     }
 
@@ -184,63 +277,76 @@ pub(crate) mod internal {
 
     pub struct ArenaSegment {
         segment: Segment,
-        /// A segment offset indicating the used space in the segment,
-        /// or some flags. READ_ONLY_FLAG is used to indicate it's a
-        /// read-only segment, DELETED_FLAG is used to indicate the
-        /// segment was read-only, but has now been deleted.
-        used_len_or_flags: u32,
+        used_len: Option<Cell<AllocLen>>,
         segment_id: SegmentId,
     }
 
     impl ArenaSegment {
-        const READ_ONLY_FLAG: u32 = u32::MAX;
-
-        pub fn new(segment: Segment, read_only: bool, id: SegmentId) -> Self {
+        #[inline]
+        pub fn new(segment: Segment, used_len: Option<AllocLen>, id: SegmentId) -> Self {
             Self {
                 segment,
-                used_len_or_flags: if read_only { Self::READ_ONLY_FLAG } else { 0 },
+                used_len: used_len.map(Cell::new),
                 segment_id: id,
             }
         }
 
+        #[inline]
         pub fn is_read_only(&self) -> bool {
-            self.used_len_or_flags > SegmentOffset::MAX_VALUE
+            self.used_len.is_none()
         }
 
+        #[inline]
         pub fn id(&self) -> SegmentId {
             self.segment_id
         }
 
+        #[inline]
         pub fn segment(&self) -> &Segment {
             &self.segment
         }
 
+        #[inline]
+        pub fn try_use_len(&self, len: AllocLen) -> Option<SegmentOffset> {
+            let used_len = self.used_len.as_ref()?;
+            let old_used = used_len.get();
+            let max = self.segment.len().get();
+
+            let new_used = old_used.get().checked_add(len.get())?;
+            if new_used > max {
+                return None;
+            }
+
+            used_len.set(AllocLen::new(new_used).unwrap());
+            Some(old_used.into())
+        }
+
+        #[inline]
         pub fn used_len(&self) -> SegmentOffset {
-            if self.is_read_only() {
-                self.segment().len().into()
+            if let Some(len) = &self.used_len {
+                len.get().into()
             } else {
-                SegmentOffset::new(self.used_len_or_flags).unwrap()
+                self.segment().len().into()
             }
         }
 
         /// Returns a segment of the used data in this segment.
         ///
         /// If no data has been used, this returns None
-        pub fn used_segment(&self) -> Option<Segment> {
-            let len = SegmentLen::new(self.used_len().get())?;
-            unsafe { Some(Segment::new(self.segment.data(), len)) }
+        #[inline]
+        pub fn used_segment(&self) -> Segment {
+            let len = SegmentLen::new(self.used_len().get()).unwrap();
+            unsafe { Segment::new(self.segment.data(), len) }
         }
 
+        #[inline]
         pub fn as_slice(&self) -> &[Word] {
-            if let Some(segment) = self.used_segment() {
-                unsafe {
-                    core::slice::from_raw_parts(
-                        segment.data().as_ptr().cast_const(),
-                        segment.len().get() as usize,
-                    )
-                }
-            } else {
-                &[]
+            let segment = self.used_segment();
+            unsafe {
+                core::slice::from_raw_parts(
+                    segment.data().as_ptr().cast_const(),
+                    segment.len().get() as usize,
+                )
             }
         }
     }
@@ -253,10 +359,10 @@ pub(crate) mod internal {
     }
 
     struct ArenaInner<A: Alloc + ?Sized> {
-        segments: Option<ArenaSegments>,
+        segments: UnsafeCell<Option<ArenaSegments>>,
         /// The last owned segment in this set
-        last_owned: SegmentId,
-        alloc: A,
+        last_owned: Cell<SegmentId>,
+        alloc: UnsafeCell<A>,
     }
 
     /// An append-only arena for a set of message segments, managed by an Arena.
@@ -267,7 +373,7 @@ pub(crate) mod internal {
         /// Optimize for the first (and possibly only) segment
         first: ArenaSegment,
         /// An optional set of extra segments
-        tail: Vec<Pin<Box<ArenaSegment>>>,
+        tail: UnsafeCell<Vec<NonNull<ArenaSegment>>>,
     }
 
     impl<'e, A: Alloc> Arena<'e, A> {
@@ -275,19 +381,34 @@ pub(crate) mod internal {
             Self {
                 e: PhantomData,
                 inner: UnsafeCell::new(ArenaInner {
-                    alloc,
-                    last_owned: 0,
-                    segments: None,
+                    alloc: UnsafeCell::new(alloc),
+                    last_owned: Cell::new(0),
+                    segments: UnsafeCell::new(None),
                 }),
             }
         }
     }
 
     impl<'e, A: Alloc> Arena<'e, A> {
-        pub fn reader(&self) -> ArenaReader {
-            let borrow = unsafe { &*self.inner.get() };
+        pub fn segments(&self) -> Option<MessageSegments> {
+            let inner = unsafe { &*self.inner.get() };
+            let segments = unsafe { &*inner.segments.get() };
 
-            ArenaReader::FromBuilder(&borrow.segments)
+            segments.as_ref().map(|s| {
+                MessageSegments {
+                    first: s.first.as_slice(),
+                    remainder: RemainderSegments {
+                        segments: unsafe { &*s.tail.get() }
+                    },
+                }
+            })
+        }
+
+        pub fn reader(&self) -> ArenaReader {
+            let inner = unsafe { &*self.inner.get() };
+            let segments = unsafe { &*inner.segments.get() };
+
+            ArenaReader::FromBuilder(&segments)
         }
 
         pub fn builder<'b>(&'b mut self) -> BuilderArena<'b> {
@@ -313,14 +434,17 @@ pub(crate) mod internal {
 
     impl<A: Alloc + ?Sized> Drop for ArenaInner<A> {
         fn drop(&mut self) {
-            let alloc = &mut self.alloc;
-            if let Some(segments) = self.segments.as_mut() {
-                let first = &segments.first;
+            let alloc = self.alloc.get_mut();
+            if let Some(segments) = self.segments.get_mut().take() {
                 unsafe {
-                    alloc.dealloc(first.segment().clone());
+                    alloc.dealloc(segments.first.segment().clone());
                 }
 
-                for segment in segments.tail.drain(..) {
+                let segments = segments.tail
+                    .into_inner()
+                    .into_iter()
+                    .map(|ptr| unsafe { *Box::from_raw(ptr.as_ptr()) });
+                for segment in segments {
                     unsafe {
                         alloc.dealloc(segment.segment().clone());
                     }
@@ -333,7 +457,7 @@ pub(crate) mod internal {
     unsafe impl<'e, A: Alloc + Sync> Sync for Arena<'e, A> {}
 
     /// An arena builder that lets us add segments with interior mutability.
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct BuilderArena<'b> {
         /// DON'T ACCESS THIS FIELD DIRECTLY. Use arena() or arena_mut() instead.
         inner: &'b UnsafeCell<ArenaInner<dyn Alloc>>,
@@ -342,56 +466,62 @@ pub(crate) mod internal {
     impl<'b> BuilderArena<'b> {
         const MAX_SEGMENTS: usize = (u32::MAX - 1) as usize;
 
-        /// Allocates a segment of at least `min_size` words.
-        pub fn alloc_segment(&self, min_size: SegmentLen) -> SegmentBuilder<'b> {
+        /// Allocates a segment of at least `min_size` words. The newly allocated segment will
+        /// already have the minimum size allocated within it, meaning you don't have to allocate
+        /// again with the returned builder
+        pub fn alloc_in_new_segment(&self, min_size: SegmentLen) -> (SegmentRef<'b>, SegmentBuilder<'b>) {
             unsafe {
-                let inner = self.arena_mut();
-                let new_segment = inner.alloc.alloc(min_size);
-                let ptr = match inner.segments {
-                    ref mut s @ None => {
-                        let segment = ArenaSegment::new(new_segment, false, 0);
-                        let segments = s.insert(ArenaSegments {
+                let inner = self.inner();
+                let alloc = &mut *inner.alloc.get();
+                let segments = &*inner.segments.get();
+
+                let ptr = match segments {
+                    None => {
+                        let new_segment = alloc.alloc(min_size);
+                        let segments_mut = &mut *inner.segments.get();
+                        let segment = ArenaSegment::new(new_segment, Some(min_size), 0);
+                        let segments = segments_mut.insert(ArenaSegments {
                             first: segment,
-                            tail: Vec::new(),
+                            tail: UnsafeCell::new(Vec::new()),
                         });
                         // this pointer is fine, the reference will stick around at least as long
                         // as the associated arena borrow
                         NonNull::from(&segments.first)
                     }
-                    Some(ref mut segments) => {
-                        if segments.tail.len() > Self::MAX_SEGMENTS {
+                    Some(segments) => {
+                        let tail = &mut *segments.tail.get();
+
+                        if tail.len() > Self::MAX_SEGMENTS {
                             panic!("Too many segments allocated in message!");
                         }
 
-                        let next_id = (segments.tail.len() + 1) as u32;
+                        let next_id = (tail.len() + 1) as u32;
 
-                        inner.last_owned = next_id;
+                        inner.last_owned.set(next_id);
 
-                        let boxed = Box::pin(ArenaSegment::new(new_segment, false, next_id));
-                        let ptr = NonNull::from(boxed.as_ref().get_ref());
+                        let new_segment = alloc.alloc(min_size);
+                        let boxed = Box::into_raw(Box::new(ArenaSegment::new(new_segment, Some(min_size), next_id)));
+                        let ptr = NonNull::new(boxed).unwrap();
 
-                        segments.tail.push(boxed);
+                        tail.push(ptr);
 
                         ptr
                     }
                 };
-                SegmentBuilder {
+                let segment = SegmentBuilder {
                     segment: ptr,
                     arena: self.clone(),
-                }
+                };
+                (segment.start(), segment)
             }
         }
 
-        fn arena(&self) -> &ArenaInner<dyn Alloc + 'b> {
+        fn inner(&self) -> &ArenaInner<dyn Alloc + 'b> {
             unsafe { core::mem::transmute(&*self.inner.get()) }
         }
 
-        unsafe fn arena_mut(&self) -> &mut ArenaInner<dyn Alloc + 'b> {
-            unsafe { core::mem::transmute(&mut *self.inner.get()) }
-        }
-
         fn last_owned(&self) -> SegmentId {
-            self.arena().last_owned
+            self.inner().last_owned.get()
         }
 
         /// Allocate an object of size somewhere in the message, returning a pointer to the
@@ -403,29 +533,22 @@ pub(crate) mod internal {
                 }
             }
 
-            // If "last_segment_id" turned up nothing, we must be the first segment in the message
-            // If no space could be allocated in the segment, we need a new one
-            let builder = self.alloc_segment(size);
-            let space = builder
-                .alloc_in_segment(size)
-                .expect("failed to allocate enough space in new segment");
-            (space, builder)
+            self.alloc_in_new_segment(size)
         }
 
         pub fn segment_mut(&self, id: SegmentId) -> Option<SegmentBuilder<'b>> {
-            let inner = unsafe { &mut *self.inner.get() };
-            let segments = inner.segments.as_mut()?;
+            let segments = unsafe { (&*self.inner().segments.get()).as_ref()? };
             let segment = match id {
-                0 => NonNull::from(&mut segments.first),
+                0 => NonNull::from(&segments.first),
                 id => {
                     let index = (id - 1) as usize;
-                    let segment = &mut segments.tail[index];
-                    if segment.is_read_only() {
+                    let tail = unsafe { &*segments.tail.get() };
+                    let segment = tail[index];
+                    if unsafe { segment.as_ref().is_read_only() } {
                         return None;
                     }
 
-                    let inner_ref = segment.as_mut();
-                    NonNull::from(inner_ref.get_mut())
+                    segment
                 }
             };
             Some(SegmentBuilder {
@@ -442,67 +565,75 @@ pub(crate) mod internal {
     }
 
     impl<'b> SegmentBuilder<'b> {
+        pub fn arena(&self) -> &BuilderArena<'b> {
+            &self.arena
+        }
+
         fn segment(&self) -> &ArenaSegment {
             unsafe { self.segment.as_ref() }
         }
 
         pub fn as_reader<'c>(&'c self) -> SegmentReader<'c> {
-            let arena = ArenaReader::FromBuilder(&self.arena.arena().segments);
+            let segments = unsafe { &*self.arena.inner().segments.get() };
+            let arena = ArenaReader::FromBuilder(segments);
             SegmentReader {
                 arena,
                 segment: self.segment().segment().clone(),
             }
         }
 
+        #[inline]
         pub fn id(&self) -> SegmentId {
             unsafe { self.segment.as_ref().id() }
         }
 
-        pub fn contains(&self, r: SegmentRef<'b>) -> bool {
+        #[inline]
+        pub fn contains(&self, r: SegmentPtr<'b>) -> bool {
             self.segment()
                 .segment()
                 .to_ptr_range()
                 .contains(&r.as_ptr())
         }
 
-        pub fn contains_section(&self, r: SegmentRef<'b>, offset: SignedSegmentOffset) -> bool {
-            todo!()
+        #[inline]
+        pub fn contains_section(&self, r: SegmentRef<'b>, offset: SegmentOffset) -> bool {
+            self.contains_range(r.into(), r.offset(offset))
         }
 
-        pub fn contains_range(&self, start: SegmentRef<'b>, end: SegmentRef<'b>) -> bool {
-            todo!()
+        #[inline]
+        pub fn contains_range(&self, start: SegmentPtr<'b>, end: SegmentPtr<'b>) -> bool {
+            let segment_start = self.start().as_segment_ptr();
+            let segment_end = self.end();
+
+            segment_start <= start && start <= end && end < segment_end
         }
 
-        pub fn arena(&self) -> &BuilderArena<'b> {
-            &self.arena
-        }
-
+        #[inline]
         pub fn at_offset(&self, offset: SegmentOffset) -> SegmentRef<'b> {
-            let r = unsafe { self.start().offset(offset.into()) };
+            let r = self.start().offset(offset.into());
             debug_assert!(self.contains(r));
-            r
+            unsafe { r.as_ref_unchecked() }
         }
 
-        pub fn offset_from_start(&self, to: SegmentRef<'b>) -> SegmentOffset {
-            let signed_offset = self.offset_from(self.start(), to);
-            SegmentOffset::new(signed_offset.get() as u32).unwrap()
-        }
-
+        /// Gets the start of the segment as a SegmentRef
         #[inline]
         pub fn start(&self) -> SegmentRef<'b> {
-            unsafe { SegmentRef::from_ptr(self.segment().segment().data()) }
+            SegmentRef {
+                a: PhantomData,
+                ptr: self.segment().segment.data(),
+            }
         }
 
         #[inline]
-        pub fn end(&self) -> SegmentRef<'b> {
-            unsafe { self.start().offset(self.segment().used_len().into()) }
+        pub fn end(&self) -> SegmentPtr<'b> {
+            self.start().offset(self.segment().used_len().into())
         }
 
         #[inline]
-        fn offset_from(&self, from: SegmentRef<'b>, to: SegmentRef<'b>) -> SignedSegmentOffset {
+        fn offset_from(&self, from: SegmentPtr<'b>, to: SegmentPtr<'b>) -> SignedSegmentOffset {
             debug_assert!(self.contains_range(from, to));
             unsafe {
-                let offset = to.as_ptr().offset_from(from.as_ptr().add(1));
+                let offset = to.as_ptr().offset_from(from.as_ptr());
                 SignedSegmentOffset::new_unchecked(offset as i32)
             }
         }
@@ -511,13 +642,22 @@ pub(crate) mod internal {
         #[inline]
         pub fn offset_from_end_of(
             &self,
-            from: SegmentRef<'b>,
-            to: SegmentRef<'b>,
+            from: SegmentPtr<'b>,
+            to: SegmentPtr<'b>,
         ) -> SignedSegmentOffset {
-            self.offset_from(unsafe { from.offset(1.into()) }, to)
+            self.offset_from(from.offset(1u16.into()), to)
+        }
+
+        #[inline]
+        pub fn offset_from_start(&self, to: SegmentPtr<'b>) -> SegmentOffset {
+            debug_assert!(self.contains(to));
+
+            let signed_offset = self.offset_from(self.start().into(), to);
+            SegmentOffset::new(signed_offset.get() as u32).expect("offset from start was negative!")
         }
 
         /// Allocates space of the given size _somewhere_ in the message.
+        #[inline]
         pub fn alloc(&self, size: AllocLen) -> (SegmentRef<'b>, SegmentBuilder<'b>) {
             if let Some(word) = self.alloc_in_segment(size) {
                 (word, self.clone())
@@ -527,67 +667,58 @@ pub(crate) mod internal {
         }
 
         /// Attempt to allocate the given space in this segment.
+        #[inline]
         pub fn alloc_in_segment(&self, size: AllocLen) -> Option<SegmentRef<'b>> {
+            unsafe {
+                let start_alloc_offset = self.segment().try_use_len(size)?;
+                let start = self.start()
+                    .offset(start_alloc_offset.into())
+                    .as_ref_unchecked();
+                Some(start)
+            }
+        }
+    }
+
+    impl Debug for SegmentBuilder<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let segment = self.segment();
-            if segment.is_read_only() {
-                return None;
-            }
-
-            let start_alloc_offset = segment.used_len();
-            let new_used_len = start_alloc_offset.get().checked_add(size.get())?;
-            if new_used_len > segment.segment().len().get() {
-                return None;
-            }
-
-            let start = unsafe { self.start().offset(start_alloc_offset.into()) };
-            Some(start)
+            f.debug_struct("SegmentBuilder")
+                .field("id", &segment.id())
+                .field("start", &segment.segment().data())
+                .field("len", &segment.used_len())
+                .finish()
         }
     }
 
     /// Controls how far a single message reader can read into a message.
     #[derive(Debug)]
     pub struct ReadLimiter {
-        limit: AtomicU64,
+        limit: Cell<u64>,
     }
 
     impl ReadLimiter {
         #[inline]
-        pub const fn unlimited() -> Self {
-            Self {
-                limit: AtomicU64::new(u64::max_value()),
-            }
-        }
-
-        #[inline]
         pub const fn new(word_count: u64) -> Self {
             Self {
-                limit: AtomicU64::new(word_count),
+                limit: Cell::new(word_count),
             }
-        }
-
-        #[inline]
-        pub fn reset(&self, word_count: u64) {
-            self.limit.store(word_count, Ordering::Relaxed)
         }
 
         /// Attempts to read `words` from the limiter, returning a [`bool`](std::primitive::bool) indicating whether the read was successful.
         #[inline]
         pub fn try_read(&self, words: u64) -> bool {
-            let current = self.limit.load(Ordering::Relaxed);
+            let current = self.limit.get();
             if words <= current {
-                self.limit.store(current - words, Ordering::Relaxed);
+                self.limit.set(current - words);
                 return true;
             }
 
             false
         }
 
-        /// Adds some words back onto the limit, useful if you know you're going to double read some data.
         #[inline]
-        pub fn unread(&self, words: u64) {
-            let old = self.limit.load(Ordering::Relaxed);
-            let new = old.saturating_add(words);
-            self.limit.store(new, Ordering::Relaxed);
+        pub fn current_limit(&self) -> u64 {
+            self.limit.get()
         }
     }
 }
@@ -633,7 +764,7 @@ impl<'e, A: Alloc> Message<'e, A> {
 
     /// Returns the segments of the message, or None if a root segment hasn't been allocated yet.
     pub fn segments(&self) -> Option<MessageSegments> {
-        todo!()
+        self.arena.segments()
     }
 
     /// Creates a new reader for this message.
@@ -655,9 +786,15 @@ impl<'e, A: Alloc> Message<'e, A> {
 
     /// Gets a builder for this message.
     pub fn builder<'b>(&'b mut self) -> Builder<'b, 'e> {
+        let builder = self.arena.builder();
+        let segment = builder
+            .segment_mut(0)
+            .unwrap_or_else(|| {
+                builder.alloc_in_new_segment(SegmentLen::MIN).1
+            });
         Builder {
             e: PhantomData,
-            arena: self.arena.builder(),
+            root: segment,
         }
     }
 }
@@ -786,7 +923,7 @@ impl<'b> IntoIterator for MessageSegments<'b> {
 
 #[derive(Clone)]
 pub struct RemainderSegments<'b> {
-    segments: &'b Vec<Pin<Box<ArenaSegment>>>,
+    segments: &'b Vec<NonNull<ArenaSegment>>,
 }
 
 impl<'b> RemainderSegments<'b> {
@@ -799,14 +936,14 @@ impl<'b> RemainderSegments<'b> {
     fn iter(&self) -> RemainderIter<'b> {
         self.segments
             .iter()
-            .map(|s| s.as_ref().get_ref().as_slice())
+            .map(|s| unsafe { s.as_ref().as_slice() })
     }
 }
 
 type Iter<'b> = iter::Chain<iter::Once<&'b [Word]>, RemainderIter<'b>>;
 type RemainderIter<'b> = iter::Map<
-    slice::Iter<'b, Pin<Box<ArenaSegment>>>,
-    fn(&'b Pin<Box<ArenaSegment>>) -> &'b [Word],
+    slice::Iter<'b, NonNull<ArenaSegment>>,
+    fn(&'b NonNull<ArenaSegment>) -> &'b [Word],
 >;
 
 #[derive(Clone)]
@@ -829,33 +966,6 @@ impl<'b> Iterator for SegmentsIter<'b> {
         self.inner.count()
     }
     #[inline]
-    fn fold<B, F>(self, init: B, f: F) -> B
-    where
-        Self: Sized,
-        F: FnMut(B, Self::Item) -> B,
-    {
-        self.inner.fold(init, f)
-    }
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.inner.nth(n)
-    }
-    #[inline]
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        Self: Sized,
-        P: FnMut(&Self::Item) -> bool,
-    {
-        self.inner.find(predicate)
-    }
-    #[inline]
-    fn last(self) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        self.inner.last()
-    }
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
@@ -863,20 +973,20 @@ impl<'b> Iterator for SegmentsIter<'b> {
 
 pub struct Builder<'b, 'e: 'b> {
     e: PhantomData<&'e [Word]>,
-    arena: BuilderArena<'b>,
+    root: SegmentBuilder<'b>,
 }
 
 impl<'b, 'e: 'b> Builder<'b, 'e> {
     pub fn segment_inserter(&self) -> ExternalSegmentInserter<'e, 'b> {
         ExternalSegmentInserter {
             e: PhantomData,
-            arena: self.arena.clone(),
+            arena: self.root.arena().clone(),
         }
     }
 
     /// Returns the root pointer for the message.
-    pub fn into_root(self) -> PtrBuilder<'b, Empty> {
-        PtrBuilder::root(self.arena.segment_mut(0).unwrap())
+    pub fn into_root(self) -> any::PtrBuilder<'b, Empty> {
+        PtrBuilder::root(self.root).into()
     }
 }
 

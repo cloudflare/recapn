@@ -12,11 +12,11 @@
 //!
 
 use crate::alloc::ElementCount;
-use crate::any::{AnyStruct, self};
+use crate::any::{self, AnyList, AnyStruct};
 use crate::field::{Enum, Struct};
 use crate::ptr::internal::FieldData;
 use crate::ptr::{CapableReader, WriteNull};
-use crate::rpc::{self, Table};
+use crate::rpc::{self, InsertableInto, Table};
 use crate::{ty, Error, Family, IntoFamily, Result};
 use core::convert::Infallible;
 use core::marker::PhantomData;
@@ -25,8 +25,8 @@ use core::ops::ControlFlow;
 pub use crate::ptr::ElementSize;
 
 mod internal {
-    use crate::ptr::Capable;
     use crate::ptr::internal::FieldData;
+    use crate::ptr::Capable;
 
     pub trait DataAccessable: Capable {
         unsafe fn data_unchecked<D: FieldData>(&self, index: u32) -> D;
@@ -73,13 +73,14 @@ impl<T: Clone, V> Clone for List<V, T> {
 }
 
 impl<V, T> IntoFamily for List<V, T> {
-    type Family = List<V, Family>;
+    type Family = List<V>;
 }
 
 impl<'a, V, T: Table> Reader<'a, V, T> {
     /// Gets the length of the list
+    #[inline]
     pub fn len(&self) -> u32 {
-        self.repr.len()
+        self.repr.len().get()
     }
 
     /// Get the element at the specified index, or None if the index is out of range.
@@ -103,8 +104,17 @@ impl<'a, V, T: Table> Reader<'a, V, T> {
 
 impl<'a, V, T: Table> Builder<'a, V, T> {
     /// Gets the length of the list
-    pub fn len(&self) -> u32 {
+    #[inline]
+    pub fn len(&self) -> ElementCount {
         self.repr.len()
+    }
+
+    #[inline]
+    pub fn as_reader(&self) -> Reader<V, T> {
+        List {
+            v: PhantomData,
+            repr: self.repr.as_reader(),
+        }
     }
 
     /// Gets a read-only view of the element at the specified index, or None if the index is out of range.
@@ -113,7 +123,7 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     where
         V: ListElement<&'b ptr::Builder<'a, T>>,
     {
-        (index < self.len()).then(|| unsafe { self.at_unchecked(index) })
+        (index < self.len().get()).then(|| unsafe { self.at_unchecked(index) })
     }
 
     /// Gets a read-only view of the element at the specified index without bounds checks.
@@ -130,7 +140,7 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     where
         V: ListElement<&'b mut ptr::Builder<'a, T>>,
     {
-        (index < self.len()).then(move || unsafe { self.at_mut_unchecked(index) })
+        (index < self.len().get()).then(move || unsafe { self.at_mut_unchecked(index) })
     }
 
     /// Gets a mutable view of the element at the specified index without bounds checks.
@@ -241,7 +251,7 @@ macro_rules! list_of_list_reader_accessors {
 
             #[inline]
             fn empty_list(&self) -> Reader<$rtrnlt, V, $table> {
-                List::new(ptr::Reader::empty().imbue(self.repr.clone_table_reader()))
+                List::new(ptr::Reader::empty(ElementSize::Pointer).imbue(self.repr.clone_table_reader()))
             }
 
             /// Returns whether this list element is a null pointer.
@@ -400,7 +410,7 @@ where
     #[inline]
     pub fn try_set<F, E>(
         self,
-        value: &Reader<V, impl Table>,
+        value: &Reader<V, impl InsertableInto<T>>,
         err_handler: F,
     ) -> Result<Builder<'b, V, T>, E>
     where
@@ -409,11 +419,198 @@ where
         self.into_ptr_builder()
             .try_set_list(&value.repr, false, err_handler)
             .map(List::new)
+            .map_err(|(err, _)| err)
     }
 
     #[inline]
-    pub fn set(self, value: &Reader<V, impl Table>) -> Builder<'b, V, T> {
+    pub fn set(self, value: &Reader<V, impl InsertableInto<T>>) -> Builder<'b, V, T> {
         List::new(self.into_ptr_builder().set_list(&value.repr, false))
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.ptr_builder().clear()
+    }
+}
+
+macro_rules! list_of_anylist_reader_accessors {
+    ($ptrlt:lifetime, $brrwlt:lifetime, $rtrnlt:lifetime, $table:ident, $repr:ty) => {
+        impl<$ptrlt, $brrwlt, $table> Element<AnyList, $repr>
+        where
+            $table: Table,
+        {
+            #[inline]
+            fn ptr_reader(&self) -> crate::ptr::PtrReader<$rtrnlt, $table> {
+                unsafe { self.repr.ptr_unchecked(self.index) }
+            }
+
+            #[inline]
+            fn empty_list(&self) -> any::ListReader<$rtrnlt, $table> {
+                any::ListReader::new(ptr::Reader::empty(ElementSize::Pointer).imbue(self.repr.clone_table_reader()))
+            }
+
+            /// Returns whether this list element is a null pointer.
+            #[inline]
+            pub fn is_null(&self) -> bool {
+                self.ptr_reader().is_null()
+            }
+
+            /// Returns the list value in this element, or an empty list if the list is null
+            /// or an error occurs while reading.
+            #[inline]
+            pub fn get(&self) -> any::ListReader<$rtrnlt, $table> {
+                match self.try_get_option() {
+                    Ok(Some(reader)) => reader,
+                    _ => self.empty_list(),
+                }
+            }
+
+            /// Returns the list value in this element, or None if the list element is null or
+            /// an error occurs while reading.
+            #[inline]
+            pub fn get_option(&self) -> Option<any::ListReader<$rtrnlt, $table>> {
+                match self.try_get_option() {
+                    Ok(Some(reader)) => Some(reader),
+                    _ => None,
+                }
+            }
+
+            /// Returns the list value in this element. If the element is null, this returns an
+            /// empty list. If an error occurs while reading it is returned.
+            #[inline]
+            pub fn try_get(&self) -> Result<any::ListReader<$rtrnlt, $table>> {
+                match self.try_get_option() {
+                    Ok(Some(reader)) => Ok(reader),
+                    Ok(None) => Ok(self.empty_list()),
+                    Err(err) => Err(err),
+                }
+            }
+
+            /// Returns the list value in this element. If the element is null, this returns Ok(None).
+            /// If an error occurs while reading it is returned.
+            #[inline]
+            pub fn try_get_option(&self) -> Result<Option<any::ListReader<$rtrnlt, $table>>> {
+                match self.ptr_reader().to_list(None) {
+                    Ok(Some(reader)) => Ok(Some(any::ListReader::new(reader))),
+                    Ok(None) => Ok(None),
+                    Err(err) => Err(err),
+                }
+            }
+        }
+    };
+}
+
+// All accessor methods return Lists with the lifetime of 'a
+list_of_anylist_reader_accessors!('a, 'b, 'a, T, &'b ptr::Reader<'a, T>);
+// All accessor methods return Lists with the lifetime of 'b
+list_of_anylist_reader_accessors!('a, 'b, 'b, T, &'b ptr::Builder<'a, T>);
+// All accessor methods return Lists with an infered lifetime based on the accessor's borrow of
+// the element
+list_of_anylist_reader_accessors!('a, 'b, '_, T, &'b mut ptr::Builder<'a, T>);
+
+impl<'a, 'b, T> Element<AnyList, &'b mut ptr::Builder<'a, T>>
+where
+    T: Table,
+{
+    /// Borrows an element, rather than consuming it.
+    ///
+    /// Allows calling multiple builder methods without consuming the element.
+    ///
+    /// # Example
+    ///
+    /// Basic usage:
+    /// ```
+    /// let mut element = list.at(0).unwrap();
+    /// let mut sublist = element.by_ref().get_mut_or_init(2);
+    ///
+    /// // do some processing on the list. in this case, we don't actually know if the list is
+    /// // large enough for our needs. so we use by_ref to keep the original element around and
+    /// // resize if it's not big enough
+    ///
+    /// let mut sublist = element.by_ref().get_mut_or_init(4);
+    #[inline]
+    pub fn by_ref(&mut self) -> Element<AnyList, &mut ptr::Builder<'a, T>> {
+        Element {
+            repr: &mut *self.repr,
+            index: self.index,
+            v: PhantomData,
+        }
+    }
+
+    #[inline]
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+        unsafe { self.repr.ptr_mut_unchecked(self.index) }
+    }
+
+    #[inline]
+    fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
+        unsafe { self.repr.ptr_mut_unchecked(self.index) }
+    }
+
+    /// Gets the value of the element in the list as a builder. If the value is null or invalid
+    /// in some way, an empty list builder is returned.
+    #[inline]
+    pub fn get_mut(self) -> any::ListBuilder<'b, T> {
+        any::ListBuilder::new(self.into_ptr_builder().to_list_mut_or_empty(None))
+    }
+
+    #[inline]
+    pub fn try_get_mut_option(self) -> Result<Option<any::ListBuilder<'b, T>>> {
+        match self.into_ptr_builder().to_list_mut(None) {
+            Ok(ptr) => Ok(Some(any::ListBuilder::new(ptr))),
+            Err((None, _)) => Ok(None),
+            Err((Some(err), _)) => Err(err),
+        }
+    }
+
+    /// Initializes the element as a list with the specified element count. This clears any
+    /// pre-existing value.
+    ///
+    /// # Panics
+    ///
+    /// If the number of elements in the list causes the allocation size to exceed the max
+    /// segment length, this function will panic. Use `V`'s `ELEMENT_SIZE` constant to
+    /// check the max number of elements a list can contain of the value to check this ahead of
+    /// time.
+    #[inline]
+    pub fn init(self, size: ElementSize, count: ElementCount) -> any::ListBuilder<'b, T> {
+        any::ListBuilder::new(self.into_ptr_builder().init_list(size, count))
+    }
+
+    /// Initializes the element as a list with the specified element count. This clears any
+    /// pre-existing value.
+    ///
+    /// If the number of struct elements is too large for a Cap'n Proto message, this returns
+    /// an Err.
+    #[inline]
+    pub fn try_init(
+        self,
+        size: ElementSize,
+        count: ElementCount,
+    ) -> Result<any::ListBuilder<'b, T>> {
+        self.into_ptr_builder()
+            .try_init_list(size, count)
+            .map(any::ListBuilder::new)
+            .map_err(|(err, _)| err)
+    }
+    #[inline]
+    pub fn try_set<F, E>(
+        self,
+        value: &any::ListReader<impl InsertableInto<T>>,
+        err_handler: F,
+    ) -> Result<any::ListBuilder<'b, T>, E>
+    where
+        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
+    {
+        self.into_ptr_builder()
+            .try_set_list(&value.repr, false, err_handler)
+            .map(any::ListBuilder::new)
+            .map_err(|(err, _)| err)
+    }
+
+    #[inline]
+    pub fn set(self, value: &any::ListReader<impl InsertableInto<T>>) -> any::ListBuilder<'b, T> {
+        any::ListBuilder::new(self.into_ptr_builder().set_list(&value.repr, false))
     }
 
     #[inline]
@@ -427,18 +624,6 @@ where
     S: ty::Struct,
     T: Table,
 {
-    /// Initializes the element as a list with the specified element count. This clears any
-    /// pre-existing value.
-    ///
-    /// If the number of struct elements is too large for a Cap'n Proto message, this returns
-    /// an Err.
-    #[inline]
-    pub fn try_init(&mut self, count: ElementCount) -> Result<Builder<Struct<S>, T>> {
-        self.ptr_builder()
-            .try_init_list(<Struct<S> as ty::ListValue>::ELEMENT_SIZE, count)
-            .map(List::new)
-            .map_err(|(err, _)| err)
-    }
 }
 
 impl<'a, 'b, S, T> Element<Struct<S>, &'b mut ptr::Builder<'a, T>>
@@ -477,7 +662,7 @@ where
     /// If an error occurs while reading the struct, null is written instead. If you want a falible
     /// set, use `try_set_with_caveats`.
     #[inline]
-    pub fn set_with_caveats(&mut self, reader: &S::Reader<'_, impl Table>) {
+    pub fn set_with_caveats(&mut self, reader: &S::Reader<'_, impl InsertableInto<T>>) {
         self.try_set_with_caveats::<Infallible, _>(reader, |_| ControlFlow::Continue(WriteNull))
             .unwrap()
     }
@@ -485,7 +670,7 @@ where
     #[inline]
     pub fn try_set_with_caveats<E, F>(
         &mut self,
-        reader: &S::Reader<'_, impl Table>,
+        reader: &S::Reader<'_, impl InsertableInto<T>>,
         err_handler: F,
     ) -> Result<(), E>
     where
@@ -671,6 +856,19 @@ impl<'b, T: DataAccessableMut, E: ty::Enum> ListElement<&'b mut T> for Enum<E> {
 }
 
 impl<Repr, V> ListElement<Repr> for List<V> {
+    type View = Element<Self, Repr>;
+
+    #[inline]
+    unsafe fn get(repr: Repr, index: u32) -> Self::View {
+        Element {
+            repr,
+            index,
+            v: PhantomData,
+        }
+    }
+}
+
+impl<Repr> ListElement<Repr> for AnyList {
     type View = Element<Self, Repr>;
 
     #[inline]

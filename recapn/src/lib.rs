@@ -5,7 +5,7 @@
 #![feature(slice_from_ptr_range)]
 #![feature(slice_ptr_get)]
 
-use ptr::WirePtr;
+use ptr::{PtrElementSize, WirePtr};
 use thiserror::Error;
 
 #[doc(hidden)]
@@ -56,7 +56,7 @@ pub mod field;
 
 // Layer 3 : Extensions
 // pub mod schema;
-pub mod compiler;
+// pub mod compiler;
 // pub mod dynamic;
 
 #[doc(hidden)]
@@ -155,8 +155,8 @@ pub(crate) enum ErrorKind {
     /// we validate a list pointer which has upgraded to an inline composite, but has no data
     /// section when the list element size is one, two, four, or eight bytes, or has no pointer
     /// section when the list element is a pointer.
-    #[error("incompatible list upgrade")]
-    IncompatibleUpgrade,
+    #[error("{0}")]
+    IncompatibleUpgrade(ptr::IncompatibleUpgrade),
     /// Capabilities are not allowed in this context, likely because it is canonical or it has an empty cap table.
     #[error("capability not allowed in this context")]
     CapabilityNotAllowed,
@@ -167,10 +167,6 @@ pub(crate) enum ErrorKind {
     /// The message contained text that is not NUL-terminated, or wasn't large enough to contain one.
     #[error("text wasn't NUL terminated")]
     TextNotNulTerminated,
-    /// We can't copy a struct from a struct reader because one of its sections is pointing to one
-    /// of our sections and the other one isn't.
-    #[error("invalid struct overlap")]
-    InvalidStructOverlap,
     /// When reading a message, we followed a far pointer to another segment, but the segment
     /// didn't exist.
     #[error("missing segment {0}")]
@@ -204,13 +200,18 @@ impl Error {
                             Struct => ptr::ActualRead::Struct,
                             Far => ptr::ActualRead::Far,
                             Other => ptr::ActualRead::Other,
-                            List => {
-                                ptr::ActualRead::List(actual.list_ptr().unwrap().element_size())
-                            }
+                            List => ptr::ActualRead::List,
                         }
                     }
                 },
             }),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn fail_upgrade(from: PtrElementSize, to: PtrElementSize) -> Self {
+        Self {
+            kind: ErrorKind::IncompatibleUpgrade(ptr::IncompatibleUpgrade { from, to }),
         }
     }
 }
