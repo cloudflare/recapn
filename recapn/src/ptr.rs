@@ -1,3 +1,5 @@
+//! Manually manage Cap'n Proto data through raw readers and builders
+
 use crate::alloc::{
     u29, AllocLen, ElementCount, ObjectLen, SegmentOffset, SignedSegmentOffset, Word,
 };
@@ -6,16 +8,21 @@ use crate::message::internal::{
 };
 use crate::message::SegmentId;
 use crate::rpc::internal::CapPtrBuilder;
-use crate::rpc::{BreakableCapSystem, CapTable, CapTableReader, Empty, InsertableInto, Table};
+use crate::rpc::{
+    BreakableCapSystem, CapTable, CapTableReader, Capable, Empty, InsertableInto, Table,
+};
+use crate::text::ByteCount as TextByteCount;
 use crate::ty;
 use crate::{Error, ErrorKind, Result};
 use core::borrow::BorrowMut;
 use core::convert::{Infallible, TryFrom};
 use core::fmt::Debug;
-use core::marker::PhantomData;
 use core::ops::ControlFlow;
 use core::ptr::{self, NonNull};
 use core::{fmt, slice};
+
+pub use crate::data::ptr::{Reader as DataReader, Builder as DataBuilder};
+pub use crate::text::ptr::{Reader as TextReader, Builder as TextBuilder};
 
 pub(crate) mod internal {
     use super::*;
@@ -28,15 +35,7 @@ pub(crate) mod internal {
         unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self);
     }
 
-    impl<T: FieldData> crate::internal::Sealed for T {}
-
-    impl ty::Value for Bool {
-        type Default = Self;
-    }
-    impl ty::ListValue for Bool {
-        const ELEMENT_SIZE: ElementSize = ElementSize::Bit;
-    }
-    impl FieldData for Bool {
+    impl FieldData for bool {
         #[inline]
         unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
             let byte_offset = slot / 8;
@@ -71,13 +70,7 @@ pub(crate) mod internal {
     }
 
     macro_rules! impl_int {
-        ($ty:ty, $size:ident) => {
-            impl ty::Value for $ty {
-                type Default = Self;
-            }
-            impl ty::ListValue for $ty {
-                const ELEMENT_SIZE: ElementSize = ElementSize::$size;
-            }
+        ($ty:ty) => {
             impl FieldData for $ty {
                 #[inline]
                 unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
@@ -118,85 +111,98 @@ pub(crate) mod internal {
         };
     }
 
-    impl_int!(UInt8, Byte);
-    impl_int!(Int8, Byte);
-    impl_int!(UInt16, TwoBytes);
-    impl_int!(Int16, TwoBytes);
-    impl_int!(UInt32, FourBytes);
-    impl_int!(Int32, FourBytes);
-    impl_int!(UInt64, EightBytes);
-    impl_int!(Int64, EightBytes);
+    impl_int!(u8);
+    impl_int!(i8);
+    impl_int!(u16);
+    impl_int!(i16);
+    impl_int!(u32);
+    impl_int!(i32);
+    impl_int!(u64);
+    impl_int!(i64);
+
+    impl FieldData for f32 {
+        #[inline]
+        unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+            Self::from_bits(u32::read(ptr, len_bytes, slot, default.to_bits()))
+        }
+        #[inline]
+        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+            Self::from_bits(u32::read_unchecked(ptr, slot, default.to_bits()))
+        }
+
+        #[inline]
+        unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
+            u32::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
+        }
+        #[inline]
+        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+            u32::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
+        }
+    }
+
+    impl FieldData for f64 {
+        #[inline]
+        unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+            Self::from_bits(u64::read(ptr, len_bytes, slot, default.to_bits()))
+        }
+        #[inline]
+        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+            Self::from_bits(u64::read_unchecked(ptr, slot, default.to_bits()))
+        }
+
+        #[inline]
+        unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
+            u64::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
+        }
+        #[inline]
+        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+            u64::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
+        }
+    }
 }
 
-/// A void value, represented as a unit.
-pub type Void = ();
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+pub struct WireValue<T>(T);
 
-pub type Bool = bool;
-
-pub type Int8 = i8;
-pub type Int16 = i16;
-pub type Int32 = i32;
-pub type Int64 = i64;
-
-pub type UInt8 = u8;
-pub type UInt16 = u16;
-pub type UInt32 = u32;
-pub type UInt64 = u64;
-
-pub type Float32 = f32;
-pub type Float64 = f64;
-
-pub trait ToLittleEndian {
-    fn to_le(self) -> Self;
-}
-
-macro_rules! to_le {
-    ($($ty:ty: $i:ident => $ex:expr),+) => {
-        $(impl ToLittleEndian for $ty {
+macro_rules! wire_value_type {
+    ($($ty:ty),+) => {
+        $(impl WireValue<$ty> {
             #[inline]
-            fn to_le(self) -> Self {
-                let $i = self;
-                $ex
+            pub const fn new(value: $ty) -> Self {
+                Self(value.to_le())
+            }
+
+            #[inline]
+            pub const fn get(&self) -> $ty {
+                self.0.to_le()
+            }
+
+            #[inline]
+            pub fn set(&mut self, value: $ty) {
+                self.0 = value.to_le();
+            }
+
+            #[inline]
+            pub fn from_word_slice<'a>(words: &'a [Word]) -> &'a [Self] {
+                let (_, values, _) = unsafe { words.align_to() };
+                values
+            }
+
+            #[inline]
+            pub fn from_word_slice_mut<'a>(words: &'a mut [Word]) -> &'a mut [Self] {
+                let (_, values, _) = unsafe { words.align_to_mut() };
+                values
             }
         })+
     };
 }
 
-to_le! {
-    u8:  i => i.to_le(),
-    i8:  i => i.to_le(),
-    u16: i => i.to_le(),
-    i16: i => i.to_le(),
-    u32: i => i.to_le(),
-    i32: i => i.to_le(),
-    u64: i => i.to_le(),
-    i64: i => i.to_le()
+wire_value_type! {
+    u8, i8, u16, i16, u32, i32, u64, i64
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[repr(transparent)]
-struct WireValue<T>(T);
-impl<T: ToLittleEndian + Copy> WireValue<T> {
-    pub fn new(value: T) -> Self {
-        Self(value.to_le())
-    }
-
-    pub fn get(&self) -> T {
-        self.0.to_le()
-    }
-
-    pub fn set(&mut self, value: T) {
-        self.0 = value.to_le();
-    }
-}
-
-impl<T: ToLittleEndian + Copy> From<T> for WireValue<T> {
-    fn from(value: T) -> Self {
-        Self::new(value)
-    }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MessageSize {
     pub words: u64,
     pub caps: u32,
@@ -220,7 +226,7 @@ impl core::ops::AddAssign for MessageSize {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructSize {
     /// The number of words of data in this struct
     pub data: u16,
@@ -231,22 +237,47 @@ pub struct StructSize {
 impl StructSize {
     pub const EMPTY: StructSize = StructSize { data: 0, ptrs: 0 };
 
-    pub const fn is_empty(&self) -> bool {
-        matches!(*self, Self::EMPTY)
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        matches!(self, Self::EMPTY)
     }
 
     /// Gets the total size of the struct in words
-    pub const fn total(&self) -> u32 {
+    #[inline]
+    pub const fn total(self) -> u32 {
         self.data as u32 + self.ptrs as u32
     }
 
     /// Gets the max number of elements an struct list can contain of this struct
-    pub const fn max_elements(&self) -> ElementCount {
+    #[inline]
+    pub const fn max_elements(self) -> ElementCount {
         if self.is_empty() {
             ElementCount::MAX
         } else {
             // subtract 1 for the tag ptr
             ElementCount::new((ElementCount::MAX_VALUE - 1) / (self.total())).unwrap()
+        }
+    }
+
+    /// Calculate the max struct size of two sizes. This chooses the max data and pointer section
+    /// sizes from the given struct sizes.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::StructSize;
+    /// 
+    /// let a = StructSize { data: 2, ptrs: 0 };
+    /// let b = StructSize { data: 0, ptrs: 5 };
+    /// 
+    /// let c = StructSize::max(a, b);
+    /// assert_eq!(c, StructSize { data: 2, ptrs: 5 });
+    /// ```
+    #[inline]
+    pub fn max(self, other: Self) -> Self {
+        Self {
+            data: self.data.max(other.data),
+            ptrs: self.ptrs.max(other.ptrs),
         }
     }
 }
@@ -419,14 +450,17 @@ impl StructPtr {
     pub const fn new(offset: SignedSegmentOffset, StructSize { data, ptrs }: StructSize) -> Self {
         Self {
             parts: Parts {
-                upper: WireValue((data as u32 | ((ptrs as u32) << 16)).to_le()),
-                lower: WireValue(((offset.get() << 2) as u32).to_le()),
+                upper: WireValue::<u32>::new(data as u32 | ((ptrs as u32) << 16)),
+                lower: WireValue::<u32>::new((offset.get() << 2) as u32),
             },
         }
     }
 
     #[inline]
-    pub const fn new_inline_composite_tag(count: ElementCount, StructSize { data, ptrs }: StructSize) -> Self {
+    pub const fn new_inline_composite_tag(
+        count: ElementCount,
+        StructSize { data, ptrs }: StructSize,
+    ) -> Self {
         Self {
             parts: Parts {
                 upper: WireValue((data as u32 | ((ptrs as u32) << 16)).to_le()),
@@ -536,10 +570,13 @@ impl ElementSize {
         match (self, other) {
             // Structs can always upgrade to other inline composites
             (ElementSize::InlineComposite(_), PtrElementSize::InlineComposite) => true,
+            // But can't be upgraded to bit lists
             (ElementSize::InlineComposite(_), PtrElementSize::Bit) => false,
+            // Structs need one pointer field to upgrade to a pointer list
             (ElementSize::InlineComposite(StructSize { ptrs: 0, .. }), PtrElementSize::Pointer) => {
                 false
             }
+            // And need one data word to upgrade to a data list
             (
                 ElementSize::InlineComposite(StructSize { data: 0, .. }),
                 PtrElementSize::Byte
@@ -549,11 +586,40 @@ impl ElementSize {
             ) => false,
             (ElementSize::Bit, PtrElementSize::Bit) => true,
             (ElementSize::Pointer, PtrElementSize::Pointer) => true,
+            // This upgrade is valid as long as the new data is larger than the old
             (s, o) if s.bits() >= o.bits() => true,
             _ => false,
         }
     }
 
+    /// Gets the ElementSize of the given static list value type.
+    #[inline]
+    pub const fn size_of<T: ty::ListValue>() -> ElementSize {
+        <T as ty::ListValue>::ELEMENT_SIZE
+    }
+
+    /// Gets a suitable ElementSize for an empty list of the given list value type.
+    /// 
+    /// This is written to support empty default list readers, specifically empty lists
+    /// of any struct, which need an element size for the inline composite elements.
+    /// `AnyStruct` does not implement `ListValue` since it doesn't have a static
+    /// list element size, so we use this and specify an empty inline composite element
+    /// for empty lists.
+    #[inline]
+    pub const fn empty_size_of<T: ty::DynListValue>() -> ElementSize {
+        match PtrElementSize::size_of::<T>() {
+            PtrElementSize::Void => ElementSize::Void,
+            PtrElementSize::Bit => ElementSize::Bit,
+            PtrElementSize::Byte => ElementSize::Byte,
+            PtrElementSize::TwoBytes => ElementSize::TwoBytes,
+            PtrElementSize::FourBytes => ElementSize::FourBytes,
+            PtrElementSize::EightBytes => ElementSize::EightBytes,
+            PtrElementSize::Pointer => ElementSize::Pointer,
+            PtrElementSize::InlineComposite => ElementSize::InlineComposite(StructSize::EMPTY),
+        }
+    }
+
+    #[inline]
     pub const fn as_ptr_size(&self) -> PtrElementSize {
         match self {
             ElementSize::Void => PtrElementSize::Void,
@@ -632,6 +698,10 @@ impl PtrElementSize {
             _ => 0,
         }
     }
+
+    pub const fn size_of<T: ty::DynListValue>() -> Self {
+        <T as ty::DynListValue>::PTR_ELEMENT_SIZE
+    }
 }
 
 #[repr(transparent)]
@@ -642,11 +712,15 @@ pub struct ListPtr {
 
 impl ListPtr {
     #[inline]
-    pub fn new(offset: SignedSegmentOffset, size: PtrElementSize, count: ElementCount) -> Self {
+    pub const fn new(
+        offset: SignedSegmentOffset,
+        size: PtrElementSize,
+        count: ElementCount,
+    ) -> Self {
         Self {
             parts: Parts {
-                upper: WireValue::new(count.get() << 3 | size as u32),
-                lower: WireValue::new((offset.get() << 2) as u32 | WireKind::List as u32),
+                upper: WireValue::<u32>::new(count.get() << 3 | size as u32),
+                lower: WireValue::<u32>::new((offset.get() << 2) as u32 | WireKind::List as u32),
             },
         }
     }
@@ -703,11 +777,11 @@ pub struct FarPtr {
 }
 
 impl FarPtr {
-    pub fn new(segment: SegmentId, offset: SegmentOffset, double_far: bool) -> Self {
+    pub const fn new(segment: SegmentId, offset: SegmentOffset, double_far: bool) -> Self {
         Self {
             parts: Parts {
-                upper: WireValue::new(segment),
-                lower: WireValue::new(
+                upper: WireValue::<u32>::new(segment),
+                lower: WireValue::<u32>::new(
                     (offset.get() << 3) | ((double_far as u32) << 2) | WireKind::Far as u32,
                 ),
             },
@@ -867,6 +941,18 @@ impl fmt::Display for IncompatibleUpgrade {
     }
 }
 
+/// Describes the location of an object in a Cap'n Proto message. This can be used to create
+/// pointers directly into a message without needing to navigate through the message tree.
+pub struct Address {
+    pub segment: SegmentId,
+    pub offset: SegmentOffset,
+}
+
+impl Address {
+    /// The root address of a message.
+    pub const ROOT: Self = Self { segment: 0, offset: SegmentOffset::MIN };
+}
+
 /// A control flow struct used to signal that when an error occurs, the destination pointer
 /// should be null.
 ///
@@ -881,7 +967,7 @@ pub struct WriteNull;
 
 /// A struct to help with reading objects.
 #[derive(Clone, Debug)]
-struct ObjectReader<'a> {
+pub(crate) struct ObjectReader<'a> {
     /// The segment reader associated with an object. If no segment is provided, we don't
     /// perform length checks on relative pointers since it's assumed to be always valid.
     segment: Option<SegmentReader<'a>>,
@@ -891,16 +977,7 @@ struct ObjectReader<'a> {
 }
 
 impl<'a> ObjectReader<'a> {
-    pub const fn is_unchecked(&self) -> bool {
-        matches!(
-            self,
-            ObjectReader {
-                segment: None,
-                limiter: None
-            }
-        )
-    }
-
+    #[inline]
     pub unsafe fn section_slice(&self, ptr: SegmentRef<'a>, len: SegmentOffset) -> &[Word] {
         if let Some(segment) = &self.segment {
             debug_assert!(segment.try_get_section(ptr.into(), len).is_some());
@@ -1020,7 +1097,7 @@ impl<'a> ObjectReader<'a> {
 }
 
 /// Describes the content at a location.
-struct Content<'a, A> {
+pub(crate) struct Content<'a, A> {
     /// An accessor to get the content.
     pub accessor: A,
     /// The pointer that describes the content. This may not be in the same segment as
@@ -1032,7 +1109,7 @@ struct Content<'a, A> {
 }
 
 /// Describes the location at some content.
-enum Location {
+pub(crate) enum Location {
     /// A near location. The content is in the same segment as the original pointer to the content.
     Near,
     /// A far location. The pointer that describes the content is in the same segment as the
@@ -1048,36 +1125,65 @@ enum Location {
     },
 }
 
-/// Describes a type which can be imbued with a cap system.
-pub trait Capable: Sized {
-    type Table: Table;
-    type Imbued<T2: Table>: Capable<Table = T2>;
-}
+fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Result<MessageSize> {
+    let Content { 
+        accessor: reader,
+        ptr,
+        location,
+    } = reader.clone().location_of(ptr)?;
 
-pub type TableIn<T> = <T as Capable>::Table;
+    let wire_ptr = ptr.as_wire_ptr();
+    match wire_ptr.kind() {
+        WireKind::Struct => {
+            let struct_ptr = wire_ptr.struct_ptr().unwrap();
+            let len = struct_ptr.len();
+            let (struct_start, reader) = match location {
+                Location::Near | Location::Far => {
+                    reader.try_read_object_from_end_of(ptr.into(), struct_ptr.offset(), len)
+                }
+                Location::DoubleFar { segment, offset } => {
+                    reader.try_read_object_in(segment, offset, len)
+                }
+            }?;
 
-/// Describes a reader type which can be imbued with a cap table reader.
-pub trait CapableReader: Capable {
-    fn imbue_release<T2: Table>(
-        self,
-        new_table: T2::Reader,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Reader);
+            let ptrs_start = unsafe {
+                struct_start
+                    .offset(struct_ptr.data_size().into())
+                    .as_ref_unchecked()
+            };
 
-    fn imbue<T2: Table>(self, new_table: T2::Reader) -> Self::Imbued<T2> {
-        self.imbue_release(new_table).0
+            let struct_size = MessageSize { words: len.get() as u64, caps: 0 };
+            let ptrs_total_size = total_struct_ptrs_size(
+                &reader, ptrs_start, struct_ptr.ptr_count(), nesting_limit)?;
+
+            Ok(struct_size + ptrs_total_size)
+        }
+        WireKind::List => {
+            todo!()
+        }
+        WireKind::Other => {
+            let _ = wire_ptr.try_cap_ptr()?;
+            return Ok(MessageSize { words: 0, caps: 1 })
+        }
+        WireKind::Far => {
+            return Err(wire_ptr.fail_read(None))
+        }
     }
 }
 
-/// Describes a builder type which can be imbued with a cap table builder.
-pub trait CapableBuilder: Capable {
-    fn imbue_release<T2: Table>(
-        self,
-        new_table: T2::Builder,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Builder);
+/// Calculate the sizes of all pointer targets in this struct
+fn total_struct_ptrs_size(reader: &ObjectReader, ptrs_start: SegmentRef, ptrs_len: u16, nesting_limit: u32) -> Result<MessageSize> {
+    let mut total_size = MessageSize { words: 0, caps: 0 };
 
-    fn imbue<T2: Table>(self, new_table: T2::Builder) -> Self::Imbued<T2> {
-        self.imbue_release(new_table).0
+    let iter = unsafe { ptrs_start.iter_unchecked(ptrs_len.into()) };
+    for ptr in iter.filter(|w| !w.as_ref().is_null()) {
+        let nesting_limit = nesting_limit.checked_sub(1)
+            .ok_or_else(|| Error::from(ErrorKind::NestingLimitExceeded))?;
+
+        total_size += target_size(reader, ptr, nesting_limit)?;
     }
+
+    Ok(total_size)
 }
 
 pub struct PtrReader<'a, T: Table = Empty> {
@@ -1127,8 +1233,8 @@ impl<'a> PtrReader<'a, Empty> {
         }
     }
 
-    pub fn null() -> Self {
-        unsafe { Self::new_unchecked(NonNull::from(Word::null())) }
+    pub const fn null() -> Self {
+        unsafe { Self::new_unchecked(NonNull::new_unchecked(Word::null() as *const _ as *mut _)) }
     }
 }
 
@@ -1144,8 +1250,15 @@ impl<'a, T: Table> PtrReader<'a, T> {
     }
 
     #[inline]
-    pub(crate) fn clone_table(&self) -> T::Reader {
-        self.table.clone()
+    pub fn target_size(&self) -> Result<MessageSize> {
+        if self.ptr().is_null() {
+            return Ok(MessageSize { words: 0, caps: 0 })
+        }
+
+        let nesting_limit = self.nesting_limit.checked_sub(1)
+            .ok_or_else(|| ErrorKind::NestingLimitExceeded)?;
+
+        target_size(&self.reader, self.ptr, nesting_limit)
     }
 
     #[inline]
@@ -1381,7 +1494,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
     }
 
     #[inline]
-    pub fn to_text(&self) -> Result<Option<BlobReader<'a>>> {
+    pub fn to_text(&self) -> Result<Option<TextReader<'a>>> {
         if self.is_null() {
             return Ok(None);
         }
@@ -1389,7 +1502,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         self.to_text_inner().map(Some)
     }
 
-    fn to_text_inner(&self) -> Result<BlobReader<'a>> {
+    fn to_text_inner(&self) -> Result<TextReader<'a>> {
         let Content {
             accessor: reader,
             ptr,
@@ -1403,9 +1516,10 @@ impl<'a, T: Table> PtrReader<'a, T> {
         }
 
         let element_count = list_ptr.element_count();
-        let Some(len) = ObjectLen::new(Word::round_up_byte_count(element_count.into())) else {
+        let Some(text_byte_count) = TextByteCount::new(element_count.into()) else {
             return Err(ErrorKind::TextNotNulTerminated.into());
         };
+        let len = ObjectLen::new(Word::round_up_byte_count(element_count.into())).unwrap();
         let (ptr, _) = match location {
             Location::Near | Location::Far => {
                 reader.try_read_object_from_end_of(ptr.into(), list_ptr.offset(), len)
@@ -1421,15 +1535,11 @@ impl<'a, T: Table> PtrReader<'a, T> {
             return Err(ErrorKind::TextNotNulTerminated.into());
         }
 
-        Ok(BlobReader {
-            a: PhantomData,
-            ptr: data,
-            len: element_count.into(),
-        })
+        Ok(unsafe { TextReader::new_unchecked(data, text_byte_count) })
     }
 
     #[inline]
-    pub fn to_data(&self) -> Result<Option<BlobReader<'a>>> {
+    pub fn to_data(&self) -> Result<Option<DataReader<'a>>> {
         if self.is_null() {
             return Ok(None);
         }
@@ -1437,7 +1547,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         self.to_data_inner().map(Some)
     }
 
-    fn to_data_inner(&self) -> Result<BlobReader<'a>> {
+    fn to_data_inner(&self) -> Result<DataReader<'a>> {
         let Content {
             accessor: reader,
             ptr,
@@ -1450,10 +1560,8 @@ impl<'a, T: Table> PtrReader<'a, T> {
             return Err(Error::fail_upgrade(element_size, PtrElementSize::Byte));
         }
 
-        let element_count = list_ptr.element_count().get();
-        let Some(len) = ObjectLen::new(Word::round_up_byte_count(element_count)) else {
-            return Ok(BlobReader::empty());
-        };
+        let element_count = list_ptr.element_count();
+        let len = ObjectLen::new(Word::round_up_byte_count(element_count.into())).unwrap();
         let (ptr, _) = match location {
             Location::Near | Location::Far => {
                 reader.try_read_object_from_end_of(ptr.into(), list_ptr.offset(), len)
@@ -1463,22 +1571,21 @@ impl<'a, T: Table> PtrReader<'a, T> {
             }
         }?;
 
-        Ok(BlobReader {
-            a: PhantomData,
-            ptr: ptr.as_inner().cast(),
-            len: element_count,
-        })
+        Ok(unsafe { DataReader::new_unchecked(ptr.as_inner().cast(), element_count) })
     }
 }
 
 impl<'a, T: Table> Capable for PtrReader<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = PtrReader<'a, T2>;
-}
 
-impl<T: Table> CapableReader for PtrReader<'_, T> {
+    type Imbued = T::Reader;
+    type ImbuedWith<T2: Table> = PtrReader<'a, T2>;
+
     #[inline]
-    fn imbue_release<T2: Table>(self, new_table: T2::Reader) -> (Self::Imbued<T2>, T::Reader) {
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
+    fn imbue_release<T2: Table>(self, new_table: T2::Reader) -> (Self::ImbuedWith<T2>, T::Reader) {
         let old_table = self.table;
         let ptr = PtrReader {
             ptr: self.ptr,
@@ -1487,6 +1594,15 @@ impl<T: Table> CapableReader for PtrReader<'_, T> {
             nesting_limit: self.nesting_limit,
         };
         (ptr, old_table)
+    }
+
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
     }
 }
 
@@ -1651,14 +1767,6 @@ impl<'a> StructReader<'a, Empty> {
 }
 
 impl<'a, T: Table> StructReader<'a, T> {
-    /// Returns whether this struct can fit in the space allocated to a struct of the specified size
-    #[inline]
-    const fn fits(&self, size: StructSize) -> bool {
-        let data_fits = Word::round_up_byte_count(self.data_len as u32) as u16 <= size.data;
-        let ptrs_fit = self.ptrs_len <= size.ptrs;
-        data_fits && ptrs_fit
-    }
-
     fn size(&self, canonical: bool) -> (StructSize, &[u8]) {
         let mut data_section = self.data_section();
         let mut ptrs_len = self.ptrs_len;
@@ -1684,6 +1792,17 @@ impl<'a, T: Table> StructReader<'a, T> {
             },
             data_section,
         )
+    }
+
+    #[inline]
+    pub fn total_size(&self) -> Result<MessageSize> {
+        let struct_len = Word::round_up_byte_count(self.data_len) + self.ptrs_len as u32;
+        let struct_size = MessageSize { words: struct_len as u64, caps: 0 };
+
+        let ptrs_targets_size = total_struct_ptrs_size(
+            &self.reader, self.ptrs_start, self.ptrs_len, self.nesting_limit)?;
+
+        Ok(struct_size + ptrs_targets_size)
     }
 
     #[inline]
@@ -1790,11 +1909,15 @@ impl<'a, T: Table> Clone for StructReader<'a, T> {
 
 impl<'a, T: Table> Capable for StructReader<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = StructReader<'a, T2>;
-}
 
-impl<T: Table> CapableReader for StructReader<'_, T> {
-    fn imbue_release<T2: Table>(self, new_table: T2::Reader) -> (Self::Imbued<T2>, T::Reader) {
+    type Imbued = T::Reader;
+    type ImbuedWith<T2: Table> = StructReader<'a, T2>;
+
+    #[inline]
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
+    fn imbue_release<T2: Table>(self, new_table: T2::Reader) -> (Self::ImbuedWith<T2>, T::Reader) {
         let old_table = self.table;
         let ptr = StructReader {
             data_start: self.data_start,
@@ -1806,6 +1929,15 @@ impl<T: Table> CapableReader for StructReader<'_, T> {
             ptrs_len: self.ptrs_len,
         };
         (ptr, old_table)
+    }
+
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
     }
 }
 
@@ -1828,10 +1960,26 @@ pub struct ListReader<'a, T: Table = Empty> {
     element_size: PtrElementSize,
 }
 
+impl<T: Table> Clone for ListReader<'_, T> {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: self.ptr.clone(),
+            reader: self.reader.clone(),
+            table: self.table.clone(),
+            element_count: self.element_count.clone(),
+            nesting_limit: self.nesting_limit.clone(),
+            step: self.step.clone(),
+            struct_data_len: self.struct_data_len.clone(),
+            struct_ptrs_len: self.struct_ptrs_len.clone(),
+            element_size: self.element_size.clone(),
+        }
+    }
+}
+
 impl ListReader<'_, Empty> {
     /// Creates an empty list of the specific element size.
-    pub fn empty(element_size: ElementSize) -> Self {
-        unsafe { Self::new_unchecked(NonNull::dangling(), 0.into(), element_size) }
+    pub const fn empty(element_size: ElementSize) -> Self {
+        unsafe { Self::new_unchecked(NonNull::dangling(), ElementCount::MIN, element_size) }
     }
 
     pub const unsafe fn new_unchecked(
@@ -1864,11 +2012,6 @@ impl ListReader<'_, Empty> {
 }
 
 impl<'a, T: Table> ListReader<'a, T> {
-    #[inline]
-    pub(crate) fn clone_table_reader(&self) -> T::Reader {
-        self.table.clone()
-    }
-
     fn as_slice(&self) -> &[Word] {
         let elements = u64::from(self.element_count.get());
         let size_bits = u64::from(self.element_size.data_bits());
@@ -1937,14 +2080,14 @@ impl<'a, T: Table> ListReader<'a, T> {
         debug_assert!({
             match self.element_size {
                 PtrElementSize::Void | PtrElementSize::Pointer => false,
-                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<Bool>(),
+                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<bool>(),
                 PtrElementSize::InlineComposite => self.struct_data_len != 0,
                 size => PtrElementSize::from(D::ELEMENT_SIZE).data_bytes() <= size.data_bytes(),
             }
         }, "attempted to access invalid data for this list; list element size: {:?}, data type: {}",
         self.element_size, core::any::type_name::<D>());
 
-        if TypeId::of::<D>() == TypeId::of::<Bool>() {
+        if TypeId::of::<D>() == TypeId::of::<bool>() {
             D::read_unchecked(self.ptr(), index as usize, D::default())
         } else {
             let ptr = self.ptr().add(self.index_to_offset(index));
@@ -2010,19 +2153,19 @@ impl<'a, T: Table> ListReader<'a, T> {
             ptrs_len: self.struct_ptrs_len,
         }
     }
-
 }
 
 impl<'a, T: Table> Capable for ListReader<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = ListReader<'a, T2>;
-}
 
-impl<T: Table> CapableReader for ListReader<'_, T> {
-    fn imbue_release<T2: Table>(
-        self,
-        new_table: T2::Reader,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Reader) {
+    type Imbued = T::Reader;
+    type ImbuedWith<T2: Table> = ListReader<'a, T2>;
+
+    #[inline]
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
+    fn imbue_release<T2: Table>(self, new_table: T2::Reader) -> (Self::ImbuedWith<T2>, T::Reader) {
         let old_table = self.table;
         let ptr = ListReader {
             ptr: self.ptr,
@@ -2037,36 +2180,20 @@ impl<T: Table> CapableReader for ListReader<'_, T> {
         };
         (ptr, old_table)
     }
-}
 
-/// A reader for the blob types Data and Text
-pub struct BlobReader<'a> {
-    a: PhantomData<&'a [u8]>,
-    ptr: NonNull<u8>,
-    len: u32,
-}
-
-impl<'a> BlobReader<'a> {
-    pub const fn empty() -> Self {
-        Self {
-            a: PhantomData,
-            ptr: NonNull::dangling(),
-            len: 0,
-        }
-    }
-
-    pub const fn ptr(&self) -> NonNull<u8> {
-        self.ptr
-    }
-
-    pub const fn len(&self) -> u32 {
-        self.len
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
     }
 }
 
 /// A helper struct for building objects in a message
 #[derive(Clone, Debug)]
-struct ObjectBuilder<'a> {
+pub(crate) struct ObjectBuilder<'a> {
     segment: SegmentBuilder<'a>,
 }
 
@@ -2080,6 +2207,11 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
+    pub fn is_same_message(&self, other: &ObjectBuilder) -> bool {
+        self.segment.arena() == other.segment.arena()
+    }
+
+    #[inline]
     pub fn id(&self) -> SegmentId {
         self.segment.id()
     }
@@ -2089,12 +2221,16 @@ impl<'a> ObjectBuilder<'a> {
         if let Some(far) = ptr.as_wire_ptr().far_ptr() {
             let segment = far.segment();
             let double_far = far.double_far();
-            let (ptr, reader) = self.build_object_in(segment, far.offset())
+            let (ptr, reader) = self
+                .build_object_in(segment, far.offset())
                 .expect("far pointer cannot point to a read-only segment");
 
             if double_far {
                 let tag = unsafe { ptr.offset(1.into()).as_ref_unchecked() };
-                let far_ptr = ptr.as_wire_ptr().try_far_ptr().expect("malformed double far in builder");
+                let far_ptr = ptr
+                    .as_wire_ptr()
+                    .try_far_ptr()
+                    .expect("malformed double far in builder");
                 Content {
                     accessor: reader,
                     ptr: tag,
@@ -2144,17 +2280,15 @@ impl<'a> ObjectBuilder<'a> {
 
     #[inline]
     pub fn set_ptr(&self, ptr: SegmentRef<'a>, value: impl Into<WirePtr>) {
-        debug_assert!(self.segment.contains(ptr.into()), "segment does not contain ptr: {:?}; segment: {:?}", ptr.as_ptr(), &self.segment);
+        debug_assert!(
+            self.segment.contains(ptr.into()),
+            "segment does not contain ptr: {:?}; segment: {:?}",
+            ptr.as_ptr(),
+            &self.segment
+        );
 
         let value = value.into();
         unsafe { *ptr.as_ptr_mut() = Word::from(value) }
-    }
-
-    #[inline]
-    pub fn section_slice(&self, start: SegmentRef<'a>, offset: SegmentOffset) -> &'a [Word] {
-        debug_assert!(self.segment.contains_section(start, offset));
-
-        unsafe { slice::from_raw_parts(start.as_ptr(), offset.get() as usize) }
     }
 
     #[inline]
@@ -2197,7 +2331,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    fn alloc_in_arena(&self, size: AllocLen) -> (SegmentRef<'a>, Self) {
+    pub fn alloc_in_arena(&self, size: AllocLen) -> (SegmentRef<'a>, Self) {
         let (r, s) = self.segment.arena().alloc(size);
         (r, Self { segment: s })
     }
@@ -2249,7 +2383,7 @@ impl<'a> ObjectBuilder<'a> {
         let element_bits = element_size.bits() as u64;
         let total_words = Word::round_up_bit_count((element_count.get() as u64) * element_bits);
 
-        let tag_size = if is_struct_list { 1 } else { 0 }; // 1 for true, 0 for false
+        let tag_size = if is_struct_list { 1 } else { 0 };
         let total_size = total_words + tag_size;
         if total_size == 0 {
             let end = self.segment.end();
@@ -2288,7 +2422,10 @@ impl<'a> ObjectBuilder<'a> {
             let offset_to_pad = segment.segment.offset_from_start(pad.into());
 
             self.set_ptr(ptr, FarPtr::new(segment.id(), offset_to_pad, false));
-            segment.set_ptr(pad, ListPtr::new(0i16.into(), element_size.into(), list_ptr_element_count));
+            segment.set_ptr(
+                pad,
+                ListPtr::new(0i16.into(), element_size.into(), list_ptr_element_count),
+            );
 
             (start, segment)
         } else {
@@ -2299,7 +2436,10 @@ impl<'a> ObjectBuilder<'a> {
         };
 
         let start = if let ElementSize::InlineComposite(size) = element_size {
-            segment.set_ptr(start, StructPtr::new_inline_composite_tag(element_count, size));
+            segment.set_ptr(
+                start,
+                StructPtr::new_inline_composite_tag(element_count, size),
+            );
 
             unsafe { start.offset(1u16.into()).as_ref_unchecked() }
         } else {
@@ -2332,7 +2472,9 @@ impl<'a> ObjectBuilder<'a> {
         // I'm pretty sure if we can't add even one more word to a list allocation then the list
         // takes up the whole segment, which means this has to be 0, but I'm not taking chances.
         // Change it if you think it actually really matters.
-        let pad_builder = ObjectBuilder { segment: pad_segment };
+        let pad_builder = ObjectBuilder {
+            segment: pad_segment,
+        };
         let offset_to_list = list_segment.segment.offset_from_start(start.into());
         pad_builder.set_ptr(pad, FarPtr::new(list_segment.id(), offset_to_list, false));
         pad_builder.set_ptr(
@@ -2344,22 +2486,36 @@ impl<'a> ObjectBuilder<'a> {
     }
 }
 
-enum CopySize<T> {
+pub enum CopySize<T> {
     /// Size is determined by the input value's size. If canonical is true, we use the canonical
     /// size.
     FromValue { canonical: bool },
-    /// The size is explicitly set to this value. We use this when setting to a default value.
-    Explicit(T),
+    /// The size is explicitly set to at-least this value. We use this when setting a pointer to
+    /// a copy of a value so that we can build it.
+    Minimum(T),
 }
 
 /// A result for consuming PtrBuilder functions.
-pub type BuildResult<T, U, E = Error> = Result<T, (Option<E>, U)>;
+pub type BuildResult<T, U, E = Option<Error>> = Result<T, (E, U)>;
 
-#[derive(Debug)]
 pub struct PtrBuilder<'a, T: Table = Empty> {
     builder: ObjectBuilder<'a>,
     ptr: SegmentRef<'a>,
     table: T::Builder,
+}
+
+impl<'a, T> Debug for PtrBuilder<'a, T>
+where
+    T: Table,
+    T::Builder: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PtrBuilder")
+            .field("builder", &self.builder)
+            .field("ptr", &self.ptr)
+            .field("table", &self.table as &dyn Debug)
+            .finish()
+    }
 }
 
 impl<'a> PtrBuilder<'a, Empty> {
@@ -2376,10 +2532,11 @@ impl<'a> PtrBuilder<'a, Empty> {
 impl<'a, T: Table> PtrBuilder<'a, T> {
     /// Locate the content this builder points to.
     #[inline(always)]
-    fn locate(&mut self) -> Content<'a, ObjectBuilder<'a>> {
+    fn locate(&self) -> Content<'a, ObjectBuilder<'a>> {
         self.builder.clone().locate(self.ptr)
     }
 
+    #[inline]
     pub fn is_null(&self) -> bool {
         *self.ptr.as_wire_ptr() == WirePtr::NULL
     }
@@ -2394,11 +2551,31 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     /// Borrows the pointer, rather than consuming it.
+    #[inline]
     pub fn by_ref<'b>(&'b mut self) -> PtrBuilder<'b, T> {
         PtrBuilder {
             builder: self.builder.clone(),
             ptr: self.ptr,
             table: self.table.clone(),
+        }
+    }
+
+    #[inline]
+    pub fn ptr_type(&self) -> PtrType {
+        if self.is_null() {
+            return PtrType::Null;
+        }
+
+        let Content { ptr, .. } = self.locate();
+        let ptr = ptr.as_wire_ptr();
+        if ptr.is_struct() {
+            PtrType::Struct
+        } else if ptr.is_list() {
+            PtrType::List
+        } else if ptr.is_capability() {
+            PtrType::Capability
+        } else {
+            unreachable!("{}", ptr.fail_read(None))
         }
     }
 
@@ -2430,7 +2607,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     fn to_struct_mut_inner(
         mut self,
         expected_size: Option<StructSize>,
-    ) -> Result<StructBuilder<'a, T>, (Error, Self)> {
+    ) -> BuildResult<StructBuilder<'a, T>, Self, Error> {
         let table = self.table.clone();
         let Content {
             accessor: builder,
@@ -2443,7 +2620,9 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         };
 
         let (existing_data_start, builder) = match location {
-            Location::Near | Location::Far => builder.build_object_from_end_of(ptr, struct_ptr.offset()),
+            Location::Near | Location::Far => {
+                builder.build_object_from_end_of(ptr, struct_ptr.offset())
+            }
             Location::DoubleFar { segment, offset } => {
                 match builder.build_object_in(segment, offset) {
                     Some(b) => b,
@@ -2502,24 +2681,19 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         new_builder
     }
 
-    fn transfer_struct(old: &mut StructBuilder<'a, T>, new: &mut StructBuilder<'a, T>) {
+    fn transfer_struct(old: &mut StructBuilder<T>, new: &mut StructBuilder<T>) {
         let old_data = old.data_section();
         new.data_section_mut()[..old_data.len()].copy_from_slice(old_data);
 
         let ptrs_to_copy = SegmentOffset::from(old.ptrs_len);
-        let old_ptrs = old
-            .builder
-            .section_slice(old.ptrs_start, ptrs_to_copy)
-            .iter()
-            .map(|w| unsafe { SegmentRef::new_unchecked(NonNull::from(w)) });
-        let new_ptrs = new
-            .builder
-            .section_slice(new.ptrs_start, ptrs_to_copy)
-            .iter()
-            .map(|w| unsafe { SegmentRef::new_unchecked(NonNull::from(w)) });
+        let ptr_pairs = unsafe {
+            let old_ptrs = old.ptrs_start.iter_unchecked(ptrs_to_copy);
+            let new_ptrs = new.ptrs_start.iter_unchecked(ptrs_to_copy);
+            old_ptrs.zip(new_ptrs)
+        };
 
-        for (old_ptr, new_ptr) in old_ptrs.zip(new_ptrs) {
-            Self::transfer(old_ptr, &mut old.builder, new_ptr, &mut new.builder);
+        for (old_ptr, new_ptr) in ptr_pairs {
+            Self::transfer(old_ptr, &old.builder, new_ptr, &new.builder);
         }
     }
 
@@ -2532,35 +2706,15 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     /// # Panics
     ///
     /// This code expects the provided reader is a valid default value. This code will panic if
-    /// the provided reader
-    ///
-    ///   * Isn't unchecked
-    ///   * Is larger than the provided struct size
+    /// the provided reader isn't unchecked.
     ///
     /// If any far or other pointers are in the provided struct, this silently writes null instead.
     pub fn init_struct(
         mut self,
         size: StructSize,
-        default: Option<&StructReader<Empty>>,
     ) -> StructBuilder<'a, T> {
-        if let Some(default) = default {
-            assert!(
-                default.reader.is_unchecked(),
-                "default struct value isn't unchecked!"
-            );
-            assert!(default.fits(size), "default struct value is too large!");
-
-            self.try_set_struct_with_size::<Infallible, _>(default, CopySize::Explicit(size), |err| {
-                if cfg!(debug_assertions) {
-                    panic!("encountered read error while copying default value during struct init: {}", err);
-                }
-
-                ControlFlow::Continue(WriteNull)
-            }).map_err(|(i, _)| i).unwrap()
-        } else {
-            self.clear();
-            self.init_struct_zeroed(size)
-        }
+        self.clear();
+        self.init_struct_zeroed(size)
     }
 
     /// Initializes the pointer as a struct with the specified size. This does not apply a default
@@ -2596,31 +2750,38 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     pub fn to_struct_mut_or_init(
         self,
         size: StructSize,
-        default: Option<&StructReader<Empty>>,
     ) -> StructBuilder<'a, T> {
         match self.to_struct_mut(Some(size)) {
             Ok(builder) => builder,
-            Err((_, this)) => this.init_struct(size, default),
+            Err((_, this)) => this.init_struct(size),
         }
     }
 
-    /// Sets the pointer to a struct copied from the specified reader. If a size is provided, we
-    /// allocate that much space no matter the actual size of the specified value. The value must
-    /// fit in the given struct size.
+    /// Sets the pointer to a struct copied from the specified reader.
+    /// 
+    /// This function allows you to set a pointer to a copy of the given struct data and handle
+    /// struct promotion or writing the value canonically at the same time.
+    /// 
+    /// When calling to initialize a builder with a set size, pass `CopySize::Minimum` with the
+    /// size of the struct type the copy is being made for. This will handle properly promoting
+    /// the struct's size to be at least as large as the expected builder.
+    /// 
+    /// When calling to simply copy a value directly with or without canonicalization, use
+    /// `CopySize::FromValue`.
     #[inline]
-    fn try_set_struct_with_size<E, F>(
+    pub fn try_set_struct<E, F>(
         mut self,
         value: &StructReader<impl InsertableInto<T>>,
         size: CopySize<StructSize>,
         mut err_handler: F,
-    ) -> Result<StructBuilder<'a, T>, (E, Self)>
+    ) -> BuildResult<StructBuilder<'a, T>, Self, E>
     where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
     {
         let (size, data_section, canonical) = match size {
-            CopySize::Explicit(size) => {
-                debug_assert!(value.fits(size));
-                (size, value.data_section(), false)
+            CopySize::Minimum(min_size) => {
+                let (size, data_section) = value.size(false);
+                (size.max(min_size), data_section, false)
             }
             CopySize::FromValue { canonical } => {
                 let (size, data_section) = value.size(canonical);
@@ -2651,24 +2812,12 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         Ok(builder)
     }
 
-    pub fn try_set_struct<E, F>(
-        self,
-        value: &StructReader<impl InsertableInto<T>>,
-        canonical: bool,
-        err_handler: F,
-    ) -> Result<StructBuilder<'a, T>, (E, Self)>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
-        self.try_set_struct_with_size(value, CopySize::FromValue { canonical }, err_handler)
-    }
-
     pub fn set_struct(
         self,
         value: &StructReader<impl InsertableInto<T>>,
-        canonical: bool,
+        size: CopySize<StructSize>,
     ) -> StructBuilder<'a, T> {
-        self.try_set_struct::<Infallible, _>(value, canonical, |_| ControlFlow::Continue(WriteNull))
+        self.try_set_struct::<Infallible, _>(value, size, |_| ControlFlow::Continue(WriteNull))
             .map_err(|(i, _)| i)
             .unwrap()
     }
@@ -2695,9 +2844,9 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     fn to_list_mut_inner(
-        mut self,
+        self,
         expected_element_size: Option<ElementSize>,
-    ) -> Result<ListBuilder<'a, T>, (Error, Self)> {
+    ) -> BuildResult<ListBuilder<'a, T>, Self, Error> {
         let Content {
             accessor: builder,
             ptr,
@@ -2711,7 +2860,9 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         };
 
         let (existing_data_start, builder) = match location {
-            Location::Near | Location::Far => builder.build_object_from_end_of(ptr, list_ptr.offset()),
+            Location::Near | Location::Far => {
+                builder.build_object_from_end_of(ptr, list_ptr.offset())
+            }
             Location::DoubleFar { segment, offset } => {
                 match builder.build_object_in(segment, offset) {
                     Some(b) => b,
@@ -2721,17 +2872,17 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         };
 
         let existing_element_size = list_ptr.element_size();
-        let existing_list = match existing_element_size {
+        let mut existing_list = match existing_element_size {
             PtrElementSize::InlineComposite => {
                 let tag = *existing_data_start
                     .as_wire_ptr()
                     .struct_ptr()
                     .expect("inline composite list with non-struct elements is not supported");
-    
+
                 let list_start = unsafe { existing_data_start.offset(1.into()).as_ref_unchecked() };
                 let size = tag.size();
                 let step = size.total() * (Word::BYTES as u32);
-    
+
                 ListBuilder::<T> {
                     builder,
                     ptr: list_start,
@@ -2753,18 +2904,16 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 struct_ptrs_len: 1,
                 element_size: existing_element_size,
             },
-            _ => {
-                ListBuilder::<T> {
-                    builder,
-                    ptr: existing_data_start,
-                    table: self.table.clone(),
-                    element_count: list_ptr.element_count(),
-                    step: existing_element_size.data_bytes(),
-                    struct_data_len: existing_element_size.data_bytes(),
-                    struct_ptrs_len: 0,
-                    element_size: existing_element_size,
-                }
-            }
+            _ => ListBuilder::<T> {
+                builder,
+                ptr: existing_data_start,
+                table: self.table.clone(),
+                element_count: list_ptr.element_count(),
+                step: existing_element_size.data_bytes(),
+                struct_data_len: existing_element_size.data_bytes(),
+                struct_ptrs_len: 0,
+                element_size: existing_element_size,
+            },
         };
 
         macro_rules! data_element {
@@ -2796,7 +2945,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 // void
                 self.try_init_list(size, existing_list.element_count)?
             }
-            (_, Some(ElementSize::InlineComposite(size))) => {
+            (_, Some(element_size @ ElementSize::InlineComposite(size))) => {
                 // The existing pointer may or may not be an inline composite with the right size,
                 // so let's check the size of everything first and see if we need to promote the
                 // list.
@@ -2805,7 +2954,19 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 let expected_data_larger = expected_data_size_bytes > existing_list.struct_data_len;
                 let expected_ptrs_larger = size.ptrs > existing_list.struct_ptrs_len;
                 if expected_data_larger || expected_ptrs_larger {
-                    todo!()
+                    // One of the sections is bigger, so we need a promotion
+
+                    self.builder.clear_ptrs(self.ptr);
+                    let mut new_list = self.try_init_list(element_size, existing_list.element_count)?;
+                    for i in 0..existing_list.len().get() {
+                        unsafe {
+                            let mut old_struct = existing_list.struct_mut_unchecked(i);
+                            let mut new_struct = new_list.struct_mut_unchecked(i);
+                            Self::transfer_struct(&mut old_struct, &mut new_struct);
+                        }
+                    }
+
+                    new_list
                 } else {
                     existing_list
                 }
@@ -2831,6 +2992,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
 
     /// Gets a list builder for this pointer, or an empty list builder if the value is null or
     /// invalid.
+    #[inline]
     pub fn to_list_mut_or_empty(
         self,
         expected_element_size: Option<ElementSize>,
@@ -2839,7 +3001,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
             Ok(builder) => builder,
             Err((_, this)) => ListBuilder::empty(
                 this.builder,
-                unsafe { this.ptr.offset(1.into()).as_ref_unchecked() },
+                this.ptr,
                 this.table.clone(),
                 expected_element_size.unwrap_or(ElementSize::Void).into(),
             ),
@@ -2856,7 +3018,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         mut self,
         element_size: ElementSize,
         element_count: ElementCount,
-    ) -> Result<ListBuilder<'a, T>, (Error, Self)> {
+    ) -> BuildResult<ListBuilder<'a, T>, Self, Error> {
         self.clear();
 
         let Some((start, builder)) = self.builder.alloc_list(self.ptr, element_size, element_count) else {
@@ -2876,7 +3038,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         Ok(ListBuilder {
             builder,
             ptr: start,
-            table: self.table,
+            table: self.table.clone(),
             element_count,
             step,
             struct_data_len,
@@ -2885,6 +3047,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         })
     }
 
+    #[inline]
     pub fn init_list(
         self,
         element_size: ElementSize,
@@ -2900,7 +3063,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         value: &ListReader<U>,
         canonical: bool,
         mut err_handler: F,
-    ) -> Result<ListBuilder<'a, T>, (E, Self)>
+    ) -> BuildResult<ListBuilder<'a, T>, Self, E>
     where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
         U: InsertableInto<T>,
@@ -2950,6 +3113,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         Ok(list)
     }
 
+    #[inline]
     pub fn set_list(
         self,
         value: &ListReader<impl InsertableInto<T>>,
@@ -2962,18 +3126,95 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         .unwrap()
     }
 
-    /// Transfer a pointer from one place to another.
-    fn transfer_into(&mut self, other: &mut PtrBuilder<T>) {
+    #[inline]
+    pub fn to_data(&self) -> Result<Option<DataReader>> {
+        self.as_reader().to_data()
+    }
+
+    #[inline]
+    pub fn to_data_mut(self) -> BuildResult<DataBuilder<'a>, Self> {
         todo!()
     }
 
-    fn transfer(
-        existing_ptr: SegmentRef<'a>,
-        existing_builder: &mut ObjectBuilder<'a>,
-        new_ptr: SegmentRef<'a>,
-        new_builder: &mut ObjectBuilder<'a>,
-    ) {
+    #[inline]
+    pub fn init_data(
+        self,
+        element_count: ElementCount,
+    ) -> DataBuilder<'a> {
         todo!()
+    }
+
+    #[inline]
+    pub fn set_data(
+        self,
+        value: &DataReader,
+    ) -> DataBuilder<'a> {
+        let len = value.len();
+        let builder = self.init_data(len);
+        unsafe {
+            builder.data()
+                .as_ptr()
+                .copy_from_nonoverlapping(value.data().as_ptr() as *const _, len.get() as usize)
+        }
+        builder
+    }
+
+    #[inline]
+    pub fn to_text(&self) -> Result<Option<TextReader>> {
+        self.as_reader().to_text()
+    }
+
+    #[inline]
+    pub fn to_text_mut(self) -> BuildResult<TextBuilder<'a>, Self> {
+        todo!()
+    }
+
+    /// Initializes a text blob for this pointer. Note: the provided element count _includes_ the null-terminator, so it
+    /// cannot be zero.
+    #[inline]
+    pub fn init_text(
+        self,
+        element_count: TextByteCount,
+    ) -> TextBuilder<'a> {
+        todo!()
+    }
+
+    #[inline]
+    pub fn set_text(
+        self,
+        value: &TextReader,
+    ) -> TextBuilder<'a> {
+        todo!()
+    }
+
+    /// Transfer a pointer from one place to another.
+    fn transfer_into(&mut self, other: &mut PtrBuilder<'a, T>) {
+        debug_assert!(self.builder.is_same_message(&other.builder));
+
+        other.clear();
+
+        Self::transfer(self.ptr, &self.builder, other.ptr, &other.builder)
+    }
+
+    fn transfer(
+        existing_ptr: SegmentRef,
+        existing_builder: &ObjectBuilder,
+        new_ptr: SegmentRef,
+        new_builder: &ObjectBuilder,
+    ) {
+        debug_assert!(new_ptr.as_ref().is_null());
+
+        if existing_ptr.as_ref().is_null() {
+            unsafe { new_ptr.as_ptr_mut().write(Word::NULL) }
+        } else {
+            match existing_ptr.as_wire_ptr().kind() {
+                WireKind::Struct | WireKind::List => {}
+                WireKind::Far | WireKind::Other => {
+                    unsafe { new_ptr.as_ptr_mut().write(*existing_ptr.as_ref()) }
+                }
+            }
+            
+        }
     }
 
     /// Clears the pointer, passing any errors to a given error handler.
@@ -2988,7 +3229,12 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
     {
-        Self::try_clear_inner(&self.builder, self.ptr, &self.table, err_handler.borrow_mut())
+        Self::try_clear_inner(
+            &self.builder,
+            self.ptr,
+            &self.table,
+            err_handler.borrow_mut(),
+        )
     }
 
     fn try_clear_inner<E, F>(
@@ -3020,9 +3266,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 };
                 if size != StructSize::EMPTY {
                     let (start, mut struct_builder) = match location {
-                        Location::Near | Location::Far => {
-                            object_builder.build_object_from_end_of(content_ptr, struct_ptr.offset())
-                        }
+                        Location::Near | Location::Far => object_builder
+                            .build_object_from_end_of(content_ptr, struct_ptr.offset()),
                         Location::DoubleFar { segment, offset } => object_builder
                             .build_object_in(segment, offset)
                             .expect("struct pointers cannot refer to read-only segments"),
@@ -3065,12 +3310,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                             .iter_mut()
                             .map(|w| unsafe { SegmentRef::new_unchecked(NonNull::from(w)) });
                         for ptr in section {
-                            Self::try_clear_inner(
-                                &list_builder,
-                                ptr,
-                                table,
-                                err_handler,
-                            )?;
+                            Self::try_clear_inner(&list_builder, ptr, table, err_handler)?;
                         }
                     }
                     InlineComposite => {
@@ -3148,12 +3388,11 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     {
         builder.clear_section(start, size.data.into());
 
-        let ptrs_start = unsafe { start.offset(size.data.into()).as_ref_unchecked() };
-        let slice = builder
-            .section_slice_mut(ptrs_start, size.ptrs.into())
-            .iter_mut()
-            .map(|w| unsafe { SegmentRef::new_unchecked(NonNull::from(w)) });
-        for ptr in slice {
+        let iter = unsafe {
+            let ptrs_start = start.offset(size.data.into()).as_ref_unchecked();
+            ptrs_start.iter_unchecked(size.ptrs.into())
+        };
+        for ptr in iter.filter(|r| !r.as_ref().is_null()) {
             Self::try_clear_inner(&builder, ptr, table, err_handler)?;
         }
 
@@ -3194,6 +3433,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         let content_wire_ptr = content_ptr.as_wire_ptr();
         match content_wire_ptr.kind() {
             WireKind::Struct => {
+                let struct_ptr = content_wire_ptr.struct_ptr().unwrap();
+
                 todo!()
             }
             WireKind::List => {
@@ -3284,14 +3525,18 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
 
 impl<'a, T: Table> Capable for PtrBuilder<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = PtrBuilder<'a, T2>;
-}
 
-impl<T: Table> CapableBuilder for PtrBuilder<'_, T> {
+    type Imbued = T::Builder;
+    type ImbuedWith<T2: Table> = PtrBuilder<'a, T2>;
+
+    #[inline]
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
     fn imbue_release<T2: Table>(
         self,
         new_table: T2::Builder,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Builder) {
+    ) -> (Self::ImbuedWith<T2>, <Self::Table as Table>::Builder) {
         let old_table = self.table;
         let ptr = PtrBuilder {
             builder: self.builder,
@@ -3299,6 +3544,15 @@ impl<T: Table> CapableBuilder for PtrBuilder<'_, T> {
             table: new_table,
         };
         (ptr, old_table)
+    }
+
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
     }
 }
 
@@ -3313,14 +3567,18 @@ pub struct StructBuilder<'a, T: Table = Empty> {
 
 impl<'a, T: Table> Capable for StructBuilder<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = StructBuilder<'a, T2>;
-}
 
-impl<T: Table> CapableBuilder for StructBuilder<'_, T> {
+    type Imbued = T::Builder;
+    type ImbuedWith<T2: Table> = StructBuilder<'a, T2>;
+
+    #[inline]
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
     fn imbue_release<T2: Table>(
         self,
         new_table: T2::Builder,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Builder) {
+    ) -> (Self::ImbuedWith<T2>, <Self::Table as Table>::Builder) {
         let old_table = self.table;
         let ptr = StructBuilder {
             builder: self.builder,
@@ -3332,9 +3590,19 @@ impl<T: Table> CapableBuilder for StructBuilder<'_, T> {
         };
         (ptr, old_table)
     }
+
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
+    }
 }
 
 impl<'a, T: Table> StructBuilder<'a, T> {
+    #[inline]
     pub fn as_reader<'b>(&'b self) -> StructReader<'b, T> {
         StructReader {
             reader: self.builder.as_reader(),
@@ -3358,13 +3626,38 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    fn data_section(&self) -> &[u8] {
+    pub fn size(&self) -> StructSize {
+        StructSize {
+            data: Word::round_up_byte_count(self.data_len) as u16,
+            ptrs: self.ptrs_len,
+        }
+    }
+
+    #[inline]
+    pub fn total_size(&self) -> Result<MessageSize> {
+        todo!()
+    }
+
+    #[inline]
+    pub fn data_section(&self) -> &[u8] {
         unsafe { core::slice::from_raw_parts(self.data_const(), self.data_len as usize) }
     }
 
     #[inline]
-    fn data_section_mut(&mut self) -> &mut [u8] {
+    pub fn data_section_mut(&mut self) -> &mut [u8] {
         unsafe { core::slice::from_raw_parts_mut(self.data(), self.data_len as usize) }
+    }
+
+    #[inline]
+    pub fn by_ref<'b>(&'b mut self) -> StructBuilder<'b, T> {
+        StructBuilder {
+            builder: self.builder.clone(),
+            data_start: self.data_start,
+            ptrs_start: self.ptrs_start,
+            table: self.table.clone(),
+            data_len: self.data_len,
+            ptrs_len: self.ptrs_len,
+        }
     }
 
     /// Clears all data in the struct
@@ -3445,7 +3738,22 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    fn ptr_section_mut<'b>(&'b mut self) -> ListBuilder<'b, T> {
+    pub fn ptr_section<'b>(&'b self) -> ListReader<'b, T> {
+        ListReader {
+            reader: self.builder.as_reader(),
+            ptr: self.ptrs_start,
+            table: self.table.as_reader(),
+            element_count: self.ptrs_len.into(),
+            step: Word::BYTES as u32,
+            struct_data_len: 0,
+            struct_ptrs_len: 1,
+            element_size: PtrElementSize::Pointer,
+            nesting_limit: u32::MAX,
+        }
+    }
+
+    #[inline]
+    pub fn ptr_section_mut<'b>(&'b mut self) -> ListBuilder<'b, T> {
         ListBuilder {
             builder: self.builder.clone(),
             ptr: self.ptrs_start,
@@ -3501,11 +3809,6 @@ pub struct ListBuilder<'a, T: Table = Empty> {
 
 impl<'a, T: Table> ListBuilder<'a, T> {
     #[inline]
-    pub(crate) fn clone_table_reader(&self) -> T::Reader {
-        self.table.as_reader()
-    }
-
-    #[inline]
     fn empty(
         builder: ObjectBuilder<'a>,
         ptr: SegmentRef<'a>,
@@ -3535,7 +3838,17 @@ impl<'a, T: Table> ListBuilder<'a, T> {
 
     #[inline]
     pub fn as_reader(&self) -> ListReader<T> {
-        todo!()
+        ListReader {
+            ptr: self.ptr,
+            reader: self.builder.as_reader(),
+            table: self.table.as_reader(),
+            element_count: self.element_count,
+            nesting_limit: u32::MAX,
+            step: self.step,
+            struct_data_len: self.struct_data_len,
+            struct_ptrs_len: self.struct_ptrs_len,
+            element_size: self.element_size,
+        }
     }
 
     #[inline]
@@ -3580,14 +3893,14 @@ impl<'a, T: Table> ListBuilder<'a, T> {
         debug_assert!({
             match self.element_size {
                 PtrElementSize::Void | PtrElementSize::Pointer => false,
-                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<Bool>(),
+                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<bool>(),
                 PtrElementSize::InlineComposite => self.struct_data_len != 0,
                 size => PtrElementSize::from(D::ELEMENT_SIZE).data_bytes() <= size.data_bytes(),
             }
         }, "attempted to access invalid data for this list; list element size: {:?}, data type: {}",
         self.element_size, core::any::type_name::<D>());
 
-        if TypeId::of::<D>() == TypeId::of::<Bool>() {
+        if TypeId::of::<D>() == TypeId::of::<bool>() {
             D::read_unchecked(self.ptr(), index as usize, D::default())
         } else {
             let ptr = self.ptr().add(self.index_to_offset(index));
@@ -3602,14 +3915,14 @@ impl<'a, T: Table> ListBuilder<'a, T> {
         debug_assert!({
             match self.element_size {
                 PtrElementSize::Void | PtrElementSize::Pointer => false,
-                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<Bool>(),
+                PtrElementSize::Bit => TypeId::of::<D>() == TypeId::of::<bool>(),
                 PtrElementSize::InlineComposite => self.struct_data_len != 0,
                 size => PtrElementSize::from(D::ELEMENT_SIZE).data_bytes() <= size.data_bytes(),
             }
         }, "attempted to access invalid data for this list; list element size: {:?}, data type: {}",
         self.element_size, core::any::type_name::<D>());
 
-        if TypeId::of::<D>() == TypeId::of::<Bool>() {
+        if TypeId::of::<D>() == TypeId::of::<bool>() {
             D::write_unchecked(self.ptr_mut(), index as usize, value, D::default())
         } else {
             let ptr = self.ptr_mut().add(self.index_to_offset(index));
@@ -3720,14 +4033,18 @@ impl<'a, T: Table> ListBuilder<'a, T> {
 
 impl<'a, T: Table> Capable for ListBuilder<'a, T> {
     type Table = T;
-    type Imbued<T2: Table> = ListBuilder<'a, T2>;
-}
 
-impl<T: Table> CapableBuilder for ListBuilder<'_, T> {
+    type Imbued = T::Builder;
+    type ImbuedWith<T2: Table> = ListBuilder<'a, T2>;
+
+    #[inline]
+    fn imbued(&self) -> &Self::Imbued { &self.table }
+
+    #[inline]
     fn imbue_release<T2: Table>(
         self,
         new_table: T2::Builder,
-    ) -> (Self::Imbued<T2>, <Self::Table as Table>::Builder) {
+    ) -> (Self::ImbuedWith<T2>, T::Builder) {
         let old_table = self.table;
         let ptr = ListBuilder {
             builder: self.builder,
@@ -3741,21 +4058,14 @@ impl<T: Table> CapableBuilder for ListBuilder<'_, T> {
         };
         (ptr, old_table)
     }
-}
 
-pub struct BlobBuilder<'a> {
-    a: PhantomData<&'a mut [u8]>,
-    ptr: NonNull<u8>,
-    len: u32,
-}
-
-impl<'a> BlobBuilder<'a> {
-    pub fn ptr(&self) -> NonNull<u8> {
-        self.ptr
-    }
-
-    pub fn len(&self) -> u32 {
-        self.len
+    #[inline]
+    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    where
+        U: Capable,
+        U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        other.imbue_release::<T>(self.table.clone())
     }
 }
 
@@ -3763,26 +4073,28 @@ impl<'a> BlobBuilder<'a> {
 mod tests {
     use crate::{
         alloc::{Alloc, AllocLen, Fixed, Global, Scratch, Space, Word},
+        any::AnyStruct,
         message::{Message, ReaderOptions},
         rpc::Empty,
     };
     use core::ptr::NonNull;
 
     use super::{
-        ElementCount, ElementSize, PtrElementSize, PtrReader, StructBuilder, StructReader,
-        StructSize, PtrBuilder,
+        ElementCount, ElementSize, PtrBuilder, PtrElementSize, PtrReader, StructBuilder,
+        StructReader, StructSize,
     };
 
     #[test]
     fn simple_struct() {
         // making AlignedData hard, easier to just write the bytes as numbers
-        // and swap the bytes with u64::swap_bytes()
+        // and swap the bytes with u64::to_be()
         let data = [
-            Word(0x_00_00_00_00_01_00_00_00_u64.swap_bytes()),
-            Word(0x_01_23_45_67_89_ab_cd_ef_u64.swap_bytes()),
+            Word(0x_00_00_00_00_01_00_00_00_u64.to_be()),
+            Word(0x_01_23_45_67_89_ab_cd_ef_u64.to_be()),
         ];
 
-        let ptr = unsafe { PtrReader::new_unchecked(NonNull::new(data.as_ptr().cast_mut()).unwrap()) };
+        let ptr =
+            unsafe { PtrReader::new_unchecked(NonNull::new(data.as_ptr().cast_mut()).unwrap()) };
         let reader = ptr.to_struct().unwrap().unwrap();
 
         assert_eq!(0xefcdab8967452301, reader.data_field::<u64>(0));
@@ -3859,7 +4171,7 @@ mod tests {
             let mut sub_struct = builder
                 .ptr_field_mut(0)
                 .unwrap()
-                .init_struct(StructSize { data: 1, ptrs: 0 }, None);
+                .init_struct(StructSize { data: 1, ptrs: 0 });
             sub_struct.set_field::<u32>(0, 123);
         }
 
@@ -3888,7 +4200,7 @@ mod tests {
                 builder
                     .ptr_field_mut(0)
                     .unwrap()
-                    .init_struct(StructSize { data: 1, ptrs: 0 }, None)
+                    .init_struct(StructSize { data: 1, ptrs: 0 })
                     .set_field(0, 400 + i);
             }
         }
@@ -4066,7 +4378,7 @@ mod tests {
     fn struct_round_trip(message: &mut Message<impl Alloc>) {
         {
             let ptr: PtrBuilder = message.builder().into_root().into();
-            let mut builder = ptr.init_struct(StructSize { data: 2, ptrs: 4 }, None);
+            let mut builder = ptr.init_struct(StructSize { data: 2, ptrs: 4 });
             setup_struct(&mut builder);
 
             check_struct_builder(&mut builder);
@@ -4074,7 +4386,7 @@ mod tests {
         }
 
         let reader = message.reader();
-        let root_reader = reader.root().to_struct().unwrap().unwrap();
+        let root_reader = reader.read_as::<AnyStruct>().into();
 
         check_struct_reader(&root_reader);
 
@@ -4082,7 +4394,7 @@ mod tests {
             nesting_limit: 4,
             traversal_limit: u64::MAX,
         });
-        let root_reader = limited_reader.root().to_struct().unwrap().unwrap();
+        let root_reader = limited_reader.read_as::<AnyStruct>().into();
 
         check_struct_reader(&root_reader);
     }
@@ -4105,7 +4417,7 @@ mod tests {
         //         6 sub-lists (4x 1 word, 1x 2 words)
         // -----
         //   34
-        let mut space = Space::<34>::VALUE;
+        let mut space = Space::<34>::new();
         let alloc = Scratch::with_space(&mut space, Global);
         let mut message = Message::new(alloc);
         struct_round_trip(&mut message);

@@ -4,16 +4,13 @@ version = "0.1.0"
 authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
 edition = "2018"
 
-[[bin]]
-name = "capnpc-rust"
-required-features = ["compiler"]
-
 [features]
 default = ["std"]
-std = []
+std = ["tinyvec"]
 compiler = []
 compat = ["rpc"]
 rpc = []
 
 [dependencies]
 thiserror = "1.0"
+tinyvec = { version = "1.6", features = ["rustc_1_40", "alloc"], optional = true }

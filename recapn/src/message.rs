@@ -1,25 +1,29 @@
+//! An arena of segments containing Cap'n Proto data.
+
 use crate::alloc::{
     Alloc, AllocLen, DynSpace, Global, Growing, ObjectLen, Scratch, Segment, SegmentLen,
-    SegmentOffset, Space, Word,
+    SegmentOffset, SignedSegmentOffset, Space, Word,
 };
+use crate::{any, ty, Result};
+use crate::io::{StreamTable, StreamTableRef, TableReadError};
 use crate::ptr::{PtrBuilder, PtrReader};
-use crate::rpc::Empty;
-use crate::any;
+use crate::rpc::{Empty, InsertableInto};
 use core::cell::{Cell, UnsafeCell};
-use core::convert::TryInto;
-use core::fmt;
+use core::convert::TryFrom;
+use core::fmt::{self, Debug};
 use core::iter;
 use core::marker::PhantomData;
-use core::pin::Pin;
 use core::ptr::NonNull;
 use core::slice;
 
+use thiserror::Error;
+
+/// An ID for a segment
 pub type SegmentId = u32;
 
+#[allow(dead_code)]
 pub(crate) mod internal {
     use core::fmt::Debug;
-
-    use crate::alloc::{SignedSegmentOffset, NonZeroU29};
 
     use super::*;
 
@@ -66,7 +70,10 @@ pub(crate) mod internal {
         }
 
         pub const unsafe fn as_ref_unchecked(self) -> SegmentRef<'a> {
-            SegmentRef { a: PhantomData, ptr: NonNull::new_unchecked(self.ptr) }
+            SegmentRef {
+                a: PhantomData,
+                ptr: NonNull::new_unchecked(self.ptr),
+            }
         }
     }
 
@@ -127,6 +134,15 @@ pub(crate) mod internal {
         pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> SegmentPtr<'a> {
             self.as_segment_ptr().signed_offset_from_end(offset)
         }
+
+        #[inline]
+        pub unsafe fn iter_unchecked(self, offset: SegmentOffset) -> impl Iterator<Item = SegmentRef<'a>> {
+            let range = 0..offset.get();
+            range.into_iter().map(move |offset| unsafe {
+                let offset = SegmentOffset::new_unchecked(offset);
+                self.offset(offset).as_ref_unchecked()
+            })
+        }
     }
 
     impl AsRef<Word> for SegmentRef<'_> {
@@ -143,42 +159,21 @@ pub(crate) mod internal {
         }
     }
 
-    #[derive(Clone, Copy)]
-    pub enum ArenaReader<'a> {
-        FromBuilder(&'a Option<ArenaSegments>),
-    }
-
-    impl<'a> ArenaReader<'a> {
-        pub fn get(&self, id: SegmentId) -> Option<SegmentReader<'a>> {
-            match self {
-                ArenaReader::FromBuilder(segments) => {
-                    let segments = segments.as_ref()?;
-                    let segment = match id {
-                        0 => &segments.first,
-                        id => unsafe {
-                            let tail = &*segments.tail.get();
-                            tail.get((id - 1) as usize)?.as_ref()
-
-                        },
-                    }
-                    .used_segment();
-
-                    Some(SegmentReader::new(*self, segment))
-                }
-            }
-        }
-    }
-
     #[derive(Clone)]
     pub struct SegmentReader<'a> {
-        arena: ArenaReader<'a>,
+        arena: &'a dyn SegmentSource,
+        id: SegmentId,
         segment: Segment,
     }
 
     impl<'a> SegmentReader<'a> {
+        pub fn from_source(source: &'a dyn SegmentSource, id: SegmentId) -> Option<Self> {
+            Some(Self::new(source, id, source.get(id)?))
+        }
+
         #[inline]
-        pub fn new(arena: ArenaReader<'a>, segment: Segment) -> Self {
-            Self { arena, segment }
+        pub fn new(arena: &'a dyn SegmentSource, id: SegmentId, segment: Segment) -> Self {
+            Self { arena, id, segment }
         }
 
         /// Gets the start of the segment as a SegmentRef
@@ -199,6 +194,11 @@ pub(crate) mod internal {
                     .as_ptr()
                     .add(self.segment.len().get() as usize)
             })
+        }
+
+        #[inline]
+        pub fn id(&self) -> SegmentId {
+            self.id
         }
 
         #[inline]
@@ -265,7 +265,7 @@ pub(crate) mod internal {
         /// if the segment doesn't exist.
         #[inline]
         pub fn segment(&self, id: SegmentId) -> Option<SegmentReader<'a>> {
-            self.arena.get(id)
+            Self::from_source(self.arena, id)
         }
     }
 
@@ -335,8 +335,7 @@ pub(crate) mod internal {
         /// If no data has been used, this returns None
         #[inline]
         pub fn used_segment(&self) -> Segment {
-            let len = SegmentLen::new(self.used_len().get()).unwrap();
-            unsafe { Segment::new(self.segment.data(), len) }
+            Segment::new(self.segment.data(), self.used_len())
         }
 
         #[inline]
@@ -351,177 +350,295 @@ pub(crate) mod internal {
         }
     }
 
-    pub struct Arena<'e, A: Alloc + ?Sized> {
-        /// A phantom lifetime from external readonly segments.
-        e: PhantomData<&'e Segment>,
-        /// The inner arena data, wrapped in an unsafe cell
-        inner: UnsafeCell<ArenaInner<A>>,
-    }
+    #[derive(Clone)]
+    struct ArenaSegmentBuilder(NonNull<ArenaSegment>);
 
-    struct ArenaInner<A: Alloc + ?Sized> {
-        segments: UnsafeCell<Option<ArenaSegments>>,
-        /// The last owned segment in this set
-        last_owned: Cell<SegmentId>,
-        alloc: UnsafeCell<A>,
+    impl ArenaSegmentBuilder {
+        #[inline]
+        pub const unsafe fn get(&self) -> &ArenaSegment {
+            self.0.as_ref()
+        }
     }
 
     /// An append-only arena for a set of message segments, managed by an Arena.
     ///
     /// This mostly serves as an optimization for the likely case where a message contains
     /// exactly one segment, in which case we don't want to have to allocate a vec.
-    pub struct ArenaSegments {
+    struct ArenaSegments {
+        inner: UnsafeCell<ArenaSegmentsInner>,
+    }
+
+    struct ArenaSegmentsInner {
         /// Optimize for the first (and possibly only) segment
         first: ArenaSegment,
         /// An optional set of extra segments
-        tail: UnsafeCell<Vec<NonNull<ArenaSegment>>>,
+        tail: Vec<NonNull<ArenaSegment>>,
     }
 
-    impl<'e, A: Alloc> Arena<'e, A> {
-        pub fn new(alloc: A) -> Self {
+    impl ArenaSegments {
+        const MAX_SEGMENTS: usize = (u32::MAX - 1) as usize;
+
+        #[inline]
+        pub fn new(first: Segment, used_size: AllocLen) -> Self {
             Self {
-                e: PhantomData,
-                inner: UnsafeCell::new(ArenaInner {
-                    alloc: UnsafeCell::new(alloc),
-                    last_owned: Cell::new(0),
-                    segments: UnsafeCell::new(None),
+                inner: UnsafeCell::new(ArenaSegmentsInner {
+                    first: ArenaSegment::new(first, Some(used_size), 0),
+                    tail: Vec::new(),
                 }),
             }
         }
-    }
 
-    impl<'e, A: Alloc> Arena<'e, A> {
-        pub fn segments(&self) -> Option<MessageSegments> {
-            let inner = unsafe { &*self.inner.get() };
-            let segments = unsafe { &*inner.segments.get() };
-
-            segments.as_ref().map(|s| {
-                MessageSegments {
-                    first: s.first.as_slice(),
-                    remainder: RemainderSegments {
-                        segments: unsafe { &*s.tail.get() }
-                    },
-                }
-            })
+        #[inline]
+        fn inner(&self) -> &ArenaSegmentsInner {
+            unsafe { &*self.inner.get() }
         }
 
-        pub fn reader(&self) -> ArenaReader {
-            let inner = unsafe { &*self.inner.get() };
-            let segments = unsafe { &*inner.segments.get() };
-
-            ArenaReader::FromBuilder(&segments)
+        pub fn as_message_segments<'b>(&'b self) -> MessageSegments<'b> {
+            let inner = self.inner();
+            MessageSegments {
+                first: inner.first.as_slice(),
+                remainder: RemainderSegments { segments: inner.tail.as_slice() }
+            }
         }
 
-        pub fn builder<'b>(&'b mut self) -> BuilderArena<'b> {
-            let borrow = unsafe {
-                // VERY UNSAFE.
-                // In order to prevent some very _unfortunate_ API choices made by other libraries,
-                // we need to make 'b covariant. Normally due to the normal borrow below of
-                // &'b UnsafeCell<ArenaInner<dyn Alloc + 'b>>, this makes 'b invariant since it's
-                // part of the cell's type of T. This rule makes sense. If 'b was normally
-                // allowed to automatically shorten, it would be possible to smuggle shorter variable
-                // lifetimes into the cell. But in this _very specific case_, that doesn't apply.
-                // We don't take anything out of the cell without giving it the lifetime 'b or shorter,
-                // and most importantly, _we don't put anything into the cell with that lifetime_.
-                // Unfortunately, we can't represent this in standard rust code. There is no
-                // "UnsafeCovariant" type in the standard lib to make that possible, so we must
-                // do it artificially by transmuting the reference into the one we actually want.
-                let borrow: &'b UnsafeCell<ArenaInner<dyn Alloc + 'b>> = &self.inner;
-                core::mem::transmute::<_, &'b UnsafeCell<ArenaInner<dyn Alloc>>>(borrow)
-            };
-            BuilderArena { inner: borrow }
+        #[inline]
+        pub fn first(&self) -> NonNull<ArenaSegment> {
+            NonNull::from(&self.inner().first)
         }
-    }
 
-    impl<A: Alloc + ?Sized> Drop for ArenaInner<A> {
-        fn drop(&mut self) {
-            let alloc = self.alloc.get_mut();
-            if let Some(segments) = self.segments.get_mut().take() {
-                unsafe {
-                    alloc.dealloc(segments.first.segment().clone());
-                }
+        #[inline]
+        pub fn first_builder(&self) -> ArenaSegmentBuilder {
+            ArenaSegmentBuilder(self.first())
+        }
 
-                let segments = segments.tail
-                    .into_inner()
-                    .into_iter()
-                    .map(|ptr| unsafe { *Box::from_raw(ptr.as_ptr()) });
-                for segment in segments {
-                    unsafe {
-                        alloc.dealloc(segment.segment().clone());
+        #[inline]
+        pub fn get(&self, id: SegmentId) -> Option<NonNull<ArenaSegment>> {
+            match id {
+                0 => Some(self.first()),
+                _ => {
+                    let idx = id as usize - 1;
+                    self.inner().tail.get(idx).copied()
+                },
+            }
+        }
+
+        #[inline]
+        pub fn builder(&self, id: SegmentId) -> Option<ArenaSegmentBuilder> {
+            match id {
+                0 => Some(self.first_builder()),
+                _ => {
+                    let idx = id as usize - 1;
+                    let ptr = self.inner().tail[idx];
+                    if unsafe { ptr.as_ref().is_read_only() } {
+                        return None
                     }
-                }
+        
+                    Some(ArenaSegmentBuilder(ptr))
+                },
+            }
+        }
+
+        /// Add a new segment to the set, returning the next segment ID
+        #[inline]
+        pub fn push(&self, segment: Segment, used_len: AllocLen) -> (SegmentId, ArenaSegmentBuilder) {
+            // Create a mutable reference directly to the tail vec. This prevents miri
+            // saying we violated stacked borrows by taking a mutable borrow to the
+            // whole ArenaSegmentsInner struct, which includes the ranges that the
+            // first segment resides in.
+            let tail = unsafe { &mut (*self.inner.get()).tail };
+
+            if tail.len() > Self::MAX_SEGMENTS {
+                panic!("Too many segments allocated in message!");
+            }
+
+            let id = (tail.len() + 1) as SegmentId;
+
+            let arena_segment = ArenaSegment::new(segment, Some(used_len), id);
+            let segment_ptr = NonNull::new(Box::into_raw(Box::new(arena_segment))).unwrap();
+            tail.push(segment_ptr);
+
+            (id, ArenaSegmentBuilder(segment_ptr))
+        }
+
+        #[inline]
+        pub fn drain(self) -> impl Iterator<Item = ArenaSegment> {
+            let ArenaSegmentsInner { first, tail } = self.inner.into_inner();
+
+            let first = core::iter::once(first);
+            let tail = tail.into_iter().map(|ptr| {
+                let boxed = unsafe { Box::from_raw(ptr.as_ptr()) };
+                *boxed
+            });
+            first.chain(tail)
+        }
+    }
+
+    struct ArenaSegmentSet {
+        segments: ArenaSegments,
+        /// The last owned segment in the set
+        last_owned: Cell<SegmentId>,
+    }
+
+    impl ArenaSegmentSet {
+        pub fn new(first: Segment, used_size: AllocLen) -> Self {
+            Self {
+                segments: ArenaSegments::new(first, used_size),
+                last_owned: Cell::new(0),
             }
         }
     }
 
-    unsafe impl<'e, A: Alloc + Send> Send for Arena<'e, A> {}
-    unsafe impl<'e, A: Alloc + Sync> Sync for Arena<'e, A> {}
+    impl SegmentSource for ArenaSegmentSet {
+        fn get(&self, id: SegmentId) -> Option<Segment> {
+            let segment = self.segments.get(id)?;
+            unsafe { Some(segment.as_ref().used_segment()) }
+        }
+    }
+
+    pub(super) struct Arena<A: Alloc + ?Sized> {
+        segments: Option<ArenaSegmentSet>,
+        alloc: UnsafeCell<A>,
+    }
+
+    impl<A: Alloc> Arena<A> {
+        pub const fn new(alloc: A) -> Self {
+            Self {
+                segments: None,
+                alloc: UnsafeCell::new(alloc),
+            }
+        }
+
+        pub fn root_builder<'b>(&'b mut self) -> SegmentBuilder<'b> {
+            let alloc = self.alloc.get_mut();
+
+            let alloc_len = AllocLen::MIN; // 1 Word for the root pointer
+            let segments = self.segments.get_or_insert_with(|| unsafe {
+                ArenaSegmentSet::new(alloc.alloc(alloc_len), alloc_len)
+            });
+            let segment = segments.segments.first_builder();
+            let arena = BuilderArena { inner: unsafe { CovariantArenaStore::new(&*self) } };
+
+            SegmentBuilder { segment, arena }
+        }
+    }
+
+    impl<A: Alloc + ?Sized> Arena<A> {
+        pub fn segments(&self) -> Option<MessageSegments> {
+            Some(self.segments.as_ref()?.segments.as_message_segments())
+        }
+
+        pub fn alloc(&self) -> &A {
+            // SAFETY: Since we're borrowing the arena fully with a shared reference, we know there
+            // can't be any builders with interior mutability
+            unsafe { &*self.alloc.get() }
+        }
+
+        pub fn get(&self, id: SegmentId) -> Option<Segment> {
+            self.segments.as_ref()?.get(id)
+        }
+
+        pub fn clear(&mut self) {
+            let alloc = self.alloc.get_mut();
+
+            self.segments
+                .take()
+                .into_iter()
+                .flat_map(|set| set.segments.drain())
+                .filter(|s| !s.is_read_only())
+                .for_each(|s| {
+                    unsafe { alloc.dealloc(s.segment) }
+                });
+        }
+    }
+
+    impl<A: Alloc + ?Sized> Drop for Arena<A> {
+        fn drop(&mut self) {
+            self.clear()
+        }
+    }
+
+    unsafe impl<A: Alloc + Send> Send for Arena<A> {}
+    unsafe impl<A: Alloc + Sync> Sync for Arena<A> {}
+
+    /// A reference to Arena<dyn Alloc> that doesn't make 'b invariant
+    #[derive(Clone, Copy)]
+    struct CovariantArenaStore<'b> {
+        /// DON'T ACCESS THIS FIELD DIRECTLY, use get()
+        inner: &'b Arena<dyn Alloc>,
+    }
+
+    impl<'b> CovariantArenaStore<'b> {
+        unsafe fn new(borrow: &'b Arena<dyn Alloc + 'b>) -> Self {
+            // VERY UNSAFE.
+            // In order to prevent some very _unfortunate_ API choices made by other libraries,
+            // we need to make 'b covariant. Normally due to the borrow below of
+            // &'b ArenaInner<dyn Alloc + 'b>, this makes 'b invariant since it's
+            // part of the traits's dynamic type of Alloc. This rule makes sense. If 'b was normally
+            // allowed to automatically shorten, it would be possible to smuggle shorter variable
+            // lifetimes into a possible cell. But in this _very specific case_, that doesn't apply.
+            // We don't take anything out of the cell without giving it the lifetime 'b or shorter,
+            // and most importantly, _we don't put anything into the cell with that lifetime_.
+            // Unfortunately, we can't represent this in standard rust code. There is no
+            // "UnsafeCovariant" type in the standard lib to make that possible, so we must
+            // do it artificially by transmuting the reference into the one we actually want.
+            Self {
+                inner: core::mem::transmute::<_, &'b Arena<dyn Alloc>>(borrow)
+            }
+        }
+
+        pub fn get(self) -> &'b Arena<dyn Alloc + 'b> {
+            unsafe { core::mem::transmute::<_, &'b Arena<dyn Alloc>>(self.inner) }
+        }
+    }
 
     /// An arena builder that lets us add segments with interior mutability.
-    #[derive(Clone, Debug)]
+    #[derive(Clone)]
     pub struct BuilderArena<'b> {
-        /// DON'T ACCESS THIS FIELD DIRECTLY. Use arena() or arena_mut() instead.
-        inner: &'b UnsafeCell<ArenaInner<dyn Alloc>>,
+        inner: CovariantArenaStore<'b>,
     }
 
     impl<'b> BuilderArena<'b> {
-        const MAX_SEGMENTS: usize = (u32::MAX - 1) as usize;
+        fn parts(&self) -> (&mut dyn Alloc, &ArenaSegmentSet) {
+            unsafe {
+                let arena = self.inner.get();
+                let alloc = &mut *arena.alloc.get();
+                let segments = arena.segments.as_ref().unwrap_unchecked();
+                (alloc, segments)
+            }
+        }
+
+        fn segment_set(&self) -> &ArenaSegmentSet {
+            let arena = self.inner.get();
+            unsafe { arena.segments.as_ref().unwrap_unchecked() }
+        }
+
+        pub fn as_message_segments(&self) -> MessageSegments {
+            self.segment_set().segments.as_message_segments()
+        }
 
         /// Allocates a segment of at least `min_size` words. The newly allocated segment will
         /// already have the minimum size allocated within it, meaning you don't have to allocate
         /// again with the returned builder
-        pub fn alloc_in_new_segment(&self, min_size: SegmentLen) -> (SegmentRef<'b>, SegmentBuilder<'b>) {
-            unsafe {
-                let inner = self.inner();
-                let alloc = &mut *inner.alloc.get();
-                let segments = &*inner.segments.get();
+        pub fn alloc_in_new_segment(
+            &self,
+            min_size: AllocLen,
+        ) -> (SegmentRef<'b>, SegmentBuilder<'b>) {
+            let (alloc, segments) = self.parts();
 
-                let ptr = match segments {
-                    None => {
-                        let new_segment = alloc.alloc(min_size);
-                        let segments_mut = &mut *inner.segments.get();
-                        let segment = ArenaSegment::new(new_segment, Some(min_size), 0);
-                        let segments = segments_mut.insert(ArenaSegments {
-                            first: segment,
-                            tail: UnsafeCell::new(Vec::new()),
-                        });
-                        // this pointer is fine, the reference will stick around at least as long
-                        // as the associated arena borrow
-                        NonNull::from(&segments.first)
-                    }
-                    Some(segments) => {
-                        let tail = &mut *segments.tail.get();
+            let new_segment = unsafe { alloc.alloc(min_size) };
+            let (new_id, ptr) = segments.segments.push(new_segment, min_size);
 
-                        if tail.len() > Self::MAX_SEGMENTS {
-                            panic!("Too many segments allocated in message!");
-                        }
+            segments.last_owned.set(new_id);
 
-                        let next_id = (tail.len() + 1) as u32;
-
-                        inner.last_owned.set(next_id);
-
-                        let new_segment = alloc.alloc(min_size);
-                        let boxed = Box::into_raw(Box::new(ArenaSegment::new(new_segment, Some(min_size), next_id)));
-                        let ptr = NonNull::new(boxed).unwrap();
-
-                        tail.push(ptr);
-
-                        ptr
-                    }
-                };
-                let segment = SegmentBuilder {
-                    segment: ptr,
-                    arena: self.clone(),
-                };
-                (segment.start(), segment)
-            }
-        }
-
-        fn inner(&self) -> &ArenaInner<dyn Alloc + 'b> {
-            unsafe { core::mem::transmute(&*self.inner.get()) }
+            let segment = SegmentBuilder {
+                segment: ptr,
+                arena: self.clone(),
+            };
+            (segment.start(), segment)
         }
 
         fn last_owned(&self) -> SegmentId {
-            self.inner().last_owned.get()
+            self.segment_set().last_owned.get()
         }
 
         /// Allocate an object of size somewhere in the message, returning a pointer to the
@@ -537,20 +654,9 @@ pub(crate) mod internal {
         }
 
         pub fn segment_mut(&self, id: SegmentId) -> Option<SegmentBuilder<'b>> {
-            let segments = unsafe { (&*self.inner().segments.get()).as_ref()? };
-            let segment = match id {
-                0 => NonNull::from(&segments.first),
-                id => {
-                    let index = (id - 1) as usize;
-                    let tail = unsafe { &*segments.tail.get() };
-                    let segment = tail[index];
-                    if unsafe { segment.as_ref().is_read_only() } {
-                        return None;
-                    }
+            let segments = self.segment_set();
+            let segment = segments.segments.builder(id)?;
 
-                    segment
-                }
-            };
             Some(SegmentBuilder {
                 segment,
                 arena: self.clone(),
@@ -558,9 +664,20 @@ pub(crate) mod internal {
         }
     }
 
+    impl PartialEq<BuilderArena<'_>> for BuilderArena<'_> {
+        #[inline]
+        fn eq(&self, other: &BuilderArena<'_>) -> bool {
+            core::ptr::eq(
+                // compare by data pointers directly
+                self.inner.get() as *const _ as *const (),
+                other.inner.get() as *const _ as *const ()
+            )
+        }
+    }
+
     #[derive(Clone)]
     pub struct SegmentBuilder<'b> {
-        segment: NonNull<ArenaSegment>,
+        segment: ArenaSegmentBuilder,
         arena: BuilderArena<'b>,
     }
 
@@ -570,21 +687,22 @@ pub(crate) mod internal {
         }
 
         fn segment(&self) -> &ArenaSegment {
-            unsafe { self.segment.as_ref() }
+            unsafe { self.segment.get() }
         }
 
         pub fn as_reader<'c>(&'c self) -> SegmentReader<'c> {
-            let segments = unsafe { &*self.arena.inner().segments.get() };
-            let arena = ArenaReader::FromBuilder(segments);
+            let arena = self.arena.segment_set();
+            let arena_segment = self.segment();
             SegmentReader {
                 arena,
-                segment: self.segment().segment().clone(),
+                id: arena_segment.id(),
+                segment: arena_segment.segment().clone(),
             }
         }
 
         #[inline]
         pub fn id(&self) -> SegmentId {
-            unsafe { self.segment.as_ref().id() }
+            self.segment().id()
         }
 
         #[inline]
@@ -671,7 +789,8 @@ pub(crate) mod internal {
         pub fn alloc_in_segment(&self, size: AllocLen) -> Option<SegmentRef<'b>> {
             unsafe {
                 let start_alloc_offset = self.segment().try_use_len(size)?;
-                let start = self.start()
+                let start = self
+                    .start()
                     .offset(start_alloc_offset.into())
                     .as_ref_unchecked();
                 Some(start)
@@ -721,6 +840,23 @@ pub(crate) mod internal {
             self.limit.get()
         }
     }
+
+    pub trait SegmentSource {
+        fn get(&self, id: SegmentId) -> Option<Segment>;
+
+        fn size_in_words(&self) -> usize {
+            (0u32..)
+                .map_while(|id| self.get(id))
+                .map(|s| s.len().get() as usize)
+                .sum()
+        }
+    }
+
+    impl<'a, T: SegmentSource> SegmentSource for &'a T {
+        fn get(&self, id: SegmentId) -> Option<Segment> {
+            T::get(*self, id)
+        }
+    }
 }
 
 use internal::*;
@@ -748,83 +884,104 @@ use internal::*;
 /// (unless its allocator does), which means it can be send + sync. With send and sync, we can store
 /// the message in an Arc, allowing us to read or build (with a lock) across threads.
 ///
-/// This type does not allocate by default. The first time you init the root of the message, a
+/// This type does not allocate by default. The first time you get the builder for the message, a
 /// segment is allocated.
 pub struct Message<'e, A: Alloc> {
-    arena: Arena<'e, A>,
+    /// A phantom lifetime from external readonly segments.
+    e: PhantomData<&'e Segment>,
+    arena: Arena<A>,
 }
 
 impl<'e, A: Alloc> Message<'e, A> {
     /// Creates a new message backed by the specified allocator
-    pub fn new(alloc: A) -> Self {
+    #[inline]
+    pub const fn new(alloc: A) -> Self {
         Self {
+            e: PhantomData,
             arena: Arena::new(alloc),
         }
     }
 
     /// Returns the segments of the message, or None if a root segment hasn't been allocated yet.
+    #[inline]
     pub fn segments(&self) -> Option<MessageSegments> {
         self.arena.segments()
     }
 
-    /// Creates a new reader for this message.
-    pub fn reader<'b>(&'b self) -> Reader<'b> {
-        Reader {
-            arena: self.arena.reader(),
-            limiter: None,
-            nesting_limit: u32::MAX,
-        }
+    /// Creates a new reader for this message. This reader has no limits placed on it.
+    ///
+    /// If you want a limited reader, use [`Message::reader_with_options`].
+    #[inline]
+    pub fn reader(&self) -> Reader<&Self> {
+        Reader::limitless(self)
     }
 
-    pub fn reader_with_options<'b>(&'b self, options: ReaderOptions) -> Reader<'b> {
-        Reader {
-            arena: self.arena.reader(),
-            limiter: Some(ReadLimiter::new(options.traversal_limit)),
-            nesting_limit: options.nesting_limit,
-        }
+    /// Creates a new reader for this message with the specified reader options.
+    #[inline]
+    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader<&Self> {
+        Reader::new(self, options)
     }
 
-    /// Gets a builder for this message.
+    /// Gets the builder for this message. This will allocate the root segment if it doesn't exist.
+    #[inline]
     pub fn builder<'b>(&'b mut self) -> Builder<'b, 'e> {
-        let builder = self.arena.builder();
-        let segment = builder
-            .segment_mut(0)
-            .unwrap_or_else(|| {
-                builder.alloc_in_new_segment(SegmentLen::MIN).1
-            });
         Builder {
             e: PhantomData,
-            root: segment,
+            root: self.arena.root_builder(),
         }
+    }
+
+    /// Clears the message, deallocating all the segments within it.
+    pub fn clear(&mut self) {
+        self.arena.clear()
     }
 }
 
 impl Message<'_, Growing<Global>> {
-    /// Creates a message backed by the default growing global allocator configuration.
-    pub fn global() -> Self {
-        Self::default()
+    /// Creates a message backed by the default growing global allocator configuration. This is
+    /// the configuration similar to the default configuration of the `MallocMessageBuilder` in
+    /// Cap'n Proto C++.
+    #[inline]
+    pub const fn global() -> Self {
+        Self::new(Growing::new(
+            Growing::<()>::DEFAULT_FIRST_SEGMENT_LEN,
+            Global,
+        ))
     }
 }
 
 impl<'s> Message<'_, Scratch<'s, Growing<Global>>> {
     /// Creates a message backed by the default growing global allocator configuration and the
     /// given scratch space.
+    #[inline]
     pub fn with_scratch<const N: usize>(space: &'s mut Space<N>) -> Self {
         Self::new(Scratch::with_space(space, Default::default()))
     }
 
     /// Creates a message backed by the default growing global allocator configuration and the
     /// given dynamically sized scratch space.
+    #[inline]
     pub fn with_dyn_scratch(space: &'s mut DynSpace) -> Self {
         Self::new(Scratch::with_dyn_space(space, Default::default()))
     }
 }
 
 impl<A: Alloc + Default> Default for Message<'_, A> {
+    /// Creates a default instance of the allocator and returns a new message backed by it.
+    #[inline]
     fn default() -> Self {
         Message::new(A::default())
     }
 }
+
+impl<A: Alloc> SegmentSource for Message<'_, A> {
+    fn get(&self, id: SegmentId) -> Option<Segment> {
+        self.arena.get(id)
+    }
+}
+
+unsafe impl<A: Alloc + Send> Send for Message<'_, A> {}
+unsafe impl<A: Alloc + Sync> Sync for Message<'_, A> {}
 
 /// Options controlling how data is read
 pub struct ReaderOptions {
@@ -859,33 +1016,136 @@ pub struct ReaderOptions {
     pub nesting_limit: u32,
 }
 
+impl ReaderOptions {
+    /// The default reader options returned by the default implementation
+    pub const DEFAULT: Self = Self {
+        traversal_limit: 8 * 1024 * 1024,
+        nesting_limit: 64,
+    };
+}
+
 impl Default for ReaderOptions {
     fn default() -> Self {
-        Self {
-            traversal_limit: 8 * 1024 * 1024,
-            nesting_limit: 64,
-        }
+        Self::DEFAULT
     }
 }
 
-pub struct Reader<'a> {
-    arena: internal::ArenaReader<'a>,
+/// A type used to read a message on a single thread.
+pub struct Reader<M> {
+    message: M,
     limiter: Option<ReadLimiter>,
     nesting_limit: u32,
 }
 
-impl Reader<'_> {
-    pub fn root(&self) -> PtrReader<Empty> {
+impl<M: SegmentSource> Reader<M> {
+    /// Creates a message reader with the specified limits.
+    pub const fn new(message: M, options: ReaderOptions) -> Self {
+        Self {
+            message,
+            limiter: Some(ReadLimiter::new(options.traversal_limit)),
+            nesting_limit: options.nesting_limit,
+        }
+    }
+
+    /// Creates a message reader with no limits applied.
+    /// 
+    /// Note: You should only use this if you trust the source of this data! Untrusted
+    /// data can perform amplification attacks and stack overflow DoS attacks while
+    /// reading the data, so you should only use this method if you want to read some
+    /// data that you know is safe.For instance: data built yourself using Message
+    /// is generally trusted, so Message::reader uses this constructor.
+    pub const fn limitless(message: M) -> Self {
+        Self {
+            message,
+            limiter: None,
+            nesting_limit: u32::MAX,
+        }
+    }
+
+    /// Returns the root as any pointer. If no root segment exists, this is a default null pointer.
+    #[inline]
+    pub fn root(&self) -> any::PtrReader {
         self.root_option().unwrap_or_default()
     }
 
-    pub fn root_option(&self) -> Option<PtrReader<Empty>> {
-        self.arena
-            .get(0)
-            .map(|s| PtrReader::root(s, self.limiter.as_ref(), self.nesting_limit))
+    /// Returns the root as any pointer. If no root segment exists, this returns None.
+    #[inline]
+    pub fn root_option(&self) -> Option<any::PtrReader> {
+        let segment = SegmentReader::from_source(&self.message, 0)?;
+        Some(PtrReader::root(segment, self.limiter.as_ref(), self.nesting_limit).into())
+    }
+
+    /// Returns the root and interprets it as the specified pointer type.
+    #[inline]
+    pub fn read_as<'b, T: ty::FromPtr<any::PtrReader<'b>>>(&'b self) -> T::Output {
+        self.root().read_as::<T>()
+    }
+
+    /// Calculates the message's total size in words.
+    #[inline]
+    pub fn size_in_words(&self) -> usize {
+        self.message.size_in_words()
     }
 }
 
+pub struct Builder<'b, 'e: 'b> {
+    e: PhantomData<&'e [Word]>,
+    root: SegmentBuilder<'b>,
+}
+
+impl<'b, 'e: 'b> Builder<'b, 'e> {
+    pub fn by_ref<'c>(&'c mut self) -> Builder<'c, 'e> {
+        Builder {
+            e: PhantomData,
+            root: self.root.clone(),
+        }
+    }
+
+    pub fn init_struct_root<S: ty::Struct>(self) -> S::Builder<'b, Empty> {
+        let root = self.into_root();
+        let root_raw = crate::ptr::PtrBuilder::from(root);
+        let builder = root_raw.init_struct(<S as ty::Struct>::SIZE);
+        unsafe { ty::StructBuilder::from_ptr(builder) }
+    }
+
+    pub fn set_struct_root<S, T>(self, reader: &S::Reader<'_, T>) -> S::Builder<'b, Empty>
+    where
+        S: ty::Struct,
+        T: InsertableInto<Empty>,
+    {
+        let root = self.into_root();
+        let root_raw = crate::ptr::PtrBuilder::from(root);
+        let builder = root_raw.set_struct(reader.as_ref(), crate::ptr::CopySize::Minimum(S::SIZE));
+        unsafe { ty::StructBuilder::from_ptr(builder) }
+    }
+
+    /// Returns the root pointer for the message.
+    pub fn into_root(self) -> any::PtrBuilder<'b> {
+        PtrBuilder::root(self.root).into()
+    }
+
+    pub fn into_parts(self) -> BuilderParts<'b> {
+        BuilderParts {
+            root: PtrBuilder::root(self.root).into(),
+        }
+    }
+
+    pub fn segments(&self) -> MessageSegments {
+        self.root.arena().as_message_segments()
+    }
+
+    pub fn size_in_words(&self) -> usize {
+        self.segments().iter().map(|s| s.len()).sum()
+    }
+}
+
+/// The raw components of the builder, including the root pointer, the root lifetime orphanage,
+/// and the external segment inserter.
+pub struct BuilderParts<'b> {
+    pub root: any::PtrBuilder<'b>,
+}
+
+/// The internal segments of a built message. This always contains at least one segment.
 #[derive(Clone)]
 pub struct MessageSegments<'b> {
     pub first: &'b [Word],
@@ -893,18 +1153,17 @@ pub struct MessageSegments<'b> {
 }
 
 impl<'b> MessageSegments<'b> {
+    #[inline]
     pub fn first_bytes(&self) -> &'b [u8] {
-        unsafe {
-            // i'm very lazy
-            let (_, bytes, _) = self.first.align_to();
-            bytes
-        }
+        Word::slice_to_bytes(self.first)
     }
 
+    #[inline]
     pub fn len(&self) -> u32 {
         self.remainder.len() + 1
     }
 
+    #[inline]
     pub fn iter(&self) -> SegmentsIter<'b> {
         SegmentsIter {
             inner: core::iter::once(self.first).chain(self.remainder.iter()),
@@ -921,18 +1180,30 @@ impl<'b> IntoIterator for MessageSegments<'b> {
     }
 }
 
+impl<'a, 'b> IntoIterator for &'b MessageSegments<'a> {
+    type IntoIter = SegmentsIter<'a>;
+    type Item = &'a [Word];
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[derive(Clone)]
 pub struct RemainderSegments<'b> {
-    segments: &'b Vec<NonNull<ArenaSegment>>,
+    segments: &'b [NonNull<ArenaSegment>],
 }
 
 impl<'b> RemainderSegments<'b> {
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
+    #[inline]
     pub fn len(&self) -> u32 {
         self.segments.len() as u32
     }
+    #[inline]
     fn iter(&self) -> RemainderIter<'b> {
         self.segments
             .iter()
@@ -941,10 +1212,8 @@ impl<'b> RemainderSegments<'b> {
 }
 
 type Iter<'b> = iter::Chain<iter::Once<&'b [Word]>, RemainderIter<'b>>;
-type RemainderIter<'b> = iter::Map<
-    slice::Iter<'b, NonNull<ArenaSegment>>,
-    fn(&'b NonNull<ArenaSegment>) -> &'b [Word],
->;
+type RemainderIter<'b> =
+    iter::Map<slice::Iter<'b, NonNull<ArenaSegment>>, fn(&'b NonNull<ArenaSegment>) -> &'b [Word]>;
 
 #[derive(Clone)]
 pub struct SegmentsIter<'b> {
@@ -971,150 +1240,330 @@ impl<'b> Iterator for SegmentsIter<'b> {
     }
 }
 
-pub struct Builder<'b, 'e: 'b> {
-    e: PhantomData<&'e [Word]>,
-    root: SegmentBuilder<'b>,
+enum RawKind {
+    Slice,
+    Box,
 }
 
-impl<'b, 'e: 'b> Builder<'b, 'e> {
-    pub fn segment_inserter(&self) -> ExternalSegmentInserter<'e, 'b> {
-        ExternalSegmentInserter {
-            e: PhantomData,
-            arena: self.root.arena().clone(),
-        }
-    }
-
-    /// Returns the root pointer for the message.
-    pub fn into_root(self) -> any::PtrBuilder<'b, Empty> {
-        PtrBuilder::root(self.root).into()
-    }
-}
-
-/// A type that can be used to create external read-only segments in a message.
-pub struct ExternalSegment<'e> {
-    e: PhantomData<&'e [Word]>,
+struct RawSegment {
     segment: Segment,
+    kind: RawKind,
 }
 
-impl<'e> ExternalSegment<'e> {
-    pub unsafe fn from_raw_parts(ptr: NonNull<Word>, len: SegmentLen) -> Self {
+impl RawSegment {
+    pub fn from_slice(slice: &[Word]) -> Self {
+        let len_u32 = u32::try_from(slice.len()).expect("segment too large");
+        let len = SegmentLen::new(len_u32).expect("segment too large");
+        let ptr = NonNull::from(&slice[0]);
+        let segment = Segment::new(ptr, len);
+
         Self {
-            e: PhantomData,
-            segment: Segment::new(ptr, len),
+            segment,
+            kind: RawKind::Slice,
         }
     }
 
-    /// Attempts to make an external segment from the given bytes. This requires that:
-    ///
-    /// * The data be aligned to Words
-    /// * The length is divisible by 8
-    /// * The length (in words) is a valid segment length
-    ///
-    /// Otherwise, the function returns None.
-    pub fn from_bytes(b: &'e [u8]) -> Option<Self> {
-        let ([], words, []) = (unsafe { b.align_to::<Word>() }) else { return None };
-        let slen32: u32 = words.len().try_into().ok()?;
-        let len = SegmentLen::new(slen32)?;
-        Some(unsafe { Self::from_raw_parts(NonNull::from(&words[0]), len) })
-    }
-}
+    pub fn from_box(boxed: Box<[Word]>) -> Self {
+        let len_u32 = u32::try_from(boxed.len()).expect("segment too large");
+        let len = SegmentLen::new(len_u32).expect("segment too large");
+        let ptr = NonNull::new(Box::leak(boxed).as_mut_ptr()).unwrap();
+        let segment = Segment::new(ptr, len);
 
-/// Allows for the insertion of borrowed external segments into a message builder in the form of
-/// data orphans.
-///
-/// This is kept separate from Orphanages since external segments require a separate lifetime
-/// (normally refered to as `'e`). But bringing that lifetime around just for orphanages and only
-/// for external segments is a massive cognitive drain for users of the library.
-///
-/// Note, this only applies to *borrowed* external segments. External segments with a static
-/// lifetime can be inserted through a normal orphanage. This is only needed for external segments
-/// without a static lifetime.
-pub struct ExternalSegmentInserter<'b, 'e: 'b> {
-    e: PhantomData<&'e [Word]>,
-    arena: BuilderArena<'b>,
-}
-
-impl<'b, 'e: 'b> ExternalSegmentInserter<'b, 'e> {
-    pub fn insert(&self, segment: ExternalSegment<'e>) -> PhantomData<&'b ()> {
-        todo!()
-    }
-}
-
-/*
-struct ReaderSegment<'a> {
-    a: PhantomData<&'a [Word]>,
-    segment: Segment,
-    drop: fn(Segment),
-}
-
-impl ReaderSegment<'static> {
-    pub fn from_box(b: Box<[Word]>) -> Result<Self, Box<[Word]>> {
-        let len = if let Some(len) = u32::try_from(b.len()).ok().and_then(SegmentLen::new) {
-            len
-        } else {
-            return Err(b);
-        };
-
-        let raw = Box::into_raw(b);
-
-        let segment = unsafe { Segment::new(NonNull::new_unchecked(raw.as_mut_ptr()), len) };
-        Ok(Self {
-            a: PhantomData,
+        Self {
             segment,
-            drop: |s| unsafe {
-                let slice = slice::from_raw_parts_mut(s.data().as_ptr(), s.len().get() as usize);
-                drop(Box::<[Word]>::from_raw(slice))
-            },
-        })
+            kind: RawKind::Box,
+        }
     }
 }
 
-impl Drop for ReaderSegment<'_> {
+impl Drop for RawSegment {
     fn drop(&mut self) {
-        drop(self.segment.clone())
+        if let RawKind::Box = self.kind {
+            let ptr = self.segment.data().as_ptr();
+            let len = self.segment.len().get() as usize;
+            unsafe {
+                let slice = core::slice::from_raw_parts_mut(ptr, len);
+                drop(Box::from_raw(slice));
+            }
+        }
     }
 }
 
-unsafe impl Send for ReaderSegment<'_> {}
-unsafe impl Sync for ReaderSegment<'_> {}
+unsafe impl Send for RawSegment {}
+unsafe impl Sync for RawSegment {}
 
 /// A set of read-only segments used by a MessageReader.
-struct SegmentSet<'a> {
-    first: ReaderSegment<'a>,
-    tail: Vec<Option<ReaderSegment<'a>>>,
-}
-
-impl ArenaReader for SegmentSet<'_> {
-    fn get(&self, id: SegmentId) -> Option<SegmentReader> {
-        let segment = match id {
-            0 => &self.first,
-            id => self.tail.get((id - 1) as usize)?.as_ref()?,
-        }
-        .segment
-        .clone();
-
-        Some(SegmentReader::new(self, segment))
-    }
-}
-
-/// A readable message. Can be used to create multiple readers.
 ///
-/// Like [Message], this type exists to remove the need for interior mutability in a root "reader"
-/// type. This type cannot be used to read the underlying message, instead it can only be used to
-/// create readers, which are locked to a single thread from interior mutability requirements.
-pub struct MessageReader<'a> {
-    a: PhantomData<&'a [Word]>,
-    segments: SegmentSet<'a>,
+/// This is a generic backing source type provided by the library.
+pub struct SegmentSet<'a> {
+    a: PhantomData<&'a Segment>,
+    first: RawSegment,
+    tail: Vec<RawSegment>,
 }
 
-impl<'a> MessageReader<'a> {
-    /// Creates a new reader for this message.
-    pub fn reader<'b>(&'b self, options: ReaderOptions) -> Reader<'b> {
-        todo!()
+impl SegmentSource for SegmentSet<'_> {
+    fn get(&self, id: SegmentId) -> Option<Segment> {
+        let segment = match id {
+            0 => self.first.segment.clone(),
+            id => self
+                .tail
+                .get((id - 1) as usize)
+                .map(|r| r.segment.clone())?,
+        };
+        Some(segment)
     }
 }
 
-pub struct MessageReaderBuilder<'a> {
-    a: PhantomData<&'a [Word]>,
+impl<'a> SegmentSet<'a> {
+    pub fn empty() -> Self {
+        Self::of_slice(&[Word::NULL])
+    }
+
+    fn from_raw(raw: RawSegment) -> Self {
+        Self {
+            a: PhantomData,
+            first: raw,
+            tail: Vec::new(),
+        }
+    }
+
+    pub fn of_slice(slice: &'a [Word]) -> Self {
+        Self::from_raw(RawSegment::from_slice(slice))
+    }
+
+    pub fn of_box(boxed: Box<[Word]>) -> Self {
+        Self::from_raw(RawSegment::from_box(boxed))
+    }
 }
-*/
+
+impl Debug for SegmentSet<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_list()
+            .entry(&self.first.segment)
+            .entries(self.tail.iter().map(|s| &s.segment))
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct SegmentSetBuilder<'a> {
+    segments: Option<SegmentSet<'a>>,
+}
+
+impl<'a> SegmentSetBuilder<'a> {
+    pub fn new() -> Self {
+        Self { segments: None }
+    }
+
+    fn push_raw(&mut self, raw: RawSegment) {
+        match &mut self.segments {
+            Some(segments) => {
+                assert!(segments.tail.len() < (u32::MAX as usize));
+
+                segments.tail.push(raw);
+            }
+            segments @ None => *segments = Some(SegmentSet::from_raw(raw)),
+        }
+    }
+
+    /// Adds a segment slice to the set.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the slice is larger than the max segment size (4 GB)
+    pub fn push_slice(&mut self, segment: &'a [Word]) {
+        self.push_raw(RawSegment::from_slice(segment))
+    }
+
+    /// Adds a boxed segment slice to the set.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the slice is larger than the max segment size (4 GB)
+    pub fn push_box(&mut self, boxed: Box<[Word]>) {
+        self.push_raw(RawSegment::from_box(boxed))
+    }
+
+    /// Builds the reader.
+    ///
+    /// If no segments were inserted into the builder, dummy empty message reader is returned.
+    pub fn build(self) -> SegmentSet<'a> {
+        self.segments.unwrap_or_else(|| SegmentSet::empty())
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ReadError<'a> {
+    /// An error occured while reading the stream table
+    #[error(transparent)]
+    Table(#[from] TableReadError),
+    /// A segment in the table indicated it's too large to be read
+    #[error("segment too large")]
+    SegmentTooLarge {
+        /// The ID of the segment
+        segment: SegmentId,
+        /// The stream table reader
+        table: &'a StreamTableRef,
+    },
+    /// The message was incomplete
+    #[error("incomplete message")]
+    Incomplete(Box<Partial<'a>>),
+}
+
+#[cfg(feature = "std")]
+#[derive(Error, Debug)]
+pub enum StreamError {
+    /// An error occured while reading the stream table
+    #[error(transparent)]
+    Table(#[from] TableReadError),
+    /// A segment in the table indicated it's too large to be read
+    #[error("segment too large")]
+    SegmentTooLarge {
+        /// The ID of the segment
+        segment: SegmentId,
+        /// The stream table reader
+        table: StreamTable,
+    },
+    #[error("message too large")]
+    MessageTooLarge,
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+pub struct StreamOptions {
+    /// The max number of segments that are allowed to be contained in the message. If the limit is 0 or 1
+    pub segment_limit: u32,
+    /// The max amount of words that can be read from the input stream
+    pub read_limit: u64,
+}
+
+impl StreamOptions {
+    pub const DEFAULT: Self = Self {
+        segment_limit: 512,
+        read_limit: ReaderOptions::DEFAULT.traversal_limit,
+    };
+}
+
+impl Default for StreamOptions {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+#[derive(Debug)]
+pub struct Partial<'a> {
+    /// A slice of the existing segment data
+    pub existing: &'a [Word],
+    /// How many bytes are required to read the rest of the current segment
+    pub remaining: usize,
+    /// The current segment ID we were reading
+    pub current: SegmentId,
+    /// The stream table reader
+    pub table: &'a StreamTableRef,
+    /// The segment set builder
+    pub builder: SegmentSetBuilder<'a>,
+}
+
+impl<'a> SegmentSet<'a> {
+    /// Parse a message from a flat array.
+    ///
+    /// This returns both the message reader and the remainder of the slice beyond the end of
+    /// the message.
+    ///
+    /// If the content is incomplete or invalid, this returns an error
+    #[inline]
+    pub fn from_slice(slice: &'a [Word]) -> Result<(Self, &'a [Word]), ReadError<'a>> {
+        let (table, mut content) = StreamTableRef::try_read(slice)?;
+        let mut builder = SegmentSetBuilder::new();
+
+        for (len, id) in table.segments().into_iter().zip(0u32..) {
+            let Some(len) = len.try_get() else {
+                return Err(ReadError::SegmentTooLarge {
+                    segment: id, table,
+                })
+            };
+            let len = len.get() as usize;
+
+            let Some((segment, remainder)) = content.get(..len).zip(content.get(len..)) else {
+                return Err(ReadError::Incomplete(Box::new(Partial {
+                    existing: content,
+                    remaining: len - content.len(),
+                    current: id,
+                    table,
+                    builder,
+                })))
+            };
+
+            builder.push_slice(segment);
+            content = remainder;
+        }
+
+        Ok((builder.build(), content))
+    }
+
+    #[cfg(feature = "std")]
+    pub fn from_read<R: std::io::Read>(
+        mut reader: R,
+        options: StreamOptions,
+    ) -> Result<Self, StreamError> {
+        let mut first = [Word::NULL; 1];
+        let segment_table_buffer: tinyvec::TinyVec<[Word; 32]>;
+
+        reader.read_exact(Word::slice_to_bytes_mut(&mut first))?;
+
+        let segment_table = match StreamTableRef::try_read(&first) {
+            Ok((table, _)) => table,
+            Err(TableReadError::Incomplete { count, required }) => {
+                if count >= options.segment_limit {
+                    return Err(StreamError::Table(TableReadError::TooManySegments));
+                }
+
+                let mut buffer = tinyvec::tiny_vec!();
+                buffer.resize(required + 1, Word::NULL);
+                let (buffer_first, rest) = buffer.split_first_mut().unwrap();
+                *buffer_first = first[0];
+
+                reader.read_exact(Word::slice_to_bytes_mut(rest))?;
+
+                segment_table_buffer = buffer;
+
+                StreamTableRef::try_read(&segment_table_buffer)
+                    .expect("failed to read segment table")
+                    .0
+            }
+            Err(err @ TableReadError::TooManySegments) => return Err(StreamError::Table(err)),
+            Err(TableReadError::Empty) => unreachable!(),
+        };
+
+        let mut total_words = 0u64;
+        for (id, size) in segment_table.segments().into_iter().enumerate() {
+            let Some(size) = size.try_get() else {
+                return Err(StreamError::SegmentTooLarge {
+                    segment: id as u32,
+                    table: segment_table.to_owned(),
+                })
+            };
+
+            total_words += size.get() as u64;
+
+            if total_words > options.read_limit {
+                return Err(StreamError::MessageTooLarge);
+            }    
+        }
+
+        let mut segments = SegmentSetBuilder::new();
+
+        for size in segment_table
+            .segments()
+            .into_iter()
+            .map(|size| size.try_get().unwrap())
+        {
+            let mut segment = vec![Word::NULL; size.get() as usize].into_boxed_slice();
+            reader.read_exact(Word::slice_to_bytes_mut(segment.as_mut()))?;
+
+            segments.push_box(segment);
+        }
+
+        Ok(segments.build())
+    }
+}

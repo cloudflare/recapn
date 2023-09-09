@@ -1,3 +1,11 @@
+//! Serialization integration with Cap'n Proto RPC.
+//!
+//! This may look a bit different from other libraries because everything is generic.
+//! In order to avoid direct Dispatch Tax and allow for more flexible capability systems to be
+//! used (like multi-threaded cap systems), everything is generic so any capability system can
+//! be written and dropped in. Sadly this means users may have to explicitly think about what
+//! RPC system their code is using, even if no RPC system is used.
+
 pub(crate) mod internal {
     use super::{
         CapSystem, CapTable, CapTableBuilder, CapTableReader, CapTranslator, Empty, Table,
@@ -106,6 +114,71 @@ pub trait Table {
     type Builder: internal::CapPtrBuilder<Table = Self>;
 }
 
+/// Describes a type which can be imbued with a cap system.
+pub trait Capable: Sized {
+    /// The table type imbued in this type.
+    type Table: Table;
+
+    /// The type imbued in this capable type. This is either `Table::Builder` or `Table::Reader`.
+    type Imbued;
+    /// The result of imbuing this type with a new table
+    type ImbuedWith<T2: Table>: Capable<Table = T2>;
+
+    /// Get a reference to the type imbued in this type.
+    fn imbued(&self) -> &Self::Imbued;
+
+    /// Imbues this type with a table, returning the resulting value and the old table.
+    fn imbue_release<T2: Table>(
+        self,
+        new_table: <Self::ImbuedWith<T2> as Capable>::Imbued,
+    ) -> (Self::ImbuedWith<T2>, Self::Imbued);
+
+    /// Imbues this type with a table, returning the resulting value and discarding the old table.
+    #[inline]
+    fn imbue<T2: Table>(
+        self,
+        new_table: <Self::ImbuedWith<T2> as Capable>::Imbued,
+    ) -> Self::ImbuedWith<T2> {
+        self.imbue_release(new_table).0
+    }
+
+    /// Imbue another type with the table of this type, returning the resulting value and the old table.
+    fn imbue_release_into<T>(&self, other: T) -> (T::ImbuedWith<Self::Table>, T::Imbued)
+    where
+        T: Capable,
+        T::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>;
+
+    /// Imbue another type with the table of this type, returning the resulting value and discarding the old table.
+    #[inline]
+    fn imbue_into<T>(&self, other: T) -> T::ImbuedWith<Self::Table>
+    where
+        T: Capable,
+        T::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
+    {
+        self.imbue_release_into(other).0
+    }
+
+    #[inline]
+    fn imbue_release_from<T>(self, other: &T) -> (Self::ImbuedWith<T::Table>, Self::Imbued)
+    where
+        T: Capable,
+        Self::ImbuedWith<T::Table>: Capable<Imbued = T::Imbued>,
+    {
+        other.imbue_release_into(self)
+    }
+
+    #[inline]
+    fn imbue_from<T>(self, other: &T) -> Self::ImbuedWith<T::Table>
+    where
+        T: Capable,
+        Self::ImbuedWith<T::Table>: Capable<Imbued = T::Imbued>,
+    {
+        other.imbue_into(self)
+    }
+}
+
+pub type TableIn<T> = <T as Capable>::Table;
+
 /// A trait that can be used to constrain tables that can be used to copy between pointers with
 /// different tables.
 ///
@@ -173,6 +246,8 @@ pub trait CapTableBuilder: CapTableReader {
     /// Add the capability to the message and return its index. If the same cap is injected
     /// twice, this may return the same index both times, but in this case drop_cap() needs to be
     /// called an equal number of times to actually remove the cap.
+    // TODO(someday): Make this return Option<u32> to indicate that the cap was some "none" value
+    // and that the pointer should be cleared.
     fn inject_cap(&self, cap: <Self::System as CapSystem>::Cap) -> u32;
 
     /// Remove a capability injected earlier. Called when the pointer is overwritten or zero'd out.
@@ -227,6 +302,8 @@ pub trait PipelineBuilder<T> {
 pub struct Pipeline<P: Pipelined>(P);
 
 impl<P: Pipelined> Pipeline<P> {
+    pub fn new(pipeline: P) -> Self { Pipeline(pipeline) }
+
     pub fn push<T>(self, op: <P as PipelineBuilder<T>>::Operation) -> Self
     where
         P: PipelineBuilder<T>,

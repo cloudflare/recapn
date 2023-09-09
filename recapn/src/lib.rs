@@ -3,8 +3,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(const_option)]
 #![feature(slice_from_ptr_range)]
-#![feature(slice_ptr_get)]
 
+use core::fmt::{self, Display};
 use ptr::{PtrElementSize, WirePtr};
 use thiserror::Error;
 
@@ -22,101 +22,59 @@ mod internal {
 }
 
 // Modules defined in this part of the lib are for the serialization layers.
-// RPC layers may be defined later on in other modules, or not at all due to feature flags.
-// But essentially, RPC is not defined here (beyond what is essential for handling pointers).
+// RPC layers may be implemented later on in other modules, or not at all due to feature flags.
+// But essentially, RPC is not implemented here (beyond what is essential for handling pointers).
 
 // Layer 0 : Messages and segments
 
-/// Types and primitives for the allocation of segments of [Words].
 pub mod alloc;
-/// Types for the creation of Cap'n Proto messages.
 pub mod message;
+pub mod io;
 
 // Layer 1 : Typeless primitives (structs, lists, caps)
 
-/// Types and primitives for the reading and building of objects in a
-/// message (structs, lists, and pointers)
 pub mod ptr;
-/// Types and primitives for interacting with Cap'n Proto RPC.
-///
-/// This may look a bit different from other libraries because everything is generic.
-/// In order to avoid direct Dispatch Tax and allow for more flexible capability systems to be
-/// used (like multi-threaded cap systems), everything is generic so any capability system can
-/// be written and dropped in. Sadly this means users may have to explicitly think about what
-/// RPC system their code is using, even if no RPC system is used.
+pub mod data;
+pub mod text;
 pub mod rpc;
 
 // Layer 2 : Types and abstractions
-pub mod any;
-pub mod list;
+
 pub mod ty;
-// pub mod data;
-// pub mod text;
+pub mod list;
+pub mod any;
 pub mod field;
 
 // Layer 3 : Extensions
+
+// pub mod orphan;
 // pub mod schema;
 // pub mod compiler;
 // pub mod dynamic;
 
-#[doc(hidden)]
+/// A type that is the reader of a struct type.
+pub type ReaderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Reader<'a, Table>;
+/// A type that is the builder of a struct type.
+pub type BuilderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Builder<'a, Table>;
+
 pub mod prelude {
-    pub mod v1 {
-        pub use crate::field::{
-            self as f, Accessable, AccessableMut, Accessor, AccessorMut, UnionSlot, Variant,
-            VariantMut,
+    pub mod gen {
+        pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
+        pub use recapn::data::{self, Data};
+        pub use recapn::field::{
+            self, Accessor, AccessorMut, Descriptor, Enum, FieldGroup, Group, Struct,
+            UnionViewer, Variant, VariantInfo, VariantDescriptor, VariantMut, ViewOf, Viewable,
         };
-        pub use crate::{list, Family, Result};
-        pub mod t {
-            pub use crate::ptr::{
-                Bool, Int16, Int32, Int64, Int8, UInt16, UInt32, UInt64, UInt8, Void,
-            };
-            pub use crate::ty::{Enum, Struct};
-        }
-        pub use crate::rpc;
+        pub use recapn::list::{self, List};
+        pub use recapn::ptr::{
+            self, StructBuilder, StructReader, StructSize
+        };
+        pub use recapn::rpc::{self, Capable, Table};
+        pub use recapn::text::{self, Text};
+        pub use recapn::ty::{self, StructView};
+        pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
     }
 }
-
-/// A type that is the reader of a struct type.
-pub type ReaderOf<'a, T, Table = rpc::Empty> = <T as ty::Struct>::Reader<'a, Table>;
-/// A type that is the builder of a struct type.
-pub type BuilderOf<'a, T, Table = rpc::Empty> = <T as ty::Struct>::Builder<'a, Table>;
-
-/*
-pub use any::Any;
-pub use data::Data;
-pub use list::List;
-pub use text::Text;
-
-/// Includes a file as a reference to a Word array.
-///
-/// The file will be padded with 0-bytes if its length in bytes is not divisible by 8.
-///
-/// The file is located relative to the current file (similarly to how modules are found).
-/// The provided path is interpreted in a platform-specific way at compile time. So, for instance,
-/// an invocation with a Windows path containing backslashes \ would not compile correctly on Unix.
-///
-/// This macro will yield an expression of type &'static [Word; N] which is the contents of the file.
-#[macro_export]
-macro_rules! include_words {
-    ($file:expr $(,)?) => {{
-        const FILE: &[u8] = include_bytes!($file);
-        const FILE_LEN_WORDS: usize = Word::round_up_byte_count(FILE.len());
-        const fn make_aligned_words_of_file() -> [Word; FILE_LEN_WORDS] {
-            let file_aligned = [Word::NULL; FILE_LEN_WORDS];
-            unsafe {
-                core::ptr::copy_nonoverlapping(
-                    FILE.as_ptr(),
-                    file_aligned.as_ptr() as *mut u8, // LMAO
-                    FILE.len(),
-                )
-            };
-            file_aligned
-        }
-        &make_aligned_words_of_file()
-    }};
-}
-*/
 
 /// A marker type used in place of a concrete generic implementation for a message's representation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -224,3 +182,13 @@ impl From<ErrorKind> for Error {
 }
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
+
+/// A type representing a union or enum variant that doesn't exist in the Cap'n Proto schema.
+#[derive(Error, Debug)]
+pub struct NotInSchema(pub u16);
+
+impl Display for NotInSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "variant {} was not present in the schema", self.0)
+    }
+}
