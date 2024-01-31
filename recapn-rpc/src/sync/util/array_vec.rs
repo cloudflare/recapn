@@ -1,16 +1,13 @@
 use core::mem::MaybeUninit;
 use core::ptr;
-use core::task::Waker;
 
-const NUM_WAKERS: usize = 32;
-
-pub(crate) struct WakeList {
-    inner: [MaybeUninit<Waker>; NUM_WAKERS],
+pub(crate) struct ArrayVec<T, const N: usize> {
+    inner: [MaybeUninit<T>; N],
     curr: usize,
 }
 
-impl WakeList {
-    pub(crate) fn new() -> Self {
+impl<T, const N: usize> ArrayVec<T, N> {
+    pub fn new() -> Self {
         Self {
             inner: unsafe {
                 // safety: Create an uninitialized array of `MaybeUninit`. The
@@ -24,30 +21,31 @@ impl WakeList {
     }
 
     #[inline]
-    pub(crate) fn can_push(&self) -> bool {
-        self.curr < NUM_WAKERS
+    pub fn can_push(&self) -> bool {
+        self.curr < N
     }
 
-    pub(crate) fn push(&mut self, val: Waker) {
+    #[inline]
+    pub fn push(&mut self, val: T) {
         debug_assert!(self.can_push());
 
         self.inner[self.curr] = MaybeUninit::new(val);
         self.curr += 1;
     }
 
-    pub(crate) fn wake_all(&mut self) {
-        assert!(self.curr <= NUM_WAKERS);
+    #[inline]
+    pub fn for_each<F: FnMut(T)>(&mut self, mut func: F) {
+        assert!(self.curr <= N);
         while self.curr > 0 {
             self.curr -= 1;
-            let waker = unsafe { ptr::read(self.inner[self.curr].as_mut_ptr()) };
-            waker.wake();
+            (func)(unsafe { self.inner[self.curr].assume_init_read() });
         }
     }
 }
 
-impl Drop for WakeList {
+impl<T, const N: usize> Drop for ArrayVec<T, N> {
     fn drop(&mut self) {
-        let slice = ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr() as *mut Waker, self.curr);
+        let slice = ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr() as *mut T, self.curr);
         unsafe { ptr::drop_in_place(slice) };
     }
 }

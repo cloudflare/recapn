@@ -10,13 +10,24 @@ use crate::ptr::{self, StructSize, MessageSize};
 use crate::rpc::{Capable, Table};
 use crate::{NotInSchema, IntoFamily, Result};
 
-/// An enum marker trait. Enums can be converted to and from shorts (u16), no matter if their value
-/// is contained within the schema or not.
+/// An enum marker trait.
 pub trait Enum: Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
+
+/// A capability marker trait.
+pub trait Capability: 'static {
+    /// The typeless client this type is a wrapper around.
+    type Client;
+
+    /// Convert from a typeless client into an instance of this type.
+    fn from_client(c: Self::Client) -> Self;
+
+    /// Unwrap the inner typeless client.
+    fn into_inner(self) -> Self::Client;
+}
 
 /// Provides associated types for readers and builders of a struct with the given type.
 /// 
-/// Note, this is applied to both structs, and _groups_, which are not values that you can read
+/// Note, this is applied to both structs and *groups* which are not values that you can read
 /// from a pointer.
 pub trait StructView: 'static {
     type Reader<'a, T: Table>: StructReader<Ptr = ptr::StructReader<'a, T>> + IntoFamily<Family = Self>;
@@ -30,15 +41,15 @@ pub trait Struct: StructView {
     const SIZE: StructSize;
 }
 
-/// Gets the size of a struct type. This is effectively the same as <S as Struct>::SIZE
+/// Gets the size of a struct type. This is effectively the same as `<S as Struct>::SIZE`
 #[inline]
 pub const fn size_of<S: Struct>() -> StructSize {
     S::SIZE
 }
 
-/// A safely typed struct wrapper around a raw reader or builder.
+/// A safely typed wrapper around a raw reader or builder.
 pub trait TypedPtr {
-    /// The underlying pointer type for this struct.
+    /// The underlying pointer type for this type.
     type Ptr;
 }
 

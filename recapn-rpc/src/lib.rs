@@ -11,44 +11,49 @@
 //! thread, put your connection handling on one or more threads, put local servers on one thread,
 //! or any number of threads, or any combination of the above.
 
-#![feature(hash_raw_entry)]
-
-use client::Client;
+use std::borrow::Cow;
 
 pub mod gen;
 pub mod table;
 pub mod sync;
-pub mod client;
 pub mod connection;
-//mod system;
-//pub mod twoparty;
+pub mod client;
 
-#[derive(Clone, Debug)]
-pub enum ErrorKind {
-    Failed,
-    Overloaded,
-    Disconnected,
-    Unimplemented,
-}
+pub use gen::capnp_rpc_capnp::exception::Type as ErrorKind;
 
 #[derive(Clone, Debug)]
 pub struct Error {
     kind: ErrorKind,
-    description: Box<str>,
+    description: Cow<'static, str>,
 }
 
 impl Error {
-    pub fn failed(description: impl Into<Box<str>>) -> Self {
+    pub fn new(kind: ErrorKind, description: Cow<'static, str>) -> Self {
+        Error { kind, description }
+    }
+    pub fn failed(description: impl Into<Cow<'static, str>>) -> Self {
         Error { kind: ErrorKind::Failed, description: description.into() }
     }
-    pub fn overloaded(description: impl Into<Box<str>>) -> Self {
+    pub fn overloaded(description: impl Into<Cow<'static, str>>) -> Self {
         Error { kind: ErrorKind::Overloaded, description: description.into() }
     }
-    pub fn disconnected(description: impl Into<Box<str>>) -> Self {
+    pub fn disconnected(description: impl Into<Cow<'static, str>>) -> Self {
         Error { kind: ErrorKind::Disconnected, description: description.into() }
     }
-    pub fn unimplemented(description: impl Into<Box<str>>) -> Self {
+    pub fn unimplemented(description: impl Into<Cow<'static, str>>) -> Self {
         Error { kind: ErrorKind::Unimplemented, description: description.into() }
+    }
+
+    #[inline]
+    pub fn kind(&self) -> ErrorKind { self.kind }
+
+    #[inline]
+    pub fn description(&self) -> &str { &self.description }
+}
+
+impl From<recapn::Error> for Error {
+    fn from(value: recapn::Error) -> Self {
+        Error::failed(value.to_string())
     }
 }
 

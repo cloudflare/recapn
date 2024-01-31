@@ -4744,7 +4744,7 @@ impl _p::ty::Struct for Exception {
 impl Exception {
     const REASON: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
-        default: _p::text::Reader::empty(),
+        default: _p::text::ptr::Reader::empty(),
     };
     const OBSOLETE_IS_CALLERS_FAULT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 0u32,
@@ -4762,7 +4762,7 @@ impl Exception {
     };
     const TRACE: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 1u32,
-        default: _p::text::Reader::empty(),
+        default: _p::text::ptr::Reader::empty(),
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {

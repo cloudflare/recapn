@@ -2,20 +2,25 @@ use std::collections::HashMap;
 
 use anyhow::{Result, Context, ensure};
 use quote::ToTokens;
-use recapn::ReaderOf;
 use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
+use recapn::ReaderOf;
 use recapn::any::{AnyList, AnyStruct};
 use recapn::ptr::StructSize;
 use syn::PathSegment;
 use syn::punctuated::Punctuated;
 
-use crate::quotes::{GeneratedFile, GeneratedStruct, GeneratedField, GeneratedItem, GeneratedWhich, FieldDescriptor, GeneratedVariant, GeneratedEnum, GeneratedConst};
-use crate::gen::capnp_schema_capnp::{self as schema, Value};
-use schema::{node::Struct, node::Const, Node, Field, CodeGeneratorRequest, Type};
-use schema::node::Which as NodeKind;
-use schema::r#type::Which as TypeKind;
-use schema::r#type::any_pointer::Which as AnyPtrKind;
-use schema::r#type::any_pointer::unconstrained::Which as ConstraintKind;
+use crate::quotes::{
+    GeneratedFile, GeneratedStruct, GeneratedField, GeneratedItem, GeneratedWhich, FieldDescriptor,
+    GeneratedVariant, GeneratedEnum, GeneratedConst,
+};
+use crate::gen::capnp_schema_capnp as schema;
+use schema::{Node, Field, Value, CodeGeneratorRequest, Type};
+use schema::node::{Struct, Const, Which as NodeKind};
+use schema::r#type::{
+    Which as TypeKind,
+    any_pointer::Which as AnyPtrKind,
+    any_pointer::unconstrained::Which as ConstraintKind,
+};
 
 pub mod ident;
 
@@ -164,11 +169,11 @@ impl<'a> GeneratorContext<'a> {
 
         // For some reason, groups are not considered nested nodes of structs. So we
         // have to iter over all fields and find all the groups contained
-        if let Some(struct_type) = node.r#struct().get() {
+        if let Some(struct_type) = node.r#struct().field() {
             let groups = struct_type
                 .fields()
                 .into_iter()
-                .filter_map(|f| f.group().get().map(|group| (f, group.type_id())));
+                .filter_map(|f| f.group().field().map(|group| (f, group.type_id())));
             for (field, group_id) in groups {
                 let name = field.name().as_str()?;
                 Self::validate_node(group_id, name, nodes, identifiers, scope)?;
@@ -332,14 +337,14 @@ impl<'a> GeneratorContext<'a> {
             .into_iter()
             .map(|nested| self.generate_item(nested.id()));
         let nested_groups = node.r#struct()
-            .get()
+            .field()
             .into_iter()
             .flat_map(|node| node
                 .fields()
                 .into_iter()
                 .filter_map(|field| field
                     .group()
-                    .get()
+                    .field()
                     .map(|group| self.generate_item(group.type_id()))
                 )
             );
@@ -480,19 +485,19 @@ impl<'a> GeneratorContext<'a> {
 
         let expr: Box<syn::Expr> = match type_info.which()? {
             TypeKind::Void(()) => syn::parse_quote!(()),
-            TypeKind::Bool(()) => quote_value_or_default(value, |v| v.bool().get(), false),
-            TypeKind::Int8(()) => quote_value_or_default(value, |v| v.int8().get(), 0),
-            TypeKind::Uint8(()) => quote_value_or_default(value, |v| v.uint8().get(), 0),
-            TypeKind::Int16(()) => quote_value_or_default(value, |v| v.int16().get(), 0),
-            TypeKind::Uint16(()) => quote_value_or_default(value, |v| v.uint16().get(), 0),
-            TypeKind::Int32(()) => quote_value_or_default(value, |v| v.int32().get(), 0),
-            TypeKind::Uint32(()) => quote_value_or_default(value, |v| v.uint32().get(), 0),
-            TypeKind::Int64(()) => quote_value_or_default(value, |v| v.int64().get(), 0),
-            TypeKind::Uint64(()) => quote_value_or_default(value, |v| v.uint64().get(), 0),
-            TypeKind::Float32(()) => quote_value_or_default(value, |v| v.float32().get(), 0.),
-            TypeKind::Float64(()) => quote_value_or_default(value, |v| v.float64().get(), 0.),
+            TypeKind::Bool(()) => quote_value_or_default(value, |v| v.bool().field(), false),
+            TypeKind::Int8(()) => quote_value_or_default(value, |v| v.int8().field(), 0),
+            TypeKind::Uint8(()) => quote_value_or_default(value, |v| v.uint8().field(), 0),
+            TypeKind::Int16(()) => quote_value_or_default(value, |v| v.int16().field(), 0),
+            TypeKind::Uint16(()) => quote_value_or_default(value, |v| v.uint16().field(), 0),
+            TypeKind::Int32(()) => quote_value_or_default(value, |v| v.int32().field(), 0),
+            TypeKind::Uint32(()) => quote_value_or_default(value, |v| v.uint32().field(), 0),
+            TypeKind::Int64(()) => quote_value_or_default(value, |v| v.int64().field(), 0),
+            TypeKind::Uint64(()) => quote_value_or_default(value, |v| v.uint64().field(), 0),
+            TypeKind::Float32(()) => quote_value_or_default(value, |v| v.float32().field(), 0.),
+            TypeKind::Float64(()) => quote_value_or_default(value, |v| v.float64().field(), 0.),
             TypeKind::Text(()) => {
-                match value.and_then(|v| v.text().get()).map(|v| v.get()) {
+                match value.and_then(|v| v.text().field()).map(|v| v.get()) {
                     Some(text) if !text.is_empty() => {
                         todo!("implement text defaults")
                     }
@@ -500,7 +505,7 @@ impl<'a> GeneratorContext<'a> {
                 }
             }
             TypeKind::Data(()) => {
-                match value.and_then(|v| v.data().get()).map(|v| v.get()) {
+                match value.and_then(|v| v.data().field()).map(|v| v.get()) {
                     Some(data) if !data.is_empty() => {
                         todo!("implement data defaults")
                     }
@@ -509,7 +514,7 @@ impl<'a> GeneratorContext<'a> {
             }
             TypeKind::List(list) => {
                 let element_type = self.resolve_type(scope, &list.element_type().get())?;
-                let any = value.and_then(|v| v.list().get())
+                let any = value.and_then(|v| v.list().field())
                     .map(|v| v.get().read_as::<AnyList>());
                 match any {
                     Some(list) if list.len() != 0 => {
@@ -519,7 +524,7 @@ impl<'a> GeneratorContext<'a> {
                 }
             }
             TypeKind::Enum(info) => {
-                let value = value.and_then(|v| v.r#enum().get()).unwrap_or(0);
+                let value = value.and_then(|v| v.r#enum().field()).unwrap_or(0);
                 let NodeContext {
                     info: Some(NodeInfo::Enum(EnumInfo {
                         enumerants,
@@ -533,7 +538,7 @@ impl<'a> GeneratorContext<'a> {
                 syn::parse_quote!(#type_name::#enumerant)
             }
             TypeKind::Struct(_) => {
-                let any = value.and_then(|v| v.r#struct().get())
+                let any = value.and_then(|v| v.r#struct().field())
                     .and_then(|v| v.get().try_read_option_as::<AnyStruct>().ok().flatten());
                 match any {
                     Some(_) => {
@@ -546,7 +551,7 @@ impl<'a> GeneratorContext<'a> {
                 unimplemented!("cannot generate default values for Capability fields")
             }
             TypeKind::AnyPointer(kind) => {
-                let ptr = value.and_then(|v| v.any_pointer().get())
+                let ptr = value.and_then(|v| v.any_pointer().field())
                     .map(|f| f.get())
                     .filter(|p| !p.is_null());
                 match kind.which()? {

@@ -27,11 +27,11 @@
 //    * Default
 //    * PartialEq (readers + builders)
 
-use crate::field::Struct;
+use crate::field::{Struct, Capability};
 use crate::internal::Sealed;
 use crate::list::{self, List};
 use crate::ptr::{MessageSize, StructSize, PtrElementSize};
-use crate::rpc::{self, Capable, Empty, PipelineBuilder, Pipelined, Table};
+use crate::rpc::{self, Capable, Empty, PipelineBuilder, Pipelined, Table, CapTable, BreakableCapSystem};
 use crate::ty::FromPtr;
 use crate::{ty, Family, IntoFamily, Result};
 
@@ -221,6 +221,49 @@ impl<'a, T: Table> PtrReader<'a, T> {
     }
 }
 
+impl<'a, T: CapTable> PtrReader<'a, T> {
+    #[inline]
+    pub fn try_read_option_as_client<C: ty::Capability<Client = T::Cap>>(&self) -> Result<Option<C>> {
+        match self.0.try_to_capability() {
+            Ok(Some(c)) => Ok(Some(C::from_client(c))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl<'a, T: CapTable + BreakableCapSystem> PtrReader<'a, T> {
+    #[inline]
+    pub fn try_read_as_client<C: ty::Capability<Client = T::Cap>>(&self) -> Result<C> {
+        let cap = match self.0.try_to_capability() {
+            Ok(Some(c)) => c,
+            Ok(None) => T::null(),
+            Err(err) => return Err(err),
+        };
+        Ok(C::from_client(cap))
+    }
+
+    #[inline]
+    pub fn read_option_as_client<C: ty::Capability<Client = T::Cap>>(&self) -> Option<C> {
+        let cap = match self.0.try_to_capability() {
+            Ok(Some(c)) => c,
+            Ok(None) => return None,
+            Err(err) => T::broken(err.to_string()),
+        };
+        Some(C::from_client(cap))
+    }
+
+    #[inline]
+    pub fn read_as_client<C: ty::Capability<Client = T::Cap>>(&self) -> C {
+        let cap = match self.0.try_to_capability() {
+            Ok(Some(c)) => c,
+            Ok(None) => T::null(),
+            Err(err) => T::broken(err.to_string()),
+        };
+        C::from_client(cap)
+    }
+}
+
 impl<'a> Default for PtrReader<'a, Empty> {
     #[inline]
     fn default() -> Self {
@@ -325,7 +368,49 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         self.0.clear()
     }
 
-    // TODO get, init, set, orphan APIs
+    // TODO init, set, orphan APIs
+
+    #[inline]
+    pub fn read_as<'b, U: FromPtr<PtrReader<'b, T>>>(&'b self) -> U::Output {
+        U::get(self.as_reader())
+    }
+
+    #[inline]
+    pub fn try_read_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(&'b self) -> Result<U::Output> {
+        U::try_get(self.as_reader())
+    }
+
+    #[inline]
+    pub fn read_option_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(&'b self) -> Option<U::Output> {
+        U::get_option(self.as_reader())
+    }
+
+    #[inline]
+    pub fn try_read_option_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(&'b self) -> Result<Option<U::Output>> {
+        U::try_get_option(self.as_reader())
+    }
+
+    #[inline]
+    pub fn read_as_struct<'b, S: ty::Struct>(&'b self) -> <Struct<S> as FromPtr<PtrReader<'b, T>>>::Output {
+        self.read_as::<Struct<S>>()
+    }
+
+    #[inline]
+    pub fn read_as_list_of<'b, V: ty::DynListValue>(&'b self) -> <List<V> as FromPtr<PtrReader<'b, T>>>::Output {
+        self.read_as::<List<V>>()
+    }
+
+    #[inline]
+    pub fn init_struct<S: ty::Struct>(self) -> S::Builder<'a, T> {
+        let ptr = self.0.init_struct(S::SIZE);
+        unsafe { ty::StructBuilder::from_ptr(ptr) }
+    }
+
+    #[inline]
+    pub fn init_any_struct(self, size: StructSize) -> StructBuilder<'a, T> {
+        let ptr = self.0.init_struct(size);
+        AnyStruct(ptr)
+    }
 }
 
 impl<'a, T: Table, T2: Table> PartialEq<PtrReader<'a, T2>> for PtrBuilder<'a, T> {

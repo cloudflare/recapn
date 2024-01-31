@@ -1,23 +1,47 @@
-use crate::table::{Table, CapTable};
-use crate::{Result, Error, PipelineOp};
 use crate::sync::{request, mpsc};
+use crate::sync::request::PipelineResolver;
+use crate::table::{Table, CapTable};
+use crate::{connection, Result, Error, PipelineOp};
 use std::borrow::Cow;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use recapn::{ReaderOf, ty};
+use recapn::alloc::Alloc;
 use recapn::any::{AnyStruct, self};
-use recapn::message::Message;
+use recapn::message::{Message, SegmentSource};
 use recapn::rpc::Capable;
 
-mod error;
 mod local;
 mod queue;
 
-use self::queue::PipelineResolver;
-
 pub use local::{Dispatch, Dispatcher};
 
-type RpcMessage = Message<'static, recapn::alloc::Growing<recapn::alloc::Global>>;
+pub type LocalMessage = Box<Message<'static, dyn Alloc + Send>>;
+pub type ExternalMessage = Box<dyn SegmentSource + Send>;
+
+pub struct RpcMessage {
+    payload: MessagePayload,
+}
+
+/// An RPC message which can refer to either a local message or an external message
+pub enum MessagePayload {
+    /// A message that was created locally. Local messages can be modified in place if necessary
+    /// without copying the entire message content to a new message.
+    Local(LocalMessage),
+    /// An external message. Since this message hasn't been checked, we will have to check and
+    /// copy it if we want to modify it (but this should be rare).
+    External(ExternalMessage),
+}
+
+impl MessagePayload {
+    pub fn segments(&self) -> &dyn SegmentSource {
+        match self {
+            MessagePayload::Local(m) => m,
+            MessagePayload::External(m) => m,
+        }
+    }
+}
 
 /// Indicates what kind of structure exists in the root pointer of the params message.
 /// 
@@ -33,7 +57,7 @@ enum ParamsRoot {
     Params,
 }
 
-struct Params {
+pub struct Params {
     root: ParamsRoot,
     message: RpcMessage,
     /// The capability table
@@ -42,22 +66,104 @@ struct Params {
 
 impl Params {
     fn builder(&mut self) -> any::PtrBuilder<'_, CapTable<'_>> {
-        let ptr = match self.root {
-            ParamsRoot::Params => self.message.builder().into_root(),
-        };
-
-        ptr.imbue(self.table.builder())
+        todo!()
     }
 }
 
-struct RpcCall {
-    /// The client that the call was made on. This is intended to keep the client
-    /// alive for the duration that the request is in holding.
-    /// 
-    /// This is primarily intended for queue clients which cancel the future resolving
-    /// the client to call if all references to the queue client go out of scope.
-    pub client: UnbrokenClient,
+/// Like [`ParamsRoot`], indicates what kind of structure exists in the root pointer of the
+/// results message.
+/// 
+/// For most messages, like local or queued messages, this will be a pointer to the user defined
+/// results structure itself. For incoming messages, this will be a Return structure.
+enum ResultsRoot {
+    /// The message root is the result parameters.
+    Results,
+}
 
+pub struct RpcResponse {
+    root: ResultsRoot,
+    message: RpcMessage,
+    /// The capability table
+    table: Table,
+}
+
+impl PipelineResolver<RpcClient> for RpcResponse {
+    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+        todo!()
+    }
+    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+        todo!()
+    }
+}
+
+impl PipelineResolver<RpcClient> for Result<RpcResponse, Error> {
+    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+        match self {
+            Ok(r) => r.resolve(key, channel),
+            Err(err) => channel.close(err.clone()),
+        }
+    }
+    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+        match self {
+            Ok(r) => r.pipeline(key),
+            Err(err) => mpsc::broken(RpcClient::Broken, err.clone()),
+        }
+    }
+}
+
+impl PipelineResolver<RpcClient> for RpcResults {
+    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+        match self {
+            Owned(r) => r.resolve(key, channel),
+            Shared(r) => r.resolve(key, channel),
+        }
+    }
+    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+        match self {
+            Owned(r) => r.pipeline(key),
+            Shared(r) => r.pipeline(key),
+        }
+    }
+}
+
+pub(crate) enum SetPipeline {
+    Response(RpcResponse),
+    RemotePipeline(connection::QuestionPipeline),
+}
+
+impl PipelineResolver<RpcClient> for SetPipeline {
+    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+        match self {
+            Self::Response(r) => r.resolve(key, channel),
+            Self::RemotePipeline(r) => r.resolve(key, channel),
+        }
+    }
+    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+        match self {
+            Self::Response(r) => r.pipeline(key),
+            Self::RemotePipeline(r) => r.pipeline(key),
+        }
+    }
+}
+
+impl request::IntoResults<RpcClient> for Error {
+    fn into_results(self) -> <RpcClient as request::Chan>::Results {
+        Owned(Err(self))
+    }
+}
+
+/// Tracks where the response to this call is expected to go.
+/// 
+/// This is used to detect when a question is reflected back to the original
+/// caller. When a reflected call is detected the RPC system sets up the call
+/// back so that the caller doesn't send the response through us and instead
+/// handles it local.
+pub(crate) enum ResponseTarget {
+    Local,
+    Remote(connection::QuestionTarget),
+}
+
+pub(crate) struct RpcCall {
     /// The interface ID for the call
     pub interface: u64,
     /// The method ID for the call
@@ -65,68 +171,66 @@ struct RpcCall {
 
     /// The parameters of the call contained in a message.
     pub params: Params,
+
+    pub target: ResponseTarget,
 }
 
-struct RpcResponse {
+pub(crate) enum RpcClient {
+    /// A client that always returns the same error when requests are made.
+    Broken,
+    /// A client from spawning a task to fulfill it later.
+    Spawned,
+    /// A client to handle bootstrap requests.
+    Bootstrap,
+    /// A client to handle pipelined requests to a remote party.
+    RemotePipeline,
+    /// A client that sends requests to a local request handler.
+    Local,
+    /// A client that sends requests to a local request handler, but will resolve
+    /// in the future to another client. This causes the client to be advertised
+    /// as a promise in the RPC protocol.
+    LocalShortening,
 }
 
-type RpcResult = Result<RpcResponse>;
-
-type RpcRequest = request::Request<RpcCall, RpcResult>;
-type RpcResponseReceiver = request::ResponseReceiver<RpcCall, RpcResult>;
-type RpcResponder = request::Responder<RpcCall, RpcResult>;
-
-type RequestSender = mpsc::Sender<RpcCall, RpcResult>;
-type RequestReceiver = mpsc::Receiver<RpcCall, RpcResult>;
-
-#[derive(Clone)]
-enum UnbrokenClient {
-    Queue(Arc<queue::QueueClient>),
-    Local(local::LocalClient),
+pub(crate) enum RpcResults {
+    /// A response owned by this request.
+    Owned(Result<RpcResponse, Error>),
+    /// A response shared from another request.
+    /// 
+    /// This is useful if a call is sent to ourselves and another question needs to pull the
+    /// response from it.
+    Shared(request::Response<RpcClient>),
 }
 
-use UnbrokenClient::{Queue, Local};
+use RpcResults::*;
 
-impl From<UnbrokenClient> for ClientKind {
-    #[inline]
-    fn from(value: UnbrokenClient) -> Self {
-        ClientKind::Unbroken(value)
-    }
-}
+impl request::Chan for RpcClient {
+    type Parameters = RpcCall;
 
-impl From<UnbrokenClient> for Client {
-    #[inline]
-    fn from(value: UnbrokenClient) -> Self {
-        ClientKind::from(value).into()
-    }
-}
+    type PipelineKey = Box<[PipelineOp]>;
 
-#[derive(Clone)]
-enum ClientKind {
-    Unbroken(UnbrokenClient),
-    Broken(Arc<error::BrokenClient>),
-}
+    type Error = Error;
 
-use ClientKind::{Broken, Unbroken};
-
-impl From<ClientKind> for Client {
-    #[inline]
-    fn from(value: ClientKind) -> Self {
-        Client { kind: value }
-    }
+    type Pipeline = SetPipeline;
+    type Results = RpcResults;
 }
 
 /// A typeless capability client.
 #[derive(Clone)]
 pub struct Client {
-    kind: ClientKind,
+    pub(crate) sender: mpsc::Sender<RpcClient>,
 }
 
 impl Client {
+    pub(crate) fn new(client: RpcClient) -> (Client, mpsc::Receiver<RpcClient>) {
+        let (sender, receiver) = mpsc::channel(client);
+        (Self { sender }, receiver)
+    }
+
     /// Create a new client which is "broken". This client when called will always
     /// return the error passed in here.
     pub fn broken(err: Error) -> Client {
-        todo!()
+        Client { sender: mpsc::broken(RpcClient::Broken, err) }
     }
 
     /// Returns a Client that queues up calls until `future` is ready, then forwards them
@@ -143,7 +247,7 @@ impl Client {
     where
         F: Future<Output = Client> + Send + 'static,
     {
-        Queue(queue::spawn(future)).into()
+        Client { sender: queue::spawn(future) }
     }
 
     /// Returns a Client that queues up calls until `future` is ready, then forwards them
@@ -154,112 +258,46 @@ impl Client {
     /// 
     /// # Cancelation
     /// 
-    /// The future will be dropped if all client references are dropped, including those kept
+    /// The future will be canceled if all client references are dropped, including those kept
     /// transitively through active requests.
     pub fn spawn_local<F>(future: F) -> Client
     where
         F: Future<Output = Client> + 'static,
     {
-        Queue(queue::spawn_local(future)).into()
+        Client { sender: queue::spawn_local(future) }
     }
 
     pub fn call(&self, interface_id: u64, method_id: u16) -> Result<Request> {
-        match &self.kind {
-            Unbroken(unbroken) => {
-                Ok(Request::new(unbroken.clone(), interface_id, method_id))
-            },
-            Broken(_) => todo!(),
-        }
-    }
-
-    pub fn err(&self) -> Option<&Error> {
-        todo!()
-    }
-
-    // If this Client is a promise that has already resolved, returns the inner, resolved version
-    // of the capability.  The caller may permanently replace this client with the resolved one if
-    // desired.  Returns null if the client isn't a promise or hasn't resolved yet -- use
-    // `more_resolved()` to distinguish between them.
-    pub fn resolved(&self) -> Option<Self> {
-        todo!()
-    }
-
-    // If this Client is a promise that has already resolved, returns the inner, resolved version
-    // of the capability. If it resolved into an error, or is an error itself, return the error.
-    pub fn try_resolved(&self) -> Result<Option<Self>> {
-        todo!()
-    }
-
-    /// If this client is a settled reference (not a promise), return None.
-    /// Otherwise, wait for when it resolves into a new client that is closer to
-    /// being the final, settled client. Calling this repeatedly should eventually
-    /// produce a settled client. `when_resolved` does this for you.
-    pub async fn more_resolved(&self) -> Option<Self> {
-        todo!()
-    }
-
-    pub async fn when_resolved(&self) -> Self {
         todo!()
     }
 }
 
 pub struct Request {
+    client: Client,
     call: RpcCall,
 }
 
 impl Request {
-    fn new(client: UnbrokenClient, interface: u64, method: u16) -> Self {
+    fn new(client: Client, interface: u64, method: u16) -> Self {
         Request {
+            client,
             call: RpcCall {
-                client,
                 interface,
                 method,
                 params: Params {
                     root: ParamsRoot::Params,
-                    message: Message::global(),
-                    table: Table::new(),
+                    message: RpcMessage {
+                        payload: MessagePayload::Local(Box::new(Message::global()))
+                    },
+                    table: Table::new(Vec::new()),
                 },
+                target: ResponseTarget::Local,
             }
         }
     }
 
     pub fn params(&mut self) -> any::PtrBuilder<CapTable> {
         self.call.params.builder()
-    }
-
-    /// Send the request and receive the response. This does not set up pipelining.
-    /// To use pipelining, use `pipeline()` or `send_and_pipeline()`
-    pub async fn send(self) -> Result<Response> {
-        let client = self.call.client.clone();
-        let (req, response) = request::channel(self.call);
-        match client {
-            Queue(queue) => queue.call_forwarding.send(req),
-            Local(local) => local.sender.send(req),
-        }
-
-        // Since we don't need to set up pipelining, we can just await the response here.
-        response.await
-            .unwrap_or_else(|| Err(Error::failed("failed to receive response")))
-            .map(|resp| Response { inner: resp })
-    }
-
-    /// Send the request and return a pipeline.
-    pub fn pipeline(self) -> Pipeline {
-        let (mut pipeline, resolver) = queue::pipeline();
-        let client = self.call.client.clone();
-        let (req, response) = request::channel(self.call);
-        match client {
-            Queue(queue) => queue.call_forwarding.send(req),
-            Local(local) => local.sender.send(req),
-        }
-
-        pipeline.response = Some(response);
-        Pipeline { kind: PipelineKind::Unresolved(Arc::new(pipeline)) }
-    }
-
-    /// Send the request and return a pipeline and a future to receive the response.
-    pub fn send_and_pipeline(self) -> ((), Pipeline) {
-        todo!()
     }
 }
 
@@ -280,74 +318,10 @@ pub struct Results<'a, T> {
     p: PhantomData<&'a T>,
 }
 
-impl<T> Results<'_, T> {
+impl<T: ty::StructView> Results<'_, T> {
     /// Gets the root structure of the results.
-    pub fn get(&self) -> () {
+    pub fn get(&self) -> ReaderOf<T, CapTable> {
         todo!()
-    }
-}
-
-#[derive(Clone)]
-enum ResolvedPipeline {
-    Local(request::Response<RpcCall, RpcResult>),
-}
-
-impl ResolvedPipeline {
-    #[inline]
-    fn apply(&self, ops: Cow<[PipelineOp]>) -> Client {
-        todo!()
-    }
-}
-
-#[derive(Clone)]
-enum PipelineKind {
-    Resolved(ResolvedPipeline),
-    Unresolved(Arc<queue::QueuePipeline>),
-}
-
-#[derive(Clone)]
-pub struct Pipeline {
-    kind: PipelineKind,
-}
-
-impl Pipeline {
-    #[inline]
-    fn apply(&self, ops: Cow<[PipelineOp]>) -> Client {
-        match &self.kind {
-            PipelineKind::Unresolved(queue) => queue.apply(ops),
-            PipelineKind::Resolved(resolved) => resolved.apply(ops),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct PipelineBuilder {
-    pipeline: Pipeline,
-    ops: Vec<PipelineOp>,
-}
-
-impl recapn::rpc::CapSystem for PipelineBuilder {
-    type Cap = Client;
-}
-
-impl recapn::rpc::PipelineBuilder<AnyStruct> for PipelineBuilder {
-    type Operation = PipelineOp;
-
-    #[inline]
-    fn push(mut self, op: Self::Operation) -> Self {
-        self.ops.push(op);
-        self
-    }
-}
-
-impl recapn::rpc::Pipelined for PipelineBuilder {
-    #[inline]
-    fn into_cap(self) -> Self::Cap {
-        self.pipeline.apply(Cow::Owned(self.ops))
-    }
-    #[inline]
-    fn to_cap(&self) -> Self::Cap {
-        self.pipeline.apply(Cow::Borrowed(&self.ops))
     }
 }
 

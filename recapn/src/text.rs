@@ -1,8 +1,10 @@
 //! UTF-8 encoded data with a null terminator
 
+use core::ptr::NonNull;
 use core::slice;
 use core::str::Utf8Error;
 
+use crate::alloc::ElementCount;
 use crate::list::ElementSize;
 use crate::ty;
 use crate::{internal::Sealed, Family};
@@ -10,70 +12,13 @@ use crate::{internal::Sealed, Family};
 pub type ByteCount = crate::alloc::NonZeroU29;
 
 pub mod ptr {
-    use super::ByteCount;
-
-    use core::marker::PhantomData;
-    use core::ptr::NonNull;
-
-    #[derive(Clone, Copy)]
-    pub struct Reader<'a> {
-        a: PhantomData<&'a [u8]>,
-        data: NonNull<u8>,
-        len: ByteCount,
-    }
-
-    impl Reader<'_> {
-        #[inline]
-        pub const fn empty() -> Self {
-            const EMPTY: &[u8] = &[0];
-            Self {
-                a: PhantomData,
-                data: unsafe { NonNull::new_unchecked(EMPTY.as_ptr().cast_mut()) },
-                len: ByteCount::MIN,
-            }
-        }
-
-        #[inline]
-        pub const unsafe fn new_unchecked(data: NonNull<u8>, len: ByteCount) -> Self {
-            Self { a: PhantomData, data, len }
-        }
-
-        #[inline]
-        pub const fn data(&self) -> NonNull<u8> {
-            self.data
-        }
-    
-        /// The length of the text blob (including the null terminator)
-        #[inline]
-        pub const fn len(&self) -> ByteCount {
-            self.len
-        }
-    }
-
-    pub struct Builder<'a> {
-        a: PhantomData<&'a mut [u8]>,
-        data: NonNull<u8>,
-        len: ByteCount,
-    }
-
-    impl Builder<'_> {
-        #[inline]
-        pub unsafe fn new_unchecked(data: NonNull<u8>, len: ByteCount) -> Self {
-            Self { a: PhantomData, data, len }
-        }
-
-        #[inline]
-        pub const fn data(&self) -> NonNull<u8> {
-            self.data
-        }
-    
-        /// The length of the text blob (including the null terminator)
-        #[inline]
-        pub const fn len(&self) -> ByteCount {
-            self.len
-        }
-    }
+    pub use crate::ptr::{
+        BlobReader as Reader,
+        BlobBuilder as Builder,
+    };
 }
+
+const EMPTY_SLICE: &[u8] = &[0];
 
 #[derive(Clone, Copy)]
 pub struct Text<T = Family>(T);
@@ -83,16 +28,46 @@ pub type Builder<'a> = Text<ptr::Builder<'a>>;
 
 impl Sealed for Text {}
 impl ty::Value for Text {
-    type Default = Reader<'static>;
+    type Default = ptr::Reader<'static>;
 }
 impl ty::ListValue for Text {
     const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
 }
 
 impl<'a> Reader<'a> {
+    pub const EMPTY: Self = Self::empty();
+
     #[inline]
     pub const fn empty() -> Self {
-        Self(ptr::Reader::empty())
+        Self::from_slice(EMPTY_SLICE)
+    }
+
+    pub(crate) const fn new_unchecked(blob: ptr::Reader<'a>) -> Self {
+        Self(blob)
+    }
+
+    /// Interprets a given blob reader as text. This requires that the blob has at least one byte
+    /// and that the last byte is empty.
+    #[inline]
+    pub const fn new(blob: ptr::Reader<'a>) -> Option<Self> {
+        match blob.as_slice() {
+            [.., 0] => Some(Self(blob)),
+            _ => None,
+        }
+    }
+
+    /// Converts from the given byte slice to a text reader. This asserts
+    /// that the slice is a valid text blob and can be used in a constant context.
+    #[inline]
+    pub const fn from_slice(s: &'a [u8]) -> Self {
+        match s {
+            [.., 0] if s.len() < ByteCount::MAX_VALUE as usize => {
+                let ptr = unsafe { NonNull::new_unchecked(s.as_ptr().cast_mut()) };
+                let len = ElementCount::new(s.len() as u32).unwrap();
+                Self(ptr::Reader::new(ptr, len))
+            },
+            _ => panic!("attempted to make invalid text blob from slice"),
+        }
     }
 
     /// The length of the text (including the null terminator)
@@ -130,12 +105,6 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl<'a> From<ptr::Reader<'a>> for Reader<'a> {
-    fn from(repr: ptr::Reader<'a>) -> Self {
-        Self(repr)
-    }
-}
-
 impl<'a> From<Reader<'a>> for ptr::Reader<'a> {
     fn from(value: Reader<'a>) -> Self {
         value.0
@@ -170,7 +139,7 @@ impl PartialEq<Reader<'_>> for str {
 impl<'a> Builder<'a> {
     #[inline]
     pub fn as_reader<'b>(&'b self) -> Reader<'b> {
-        Text(unsafe { ptr::Reader::new_unchecked(self.0.data(), self.0.len()) })
+        Text(self.0.as_reader())
     }
 
     /// The length of the text (including the null terminator)
@@ -220,18 +189,6 @@ impl<'a> Builder<'a> {
     #[inline]
     pub unsafe fn as_str_unchecked_mut(&mut self) -> &mut str {
         core::str::from_utf8_unchecked_mut(self.as_bytes_mut())
-    }
-}
-
-impl<'a> From<ptr::Builder<'a>> for Builder<'a> {
-    fn from(repr: ptr::Builder<'a>) -> Self {
-        Self(repr)
-    }
-}
-
-impl<'a> From<Builder<'a>> for ptr::Builder<'a> {
-    fn from(value: Builder<'a>) -> Self {
-        value.0
     }
 }
 

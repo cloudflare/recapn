@@ -1,9 +1,11 @@
 pub mod linked_list;
-pub mod wake_list;
+pub mod array_vec;
 
 use std::sync::Arc;
 
-/// A utility for a shared value wrapped in an arc that can be moved away unsafely,
+/// A **M**ovable **Arc**.
+/// 
+/// A utility for a shared value wrapped in an Arc that can be moved away unsafely,
 /// for example, for dropping or transfering to another type state.
 pub struct Marc<T> {
     shared: Option<Arc<T>>,

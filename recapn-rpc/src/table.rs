@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 
-use crate::client::Client;
+use super::client::Client;
 
 type TableVec = Vec<Option<Client>>;
 
@@ -20,8 +20,8 @@ type TableVec = Vec<Option<Client>>;
 pub struct Table(UnsafeCell<TableVec>);
 
 impl Table {
-    pub fn new() -> Self {
-        Self(UnsafeCell::new(Vec::new()))
+    pub fn new(vec: TableVec) -> Self {
+        Self(UnsafeCell::new(vec))
     }
 
     pub fn reader(&self) -> TableReader<'_> {

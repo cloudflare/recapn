@@ -13,14 +13,15 @@
 use crate::alloc::ElementCount;
 use crate::any::{self, AnyList, AnyPtr, AnyStruct};
 use crate::data::{self, Data};
+use crate::ptr::CopySize;
 use crate::text::{self, Text};
 use crate::field::{Enum, EnumResult, Struct};
 use crate::internal::Sealed;
-use crate::ptr::{internal::FieldData, PtrElementSize, StructSize, WriteNull};
+use crate::ptr::{internal::FieldData, PtrElementSize, StructSize, WriteNull, write_null};
 use crate::rpc::{self, Capable, InsertableInto, Table};
-use crate::{ty, Error, Family, IntoFamily, Result};
+use crate::{ty, Error, Family, IntoFamily, Result, ErrorKind};
 
-use core::convert::{self, TryFrom};
+use core::convert::{self, TryFrom, Infallible};
 use core::marker::PhantomData;
 use core::ops::{ControlFlow, Range};
 
@@ -583,14 +584,14 @@ where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
     {
         self.into_ptr_builder()
-            .try_set_list(&value.repr, false, err_handler)
+            .try_set_list(&value.repr, V::ELEMENT_SIZE, err_handler)
             .map(List::new)
             .map_err(|(err, _)| err)
     }
 
     #[inline]
     pub fn set(self, value: &Reader<V, impl InsertableInto<T>>) -> Builder<'b, V, T> {
-        List::new(self.into_ptr_builder().set_list(&value.repr, false))
+        self.try_set(value, write_null).unwrap()
     }
 
     #[inline]
@@ -675,20 +676,26 @@ where
     pub fn try_set<F, E>(
         self,
         value: &Reader<AnyStruct, impl InsertableInto<T>>,
+        desired_size: Option<StructSize>,
         err_handler: F,
     ) -> Result<Builder<'b, AnyStruct, T>, E>
     where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
     {
+        let copy_size = match desired_size {
+            Some(size) => ElementSize::InlineComposite(size),
+            None => value.repr.element_size(),
+        };
+
         self.into_ptr_builder()
-            .try_set_list(&value.repr, false, err_handler)
+            .try_set_list(&value.repr, copy_size, err_handler)
             .map(List::new)
             .map_err(|(err, _)| err)
     }
 
     #[inline]
-    pub fn set(self, value: &Reader<AnyStruct, impl InsertableInto<T>>) -> Builder<'b, AnyStruct, T> {
-        List::new(self.into_ptr_builder().set_list(&value.repr, false))
+    pub fn set(self, value: &Reader<AnyStruct, impl InsertableInto<T>>, desired_size: Option<StructSize>) -> Builder<'b, AnyStruct, T> {
+        self.try_set(value, desired_size, write_null).unwrap()
     }
 
     #[inline]
@@ -831,14 +838,14 @@ where
         F: FnMut(Error) -> ControlFlow<E, WriteNull>,
     {
         self.into_ptr_builder()
-            .try_set_list(value.as_ref(), false, err_handler)
+            .try_set_list(value.as_ref(), value.as_ref().element_size(), err_handler)
             .map(any::ListBuilder::from)
             .map_err(|(err, _)| err)
     }
 
     #[inline]
     pub fn set(self, value: &any::ListReader<impl InsertableInto<T>>) -> any::ListBuilder<'b, T> {
-        any::ListBuilder::from(self.into_ptr_builder().set_list(value.as_ref(), false))
+        self.try_set(value, write_null).unwrap()
     }
 
     #[inline]
@@ -897,7 +904,7 @@ where
     /// If an error occurs while reading it is returned.
     #[inline]
     pub fn try_get_option(&self) -> Result<Option<data::Reader<'a>>> {
-        match self.ptr_reader().to_data() {
+        match self.ptr_reader().to_blob() {
             Ok(Some(reader)) => Ok(Some(data::Reader::from(reader))),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -921,7 +928,7 @@ where
 
     #[inline]
     pub fn get(self) -> data::Builder<'b> {
-        match self.into_ptr_builder().to_data_mut() {
+        match self.into_ptr_builder().to_blob_mut() {
             Ok(b) => b.into(),
             Err(_) => todo!(),
         }
@@ -929,7 +936,7 @@ where
 
     #[inline]
     pub fn try_get_option(self) -> Result<Option<data::Builder<'b>>> {
-        match self.into_ptr_builder().to_data_mut() {
+        match self.into_ptr_builder().to_blob_mut() {
             Ok(b) => Ok(Some(b.into())),
             Err((None, _)) => Ok(None),
             Err((Some(e), _)) => Err(e),
@@ -938,12 +945,12 @@ where
 
     #[inline]
     pub fn init(self, count: ElementCount) -> data::Builder<'b> {
-        self.into_ptr_builder().init_data(count).into()
+        self.into_ptr_builder().init_blob(count).into()
     }
 
     #[inline]
     pub fn set(self, value: &data::Reader) -> data::Builder<'b> {
-        self.into_ptr_builder().set_data(value.as_ref()).into()
+        self.into_ptr_builder().set_blob(value.as_ref()).into()
     }
 
     #[inline]
@@ -1002,8 +1009,10 @@ where
     /// If an error occurs while reading it is returned.
     #[inline]
     pub fn try_get_option(&self) -> Result<Option<text::Reader<'a>>> {
-        match self.ptr_reader().to_text() {
-            Ok(Some(reader)) => Ok(Some(text::Reader::from(reader))),
+        match self.ptr_reader().to_blob() {
+            Ok(Some(b)) => text::Reader::new(b)
+                .ok_or_else(|| Error::from(ErrorKind::TextNotNulTerminated))
+                .map(Some),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
         }
@@ -1026,29 +1035,22 @@ where
 
     #[inline]
     pub fn get(self) -> text::Builder<'b> {
-        match self.into_ptr_builder().to_text_mut() {
-            Ok(b) => b.into(),
-            Err(_) => todo!(),
-        }
+        todo!()
     }
 
     #[inline]
     pub fn try_get_option(self) -> Result<Option<text::Builder<'b>>> {
-        match self.into_ptr_builder().to_text_mut() {
-            Ok(b) => Ok(Some(b.into())),
-            Err((None, _)) => Ok(None),
-            Err((Some(e), _)) => Err(e),
-        }
+        todo!()
     }
 
     #[inline]
     pub fn init(self, count: text::ByteCount) -> text::Builder<'b> {
-        self.into_ptr_builder().init_text(count).into()
+        todo!()
     }
 
     #[inline]
     pub fn set(self, value: &text::Reader) -> text::Builder<'b> {
-        self.into_ptr_builder().set_text(value.as_ref()).into()
+        todo!()
     }
 
     /// Set the text element to a copy of the given string.
@@ -1059,18 +1061,21 @@ where
     /// panic.
     #[inline]
     pub fn set_str(self, value: &str) -> text::Builder<'b> {
-        const STR_TOO_LARGE: &str = "str is too large to fit in a Cap'n Proto message";
-        // Add one to the value to include the null byte
-        let len_with_nul = u32::try_from(value.len() + 1).expect(STR_TOO_LARGE);
-        let len = text::ByteCount::new(len_with_nul).expect(STR_TOO_LARGE);
+        self.try_set_str(value)
+            .ok()
+            .expect("str is too large to fit in a Cap'n Proto message")
+    }
+
+    #[inline]
+    pub fn try_set_str(self, value: &str) -> Result<text::Builder<'b>, Self> {
+        let len = u32::try_from(value.len() + 1).ok().and_then(text::ByteCount::new);
+        let Some(len) = len else {
+            return Err(self)
+        };
 
         let mut builder = self.init(len);
         builder.as_bytes_mut().copy_from_slice(value.as_bytes());
-        builder
-    }
-
-    pub fn try_set_str(&mut self, value: &str) -> Option<text::Builder> {
-        todo!()
+        Ok(builder)
     }
 
     #[inline]
@@ -1480,6 +1485,10 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let element = unsafe { self.list.at_unchecked(self.range.next()?) };
         Some(self.strategy.get(element))
+    }
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.range.size_hint()
     }
 }
 

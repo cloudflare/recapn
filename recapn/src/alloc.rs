@@ -140,6 +140,8 @@ impl u29 {
     pub const MIN: Self = Self(Self::MIN_VALUE);
     pub const MAX: Self = Self(Self::MAX_VALUE);
 
+    pub const ZERO: Self = Self::MIN;
+
     #[inline]
     pub const fn new(n: u32) -> Option<Self> {
         if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
@@ -258,31 +260,16 @@ impl From<i16> for i30 {
 /// A segment of Words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
-    data: NonNull<Word>,
-    len: SegmentLen,
+    pub data: NonNull<Word>,
+    pub len: SegmentLen,
 }
 
 impl Segment {
-    #[inline]
-    pub const fn new(data: NonNull<Word>, len: SegmentLen) -> Self {
-        Self { data, len }
-    }
-
-    #[inline]
-    pub const fn data(&self) -> NonNull<Word> {
-        self.data
-    }
-
     #[inline]
     pub const fn to_ptr_range(&self) -> Range<*const Word> {
         let start = self.data.as_ptr() as *const Word;
         let end = unsafe { start.add(self.len.get() as usize) };
         start..end
-    }
-
-    #[inline]
-    pub const fn len(&self) -> SegmentLen {
-        self.len
     }
 
     #[inline]
@@ -308,6 +295,20 @@ impl Segment {
     #[inline]
     pub unsafe fn as_mut_bytes(&mut self) -> &mut [u8] {
         Word::slice_to_bytes_mut(self.as_mut_slice())
+    }
+}
+
+/// A segment of Words with an attached lifetime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefSegment<'a> {
+    segment: Segment,
+    a: PhantomData<&'a [Word]>,
+}
+
+impl<'a> RefSegment<'a> {
+    #[inline]
+    pub const fn len(&self) -> SegmentLen {
+        self.segment.len
     }
 }
 
@@ -338,7 +339,7 @@ unsafe impl Alloc for Global {
         let layout = Layout::array::<Word>(size.get() as usize).expect("Segment too large!");
         let ptr = alloc::alloc_zeroed(layout);
         if let Some(ptr) = NonNull::new(ptr) {
-            Segment::new(ptr.cast(), size.into())
+            Segment { data: ptr.cast(), len: size.into() }
         } else {
             alloc::handle_alloc_error(layout);
         }
@@ -346,7 +347,7 @@ unsafe impl Alloc for Global {
     #[inline]
     unsafe fn dealloc(&mut self, segment: Segment) {
         let layout =
-            Layout::array::<Word>(segment.len().get() as usize).expect("Segment too large!");
+            Layout::array::<Word>(segment.len.get() as usize).expect("Segment too large!");
         alloc::dealloc(segment.data.as_ptr().cast(), layout)
     }
 }
@@ -479,7 +480,7 @@ impl<'s, A> Scratch<'s, A> {
 
         Self {
             s: PhantomData,
-            segment: Segment::new(start, size.into()),
+            segment: Segment { data: start, len: size.into() },
             used: false,
             next: alloc,
         }
@@ -493,7 +494,7 @@ impl<'s, A> Scratch<'s, A> {
 
         Self {
             s: PhantomData,
-            segment: Segment::new(start, size.into()),
+            segment: Segment { data: start, len: size.into() },
             used: false,
             next: alloc,
         }
@@ -520,7 +521,7 @@ impl<'s, A> Scratch<'s, A> {
 unsafe impl<A: Alloc> Alloc for Scratch<'_, A> {
     #[inline]
     unsafe fn alloc(&mut self, size: AllocLen) -> Segment {
-        if self.used || self.segment.len() < size {
+        if self.used || self.segment.len < size {
             self.next.alloc(size)
         } else {
             self.used = true;
@@ -623,7 +624,7 @@ mod tests {
         {
             let mut scratch = Scratch::with_space(&mut static_space, Global);
             alloc!(scratch, 1, |mut segment: Segment| {
-                addr = segment.data().as_ptr() as usize;
+                addr = segment.data.as_ptr() as usize;
                 assert_eq!(segment.as_slice(), &[Word::NULL; 5]);
                 segment.as_mut_bytes().fill(255);
             });

@@ -10,7 +10,7 @@ _p::generate_file! {
         size: { data: 5, ptrs: 6 },
         fields: {
             ID, id, id_mut, u64 = { slot: 0, default: 0 },
-            DISPLAY_NAME, display_name, display_name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+            DISPLAY_NAME, display_name, display_name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
             DISPLAY_NAME_PREFIX_LENGTH, display_name_prefix_length, display_name_prefix_length_mut, u32 = { slot: 2, default: 0 },
             SCOPE_ID, scope_id, scope_id_mut, u64 = { slot: 2, default: 0 },
             PARAMETERS, parameters, parameters_mut, _p::List<_p::Struct<node::Parameter>> = {
@@ -100,14 +100,14 @@ _p::generate_file! {
                 mod: parameter,
                 size: { data: 0, ptrs: 1 },
                 fields: {
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                 },
             },
             struct NestedNode {
                 mod: nested_node,
                 size: { data: 0, ptrs: 1 },
                 fields: {
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
                 },
             },
@@ -116,7 +116,7 @@ _p::generate_file! {
                 size: { data: 0, ptrs: 1 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                    DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                     MEMBERS, members, members_mut, _p::List<_p::Struct<source_info::Member>> = {
                         slot: 1, default: _p::list::Reader::empty()
                     },
@@ -126,7 +126,7 @@ _p::generate_file! {
                         mod: member,
                         size: { data: 0, ptrs: 1 },
                         fields: {
-                            DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                            DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                         },
                     }
                 },
@@ -137,7 +137,7 @@ _p::generate_file! {
         mod: field,
         size: { data: 3, ptrs: 4 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
                 slot: 1, default: _p::list::Reader::empty()
@@ -185,7 +185,7 @@ _p::generate_file! {
         mod: enumerant,
         size: { data: 1, ptrs: 2 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
                 slot: 1, default: _p::list::Reader::empty()
@@ -206,7 +206,7 @@ _p::generate_file! {
         mod: method,
         size: { data: 3, ptrs: 5 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             IMPLICIT_PARAMETERS, implicit_parameters, implicit_parameters_mut, _p::List<_p::Struct<node::Parameter>> = {
                 slot: 4, default: _p::list::Reader::empty()
@@ -376,7 +376,7 @@ _p::generate_file! {
                 UINT64, Uint64, uint64, uint64_mut, u64 = { case: 9, slot: 1, default: 0 },
                 FLOAT32, Float32, float32, float32_mut, f32 = { case: 10, slot: 1, default: 0. },
                 FLOAT64, Float64, float64, float64_mut, f64 = { case: 11, slot: 1, default: 0. },
-                TEXT, Text, text, text_mut, _p::Text = { case: 12, slot: 0, default: _p::text::Reader::empty() },
+                TEXT, Text, text, text_mut, _p::Text = { case: 12, slot: 0, default: _p::text::ptr::Reader::empty() },
                 DATA, Data, data, data_mut, _p::Data = { case: 13, slot: 0, default: _p::data::ptr::Reader::empty() },
                 LIST, List, list, list_mut, _p::AnyPtr = { case: 14, slot: 0, default: _p::any::ptr::PtrReader::null() },
                 ENUM, Enum, r#enum, enum_mut, u16 = { case: 15, slot: 1, default: 0 },
@@ -427,7 +427,7 @@ _p::generate_file! {
                 size: { data: 1, ptrs: 2 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    FILENAME, filename, filename_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                    FILENAME, filename, filename_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                     IMPORTS, imports, imports_mut, _p::List<_p::Struct<Import>> = {
                         slot: 1, default: _p::list::Reader::empty()
                     },
@@ -438,7 +438,7 @@ _p::generate_file! {
                 size: { data: 1, ptrs: 1 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
                 },
             },
         },

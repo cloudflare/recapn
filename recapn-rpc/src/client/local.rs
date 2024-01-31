@@ -3,27 +3,28 @@
 //! * Request queueing
 //! * Response handling
 
-use std::mem::MaybeUninit;
 use std::convert;
 use std::future::Future;
 use std::marker::{PhantomData, PhantomPinned};
+use std::mem;
 use std::pin::{pin, Pin};
 use tokio::task::JoinHandle;
 
+use crate::sync::mpsc::Receiver;
 use crate::{Result, Error};
 
-use super::queue::PipelineResolver;
-use super::{Client, Pipeline, RpcCall, RequestSender, RequestReceiver, RpcResponder, Params, RpcRequest};
+use super::{RpcClient, RpcCall};
 
-#[derive(Clone)]
-pub(super) struct LocalClient {
-    pub sender: RequestSender,
+enum DispatcherState {
+    Broken(Error),
+    Active(Receiver<RpcClient>),
 }
+
+use DispatcherState::*;
 
 /// The receiver side of a server that executes requests
 pub struct Dispatcher<T: ?Sized> {
-    broken: Option<Error>,
-    receiver: RequestReceiver,
+    state: DispatcherState,
     inner: T,
 }
 
@@ -56,23 +57,23 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// a blocking request, that request might be canceled prematurely. If this occurs, the
     /// dispatcher is automatically broken.
     pub async fn run_once(&mut self) -> Result<bool> {
-        if let Some(err) = &self.broken {
-            // The server is broken, return an error
-            return Err(err.clone())
-        }
+        let receiver = match &mut self.state {
+            Broken(err) => return Err(err.clone()),
+            Active(r) => r,
+        };
 
-        let Some(req) = self.receiver.recv().await else { return Ok(false) };
-        let (request, responder) = req.split();
-        let RpcCall { interface, method, params, client: _ } = request;
+        let Some(req) = receiver.recv().await else { return Ok(false) };
+        let (request, _) = req.respond();
+        let RpcCall { interface, method, .. } = request;
 
-        let request = DispatchRequest { interface, method, params, responder, pipeline: None };
+        let request = DispatchRequest { interface, method };
         let DispatchResponse(result) = self.inner.dispatch(request);
         match result {
             DispatchResult::Async => {} // do nothing, it has already been handled
             DispatchResult::Streaming(task) => {
                 // Set up a guard so that the dispatcher becomes broken if we're dropped while
                 // handling a blocking request.
-                struct Bomb<'a>(Option<&'a mut Option<Error>>);
+                struct Bomb<'a>(Option<&'a mut DispatcherState>);
                 impl Bomb<'_> {
                     fn defuse(mut self) {
                         self.0 = None;
@@ -80,14 +81,16 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
                 }
                 impl Drop for Bomb<'_> {
                     fn drop(&mut self) {
-                        if let Some(o) = self.0.take() {
-                            *o = Some(Error::failed(
-                                "a future handling a blocking request was dropped"
-                            ));
+                        if let Some(s) = self.0.take() {
+                            let err = Error::failed("a future handling a blocking request was dropped");
+                            match mem::replace(s, Broken(err.clone())) {
+                                Active(r) => r.close(err),
+                                Broken(_) => unreachable!()
+                            }
                         }
                     }
                 }
-                let bomb = Bomb(Some(&mut self.broken));
+                let bomb = Bomb(Some(&mut self.state));
                 let result = task.await;
                 bomb.defuse(); // counter-terrorists win
     
@@ -96,7 +99,10 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
                     .and_then(convert::identity);
     
                 if let Err(err) = flattened {
-                    self.broken = Some(err.clone());
+                    match mem::replace(&mut self.state, Broken(err.clone())) {
+                        Active(r) => r.close(err.clone()),
+                        Broken(_) => unreachable!()
+                    }
                     return Err(err)
                 }
             }
@@ -111,7 +117,10 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// broken. In this case, this function returns the error and all future requests
     /// return the same error.
     pub fn broken_err(&self) -> Option<&Error> {
-        self.broken.as_ref()
+        match &self.state {
+            Active(_) => None,
+            Broken(err) => Some(err),
+        }
     }
 
     /// Gets a reference to the underlying server dispatcher
@@ -191,16 +200,10 @@ pub trait Dispatch {
 /// pinned.drop();
 /// ```
 struct ParametersInPlace {
-    params: Option<Params>,
-
     _pinned: PhantomPinned,
 }
 
 impl ParametersInPlace {
-    pub fn new(params: Params) -> Self {
-        todo!()
-    }
-
     pub fn get<'a, P>(self: Pin<&'a mut Self>) -> Parameters<'a, P> {
         todo!()
     }
@@ -263,14 +266,14 @@ impl<'a, P> Drop for Parameters<'a, P> {
 /// capabilities in the response will resolve to, before making the response, allowing requests
 /// that are promise-pipelined on this call's results to continue their journey to the final
 /// destination before this call itself has completed.
+/// 
+/// # Cancellation
+/// 
+/// Request cancellation will not automatically cancel spawned futures handling requests. Instead,
+/// Response and ResponseSender have functions that can be used to hook into the cancellation
+/// future, allowing them to listen for cancellation to occur if the user requests it.
 pub struct Response<'a, R> {
     r: PhantomData<(&'a (), R)>,
-}
-
-impl<'a, R> Response<'a, R> {
-    fn new(responder: RpcResponder, pipeline: Option<PipelineResolver>) -> Self {
-        todo!()
-    }
 }
 
 #[non_exhaustive]
@@ -282,9 +285,6 @@ pub struct CallContext<'a, P, R> {
 pub struct DispatchRequest {
     interface: u64,
     method: u16,
-    params: Params,
-    responder: RpcResponder,
-    pipeline: Option<PipelineResolver>,
 }
 
 impl DispatchRequest {
@@ -314,52 +314,13 @@ impl DispatchRequest {
     where
         Res: for<'a> Responder<'a, P, R>,
     {
-        let DispatchRequest {
-            params,
-            responder: call_responder,
-            pipeline,
-            ..
-        } = self;
-        let future = async move {
-            // First, let's set up our parameters. In order to prevent allocations, we're going
-            // to try and allocate as much as we can in-place here in this future.
-            let in_place = ParametersInPlace::new(params);
-            let mut params_pinned = pin!(in_place);
-            let parameters = params_pinned.as_mut().get();
-
-            // Now let's set up our response type.
-            let pipeline = pipeline;
-            let response = Response::new(call_responder, pipeline);
-
-            let context = CallContext {
-                params: parameters,
-                response,
-            };
-
-            let result = responder.respond(context).await;
-
-            match result {
-                Ok(()) => todo!("send off response"),
-                Err(err) => todo!("return error for response"),
-            }
-
-            params_pinned.drop();
-
-            result
-        };
-
-        tokio::task::spawn_local(future)
+        todo!()
     }
 
     /// Respond with the given error.
     #[inline]
     pub fn error(self, err: Error) -> DispatchResponse {
-        if let Some(pipeline) = self.pipeline {
-            todo!()
-        }
-
-        let _ = self.responder.send(Err(err));
-        DispatchResponse(DispatchResult::Async)
+        todo!()
     }
 
     /// Respond with a generic error indicating that the interface is not implemented

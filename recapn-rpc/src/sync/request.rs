@@ -1,180 +1,853 @@
 //! A request-response oneshot. This has the unique property that the request data and
 //! response data are both part of the same allocation. This way you don't need to allocate
 //! and track the request data separately.
+//! 
+//! Request, Response, Pipeline, all in one allocation.
 
+use std::borrow::Borrow;
 use std::cell::UnsafeCell;
-use std::future::{Future, poll_fn};
-use std::marker::PhantomData;
+use std::fmt::{self, Debug};
+use std::future::{Future, IntoFuture, poll_fn};
+use std::hash::Hash;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::pin::Pin;
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicPtr, AtomicUsize};
+use std::ptr::{NonNull, addr_of_mut};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Relaxed};
 use std::sync::Arc;
-use std::task;
+use std::task::{self, Context, Poll};
 
-use super::sharedshot;
-use super::util::linked_list::Pointers;
-use crate::Error;
+use hashbrown::{HashMap, Equivalent};
+use hashbrown::hash_map::RawEntryMut;
+use parking_lot::Mutex;
+use pin_project::{pin_project, pinned_drop};
+
+use crate::sync::mpsc::{Sender, weak_channel};
 use crate::sync::util::Marc;
+use crate::sync::sharedshot::{self, RecvWaiter, ShotState, TryRecvError};
 
-/// Create a new request and response channel.
-pub fn channel<T, U>(req: T) -> (Request<T, U>, ResponseReceiver<T, U>) {
-    todo!()
+use super::mpsc::{SharedChannel, WeakChannel, self};
+use super::util::linked_list::{Pointers, Link};
+
+/// An abstract channel. This is associated data stored in a mpsc channel that
+/// also references associated types with the request-response system.
+pub trait Chan: Sized {
+    /// The parameters passed into the request.
+    type Parameters;
+
+    /// A key used to distinguish between different pipelines.
+    type PipelineKey: Eq + Hash;
+
+    /// An error that can be used to terminate channels.
+    type Error: Clone + IntoResults<Self>;
+
+    /// The results associated with this parameter type.
+    type Results: PipelineResolver<Self>;
+
+    /// A pipeline that can be configured separately via set_pipeline.
+    type Pipeline: PipelineResolver<Self>;
+}
+
+pub trait PipelineResolver<C: Chan> {
+    /// Resolves the pipeline channel with the given key.
+    fn resolve(&self, key: C::PipelineKey, channel: mpsc::Receiver<C>);
+
+    /// Returns the pipeline channel with the given key. If the key doesn't match,
+    /// this may return an already broken channel.
+    fn pipeline(&self, key: C::PipelineKey) -> mpsc::Sender<C>;
+}
+
+/// Describes a conversion from a type into "results".
+pub trait IntoResults<C: Chan> {
+    fn into_results(self) -> C::Results;
+}
+
+/// A hint to how a request is going to be used.
+/// 
+/// Requests have a response and pipeline associated with them, but sometimes only one or the
+/// other is used. By using different request constructors, a request's usage is set by what
+/// parts are constructed. This is used as a hint by the RPC system to skip bookkeeping in
+/// some cases.
+/// 
+/// This hint is not provided manually, instead it's provided depending on the constructor called
+/// to create the request.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RequestUsage {
+    /// The request's response and pipeline both might be used.
+    ResponseAndPipeline,
+    /// Only the request response will be used. Pipelines will not be used.
+    /// 
+    /// With this hint the callee doesn't keep results around for pipelining.
+    Response,
+    /// This will only be used for pipelining. The response will not be used.
+    /// 
+    /// With this hint, the results aren't stored unless needed for pipelining.
+    /// They also aren't sent over the network since the caller indicated it doesn't want them.
+    Pipeline,
+}
+
+/// The shared state behind a request
+/// 
+/// This is an extremely complex structure that controls all of the details behind
+/// request lifetime and management. It combines requests, responses, and pipelines
+/// into one structure in order to save memory allocations as all of these effectively
+/// have the same lifetime.
+pub(crate) struct SharedRequest<C: Chan> {
+    /// Intrusive linked-list pointers for request channels
+    /// 
+    /// In order to maintain "one allocation per request", we intrusively link
+    /// requests together to build a request chain.
+    pointers: Pointers<SharedRequest<C>>,
+
+    /// The channel this request is contained in. If all the receivers of this request
+    /// drop, we attempt to automatically remove the request from whatever channel it's in.
+    parent: Mutex<Option<Arc<SharedChannel<C>>>>,
+
+    /// The request data. This should only be accessed by Request. When Request drops they
+    /// will trigger a drop on these contents.
+    request: UnsafeCell<ManuallyDrop<C::Parameters>>,
+
+    /// Indicates how this request is intended to be used. This can be used as a hint when
+    /// sending requests remotely to skip certain bookkeeping.
+    usage: RequestUsage,
+
+    /// The state of the request.
+    state: sharedshot::AtomicState,
+
+    /// The number of receivers waiting for the response. When this value reaches zero,
+    /// the channel is closed and the closed task is woken up.
+    /// 
+    /// A receiver includes both response receivers, pipelines, and any pipelined clients
+    /// that are waiting for the response to be received.
+    receivers_count: AtomicUsize,
+
+    /// A set of waiters waiting to receive the value. Pipelined requests
+    /// are not included here since they're fulfilled separately.
+    waiters: sharedshot::WaitList,
+
+    /// The close task, woken up when all the receivers have been dropped and the channel
+    /// has been marked closed.
+    closed_task: sharedshot::ClosedTask,
+
+    /// The response value.
+    response: UnsafeCell<MaybeUninit<C::Results>>,
+
+    /// The map to queued clients waiting to be resolved.
+    pipeline_map: Mutex<HashMap<C::PipelineKey, WeakChannel<C>>>,
+
+    /// The destination pipeline value. If set to None, the response holds the pipeline
+    pipeline_dest: UnsafeCell<MaybeUninit<Option<C::Pipeline>>>,
+}
+
+// TODO(NOW): Make this more accurate this is definitely wrong.
+unsafe impl<C> Send for SharedRequest<C>
+where
+    C: Chan + Send,
+    C::Parameters: Send,
+    C::Error: Send,
+    C::Results: Send,
+    C::PipelineKey: Send,
+    C::Pipeline: Send,
+{}
+unsafe impl<C> Sync for SharedRequest<C>
+where
+    C: Chan + Send,
+    C::Parameters: Send,
+    C::Error: Send,
+    C::Results: Send,
+    C::PipelineKey: Send,
+    C::Pipeline: Send,
+{}
+
+unsafe impl<C: Chan> Link for SharedRequest<C> {
+    type Handle = Arc<SharedRequest<C>>;
+    type Target = SharedRequest<C>;
+
+    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
+        NonNull::new(Arc::into_raw(handle).cast_mut()).unwrap()
+    }
+    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
+        Arc::from_raw(ptr.as_ptr().cast_const())
+    }
+    unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>> {
+        let me = target.as_ptr();
+        let field = addr_of_mut!((*me).pointers);
+        NonNull::new_unchecked(field)
+    }
+}
+
+impl<C: Chan> Drop for SharedRequest<C> {
+    fn drop(&mut self) {
+        // The request parameters don't need to be dropped since we would've had to drop
+        // or otherwise destroy a Request in order to reach the point of dropping this.
+
+        let state = self.state.get();
+
+        if state.is_set() {
+            unsafe { self.response.get_mut().assume_init_drop() }
+        }
+
+        if state.is_closed_task_set() {
+            unsafe { self.closed_task.drop() }
+        }
+
+        if state.is_pipeline_set() {
+            unsafe { self.pipeline_dest.get_mut().assume_init_drop() }
+        }
+    }
+}
+
+impl<C: Chan> SharedRequest<C> {
+    pub fn new(request: C::Parameters, usage: RequestUsage, receivers: usize) -> Self {
+        Self {
+            parent: Mutex::new(None),
+            pointers: Pointers::new(),
+            request: UnsafeCell::new(ManuallyDrop::new(request)),
+            usage,
+            state: sharedshot::AtomicState::new(),
+            waiters: sharedshot::WaitList::new(),
+            receivers_count: AtomicUsize::new(receivers),
+            closed_task: sharedshot::ClosedTask::new(),
+            response: UnsafeCell::new(MaybeUninit::uninit()),
+            pipeline_map: Mutex::new(HashMap::new()),
+            pipeline_dest: UnsafeCell::new(MaybeUninit::uninit()),
+        }
+    }
+
+    pub unsafe fn request(&self) -> &C::Parameters {
+        &**self.request.get()
+    }
+
+    /// Drop the request value inside the shared request
+    pub unsafe fn drop_request(&self) {
+        let request = &mut *self.request.get();
+        ManuallyDrop::drop(request)
+    }
+
+    pub unsafe fn take_request(&self) -> C::Parameters {
+        let request = &mut *self.request.get();
+        ManuallyDrop::take(request)
+    }
+
+    pub fn close_sender(&self) {
+        self.state.set_send_closed();
+        self.waiters.wake_all();
+    }
+
+    pub unsafe fn response(&self) -> &C::Results {
+        (*self.response.get()).assume_init_ref()
+    }
+
+    /// Set the parent channel for this request.
+    /// 
+    /// This should only be called while holding a lock on the specified channel.
+    pub unsafe fn set_parent(&self, parent: Arc<SharedChannel<C>>) {
+        let mut lock = self.parent.lock();
+        debug_assert!(lock.is_none());
+        *lock = Some(parent);
+    }
+
+    /// Take back the arc for this request's channel.
+    /// 
+    /// This should only be called while holding a lock on the channel holding this request.
+    pub unsafe fn take_parent(&self) -> Option<Arc<SharedChannel<C>>> {
+        self.parent.lock().take()
+    }
+
+    /// Attempts to remove the request the current channel containing it. If this request
+    /// isn't in a channel, this does nothing.
+    pub fn try_remove_from_channel(&self) {
+        let Some(parent) = self.parent.lock().clone() else { return };
+
+        let Some(mut most_resolved) = parent.most_unresolved() else {
+            // If the channel is resolved by dropping or erroring permanently, we assume the
+            // channel is actually in the middle of dropping requests, but just hasn't detached us
+            // yet. We just return so that the channel can drop us itself.
+            return
+        };
+
+        todo!()
+    }
+
+    pub unsafe fn add_receiver(&self) {
+        let old = self.receivers_count.fetch_add(1, Relaxed);
+
+        if old == usize::MAX {
+            std::process::abort();
+        }
+
+        // Make sure I don't accidentally attempt to re-open the channel.
+        debug_assert_ne!(old, 0);
+    }
+
+    /// Remove a tracked receiver from the receiver count.
+    /// 
+    /// If this is the last receiver (and the receiver count is zero), this closes the channel on
+    /// the receiving side.
+    /// 
+    /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
+    pub unsafe fn remove_receiver(&self) {
+        let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
+        if last_receiver {
+            self.closed_task.close(&self.state);
+            self.try_remove_from_channel();
+        }
+    }
+
+    fn pipeline<K, F>(self: &Arc<Self>, key: K, chan: F) -> Sender<C>
+    where
+        K: Hash + Equivalent<C::PipelineKey>,
+        C::PipelineKey: From<K>,
+        F: FnOnce() -> C,
+    {
+        if !self.state.load(Acquire).is_pipeline_set() {
+            // The pipeline hasn't been set yet. Lock the pipeline map so we can get a
+            // pipelined client.
+            let mut map = self.pipeline_map.lock();
+            // Load relaxed since the mutex lock provides the synchronization we need
+            // if the pipeline does get set.
+            if !self.state.load(Relaxed).is_pipeline_set() {
+                // It *still* hasn't been set, time to mutate the map
+                let sender = match map.raw_entry_mut().from_key(&key) {
+                    RawEntryMut::Occupied(mut occupied) => match occupied.get().sender() {
+                        Some(sender) => sender,
+                        None => {
+                            let receiver = Receiver::track(self.clone());
+                            let (sender, weak_channel) = weak_channel(chan(), receiver);
+                            let _ = occupied.insert(weak_channel);
+                            sender
+                        }
+                    }
+                    RawEntryMut::Vacant(vacant) => {
+                        let receiver = Receiver::track(self.clone());
+                        let (sender, weak_channel) = weak_channel(chan(), receiver);
+                        let _ = vacant.insert(C::PipelineKey::from(key), weak_channel);
+                        sender
+                    }
+                };
+
+                return sender
+            }
+        }
+
+        let key = key.into();
+
+        // Ah, a pipeline was set, so we can apply the ops and resolve directly into the
+        // correct client.
+        let pipeline = unsafe { (*self.pipeline_dest.get()).assume_init_ref() };
+        match pipeline {
+            Some(p) => p.pipeline(key),
+            None => unsafe { self.response().pipeline(key) }
+        }
+    }
+
+    unsafe fn respond_and_resolve(&self, result: C::Results) {
+        // Write the response first
+        (*self.response.get()).write(result);
+
+        // Then set the pipeline to the response and resolve the pipeline.
+        // If this panics we'll leak the response which kinda sucks
+        // (since we won't set the flag saying the response is set)
+        // so let's just make sure we don't panic.
+        //
+        // TODO: Use a scope guard to make sure we set the set value
+        //       flag is set
+        self.set_pipeline(None);
+
+        // Now confirm the response being set
+        self.state.set_value();
+
+        // And wake up all the response receivers.
+        self.waiters.wake_all();
+    }
+
+    unsafe fn respond(&self, result: C::Results) {
+        (*self.response.get()).write(result);
+        self.state.set_value();
+        self.waiters.wake_all();
+    }
+
+    unsafe fn set_pipeline(&self, dest: Option<C::Pipeline>) {
+        let dest = &*(*self.pipeline_dest.get()).write(dest);
+
+        match dest {
+            None => {
+                let r = self.response();
+                self.resolve_pipeline_map(|k, c| r.resolve(k, c));
+            }
+            Some(dest) => self.resolve_pipeline_map(|k, c| dest.resolve(k, c)),
+        }
+    }
+
+    fn resolve_pipeline_map<F: Fn(C::PipelineKey, mpsc::Receiver<C>)>(&self, resolver: F) {
+        loop {
+            let mut lock = self.pipeline_map.lock();
+            if lock.is_empty() {
+                // There's nothing in the map. We can now mark the pipeline as resolved.
+                // Set the flag with relaxed ordering since when we return the unlock will
+                // provide our synchronization.
+                self.state.set_pipeline(Relaxed);
+                return
+            }
+
+            // Take the map from the mutex and unlock. This is to make sure we don't
+            // somehow deadlock somewhere down the line and lets other threads make progress.
+            let map = core::mem::take(&mut *lock);
+            drop(lock);
+
+            for (key, value) in map {
+                let Some(receiver) = value.upgrade() else { continue };
+                resolver(key, receiver);
+            }
+        }
+    }
+}
+
+/// A tracked receiver type that manipulates the `receivers_count` of the shared
+/// request state. This is intended to make it obvious what types count as receivers
+/// and automate most of the work around tracking receivers.
+pub(crate) struct Receiver<C: Chan>(Arc<SharedRequest<C>>);
+
+impl<C: Chan> Receiver<C> {
+    pub fn track(req: Arc<SharedRequest<C>>) -> Self {
+        unsafe { req.add_receiver(); }
+        Self(req)
+    }
+}
+
+impl<C: Chan> Clone for Receiver<C> {
+    fn clone(&self) -> Self {
+        Self::track(self.0.clone())
+    }
+}
+
+impl<C: Chan> Drop for Receiver<C> {
+    fn drop(&mut self) {
+        unsafe { self.0.remove_receiver() }
+    }
+}
+
+/// Create a new request and response channel with pipelining.
+pub fn request_response_pipeline<C: Chan>(msg: C::Parameters) -> (Request<C>, ResponseReceiver<C>, PipelineBuilder<C>) {
+    let request = Arc::new(SharedRequest::new(msg, RequestUsage::ResponseAndPipeline, 2));
+    (
+        Request::new(request.clone()),
+        ResponseReceiver { shared: Receiver(request.clone()) },
+        PipelineBuilder { shared: Receiver(request) },
+    )
+}
+
+/// Create a new request and response channel without pipelining.
+pub fn request_response<C: Chan>(msg: C::Parameters) -> (Request<C>, ResponseReceiver<C>) {
+    let request = Arc::new(SharedRequest::new(msg, RequestUsage::Response, 1));
+    (
+        Request::new(request.clone()),
+        ResponseReceiver { shared: Receiver(request) },
+    )
+}
+
+/// Create a new request for pipelining.
+pub fn request_pipeline<C: Chan>(msg: C::Parameters) -> (Request<C>, PipelineBuilder<C>) {
+    let request = Arc::new(SharedRequest::new(msg, RequestUsage::Pipeline, 1));
+    (
+        Request::new(request.clone()),
+        PipelineBuilder { shared: Receiver(request) },
+    )
 }
 
 /// 
-pub struct Request<T, U> {
-    shared: Marc<SharedRequest<T, U>>,
+pub struct Request<C: Chan> {
+    shared: Marc<SharedRequest<C>>,
 }
 
-impl<T, U> Request<T, U> {
+impl<C: Chan> Request<C> {
+    pub(crate) fn new(inner: Arc<SharedRequest<C>>) -> Self {
+        Self { shared: Marc::new(inner) }
+    }
+
     /// Get the inner request value.
-    pub fn get(&self) -> &T {
-        self.shared.get().request()
+    pub fn get(&self) -> &C::Parameters {
+        unsafe { self.shared.get().request() }
     }
 
-    pub fn respond(self, value: U) -> Result<(), U> {
-        todo!()
+    pub fn usage(&self) -> RequestUsage {
+        self.shared.get().usage
     }
 
-    /// Split the request into an ActiveRequest and a Responder.
-    pub fn split(self) -> (T, Responder<T, U>) {
-        todo!()
+    /// Respond to the request using a responder derived from it, taking the parameters in
+    /// the process.
+    pub fn respond(mut self) -> (C::Parameters, Responder<C>) {
+        unsafe {
+            let shared = self.shared.take();
+            let params = shared.take_request();
+            let responder = Responder { shared: Marc::new(shared) };
+            (params, responder)
+        }
+    }
+
+    pub fn is_closed(&self) -> bool {
+        !self.shared.get().state.load(Relaxed).is_recv_closed()
+    }
+
+    pub(crate) fn take_inner(mut self) -> Arc<SharedRequest<C>> {
+        unsafe { self.shared.take() }
     }
 }
 
-impl<T, U> Drop for Request<T, U> {
+impl<C: Chan> Drop for Request<C> {
     fn drop(&mut self) {
         if let Some(shared) = self.shared.try_take() {
-            unsafe { shared.drop_request() }
+            unsafe {
+                shared.drop_request();
+                shared.close_sender();
+            }
         }
     }
 }
 
 /// Allows sending a response for a request.
-pub struct Responder<T, U> {
-    shared: Arc<SharedRequest<T, U>>,
+pub struct Responder<C: Chan> {
+    shared: Marc<SharedRequest<C>>,
 }
 
-impl<T, U> Responder<T, U> {
-    pub fn send(self, resp: U) -> Result<(), U> {
-        todo!()
+impl<C: Chan> Responder<C> {
+    /// Returns the given response.
+    pub fn respond(mut self, resp: C::Results) {
+        unsafe {
+            let shared = self.shared.take();
+            shared.respond_and_resolve(resp);
+        }
+    }
+
+    /// Reuse the request to perform a tail-call, turning the responder back into a request.
+    pub fn tail_call(mut self, msg: C::Parameters) -> Request<C> {
+        unsafe {
+            let shared = self.shared.take();
+            *shared.request.get() = ManuallyDrop::new(msg);
+            Request { shared: Marc::new(shared) }
+        }
+    }
+
+    /// Fulfill the pipeline portion of the request, allowing pipelined requests to flow though
+    /// without waiting for the call to complete.
+    pub fn set_pipeline(mut self, dst: C::Pipeline) -> ResultsSender<C> {
+        unsafe {
+            let shared = self.shared.take();
+            shared.set_pipeline(Some(dst));
+            ResultsSender { shared: Marc::new(shared) }
+        }
     }
 
     pub async fn closed(&mut self) {
-        let closed = poll_fn(|ctx| self.poll_closed(ctx));
-        closed.await
+        poll_fn(|cx| self.poll_closed(cx)).await
     }
 
     pub fn is_closed(&self) -> bool {
-        todo!()
+        self.shared.get().state.load(Acquire).is_recv_closed()
     }
 
-    pub fn poll_closed(&mut self, ctx: &mut task::Context) -> task::Poll<()> {
-        todo!()
-    }
-}
-
-pub struct ResponseReceiver<T, U> {
-    shared: Option<Arc<SharedRequest<T, U>>>,
-}
-
-unsafe impl<T: Send, U: Send> Send for ResponseReceiver<T, U> {}
-unsafe impl<T: Sync, U: Sync> Sync for ResponseReceiver<T, U> {}
-
-impl<T, U> Future for ResponseReceiver<T, U> {
-    type Output = Option<U>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        todo!()
+    pub fn poll_closed(&mut self, cx: &mut task::Context<'_>) -> task::Poll<()> {
+        let shared = self.shared.get();
+        shared.closed_task.poll(&shared.state, cx)
     }
 }
 
-pub struct Response<T, U> {
-    shared: Arc<SharedRequest<T, U>>,
+impl<C: Chan> Drop for Responder<C> {
+    fn drop(&mut self) {
+        if let Some(shared) = self.shared.try_take() {
+            shared.close_sender()
+        }
+    }
 }
 
-unsafe impl<T: Send, U: Send> Send for Response<T, U> {}
-unsafe impl<T: Sync, U: Sync> Sync for Response<T, U> {}
+/// The result of calling `Responder::set_pipeline`, a type that can only be used to send the
+/// results of a call.
+pub struct ResultsSender<C: Chan> {
+    shared: Marc<SharedRequest<C>>,
+}
 
-impl<T, U> Clone for Response<T, U> {
+impl<C: Chan> ResultsSender<C> {
+    /// Returns the given response.
+    pub fn respond(mut self, resp: C::Results) {
+        unsafe {
+            let shared = self.shared.take();
+            shared.respond(resp);
+        }
+    }
+
+    pub async fn closed(&mut self) {
+        poll_fn(|cx| self.poll_closed(cx)).await
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.shared.get().state.load(Acquire).is_recv_closed()
+    }
+
+    pub fn poll_closed(&mut self, cx: &mut task::Context<'_>) -> task::Poll<()> {
+        let shared = self.shared.get();
+        shared.closed_task.poll(&shared.state, cx)
+    }
+}
+
+impl<C: Chan> Drop for ResultsSender<C> {
+    fn drop(&mut self) {
+        if let Some(shared) = self.shared.try_take() {
+            shared.close_sender()
+        }
+    }
+}
+
+/// A response receiver that can be used to await the response.
+#[derive(Clone)]
+pub struct ResponseReceiver<C: Chan> {
+    shared: Receiver<C>,
+}
+
+impl<C: Chan> ResponseReceiver<C> {
+    /// Attempts to receive the value. This returns an owned copy of the value that can be used separately from the receiver.
+    pub fn try_recv(&self) -> Result<Response<C>, TryRecvError> {
+        match self.shared.0.state.state() {
+            ShotState::Closed => Err(TryRecvError::Closed),
+            ShotState::Empty => Err(TryRecvError::Empty),
+            ShotState::Sent => Ok(Response { shared: self.shared.0.clone() }),
+        }
+    }
+
+    pub fn try_ref(&self) -> Result<&C::Results, TryRecvError> {
+        match self.shared.0.state.state() {
+            ShotState::Closed => Err(TryRecvError::Closed),
+            ShotState::Empty => Err(TryRecvError::Empty),
+            ShotState::Sent => Ok(unsafe { self.shared.0.response() }),
+        }
+    }
+
+    pub fn recv(self) -> Recv<C> {
+        Recv::new(self.shared)
+    }
+}
+
+impl<C: Chan> IntoFuture for ResponseReceiver<C> {
+    type IntoFuture = Recv<C>;
+    type Output = Option<Response<C>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        self.recv()
+    }
+}
+
+#[pin_project(PinnedDrop)]
+pub struct Recv<C: Chan> {
+    shot: Receiver<C>,
+
+    #[pin]
+    waiter: RecvWaiter,
+
+    state: Poll<Option<Response<C>>>,
+}
+
+unsafe impl<C: Chan + Send> Send for Recv<C> {}
+unsafe impl<C: Chan + Sync> Sync for Recv<C> {}
+
+impl<C: Chan> Recv<C> {
+    fn new(shot: Receiver<C>) -> Self {
+        Recv { shot, waiter: RecvWaiter::new(), state: Poll::Pending }
+    }
+}
+
+impl<C: Chan> Future for Recv<C> {
+    type Output = Option<Response<C>>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        if this.state.is_ready() {
+            return this.state.clone()
+        }
+
+        let value = match this.waiter.poll(ctx, &this.shot.0.state, &this.shot.0.waiters) {
+            ShotState::Empty => return Poll::Pending,
+            ShotState::Sent => Some(Response { shared: this.shot.0.clone() }),
+            ShotState::Closed => None,
+        };
+        *this.state = Poll::Ready(value.clone());
+
+        Poll::Ready(value)
+    }
+}
+
+#[pinned_drop]
+impl<C: Chan> PinnedDrop for Recv<C> {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+
+        this.waiter.pinned_drop(&this.shot.0.waiters);
+    }
+}
+
+pub struct Response<C: Chan> {
+    shared: Arc<SharedRequest<C>>,
+}
+
+impl<C: Chan> Response<C> {
+    fn get(&self) -> &C::Results {
+        // SAFETY: We only construct a Response when we know the inner value is set.
+        unsafe { (*self.shared.response.get()).assume_init_ref() }
+    }
+}
+
+impl<C: Chan> Clone for Response<C> {
     fn clone(&self) -> Self {
         Self { shared: self.shared.clone() }
     }
 }
 
-/// The shared state behind a request
-pub(crate) struct SharedRequest<T, U> {
-    /// Pointers to requests in a mpsc linked list.
-    pointers: Pointers<SharedRequest<T, U>>,
-
-    /// The original mpsc linked list that owned this request. Note, this may not be the
-    /// current owner of the list, as the channel may have been forwarded, in which case
-    /// the channel will have a chain of pointers pointing at the true owner of the linked
-    /// list.
-    owner: Option<Arc<()>>,
-
-    /// The request data. This should only be accessed by Request. When Request drop they
-    /// will trigger a drop on these contents.
-    request: UnsafeCell<ManuallyDrop<T>>,
-
-    /// The response sharedshot.
-    response: sharedshot::State<U>,
+impl<C> Debug for Response<C>
+where
+    C: Chan,
+    C::Results: Debug,
+    C::Error: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.get().fmt(f)
+    }
 }
 
-impl<T, U> SharedRequest<T, U> {
-    pub fn new(request: T) -> Self {
-        Self {
-            pointers: Pointers::new(),
-            owner: None,
-            request: UnsafeCell::new(ManuallyDrop::new(request)),
-            response: sharedshot::State::new(1),
-        }
+impl<C: Chan> AsRef<C::Results> for Response<C> {
+    fn as_ref(&self) -> &C::Results {
+        Response::get(self)
     }
+}
 
-    pub fn request(&self) -> &T {
-        // SAFETY: Request data can be accessed through a shared reference by anyone
-        unsafe { &**self.request.get() }
+impl<C: Chan> Deref for Response<C> {
+    type Target = C::Results;
+
+    fn deref(&self) -> &Self::Target {
+        Response::get(self)
     }
+}
 
-    /// Drop the request value inside the shared request
-    /// 
-    /// SAFETY: This may only be called once and is primarily used by the Drop implementations of
-    /// Request and ActiveRequest
-    pub unsafe fn drop_request(&self) {
-        let request = &mut *self.request.get();
-        ManuallyDrop::drop(request)
+#[derive(Clone)]
+pub struct PipelineBuilder<C: Chan> {
+    shared: Receiver<C>,
+}
+
+impl<C: Chan> PipelineBuilder<C> {
+    pub fn build<K, F>(&self, key: K, chan: F) -> Sender<C>
+    where
+        K: Hash + Equivalent<C::PipelineKey>,
+        C::PipelineKey: From<K>,
+        F: FnOnce() -> C,
+    {
+        self.shared.0.pipeline(key, chan)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::channel;
+    use assert_matches2::assert_matches;
+    use hashbrown::HashMap;
+    use mpsc::TryRecvError;
 
-    #[tokio::test]
-    async fn request_response() {
-        // Requests and responses are a core primitive to RPC. Since we make a lot of them, it
-        // doesn't make sense to do many allocations when we always are going to have both at once.
-        // Request combines the request and response data into a single allocation and exposes an
-        // sharedshot API to allow for the receipt of the response.
+    use crate::{sync::{mpsc, request::RequestUsage}, Error};
 
-        // Requests are created similar to a oneshot with the request function which returns a
-        // new request and response receiver.
-        let (request, receiver) = channel(1);
+    use super::{request_response, Chan, PipelineResolver, IntoResults};
 
-        // Requests can be split into an active request and a responder to allow dropping the
-        // request data separately from the responder.
-        let (request, responder) = request.split();
-        assert_eq!(request, 1);
+    #[derive(Debug)]
+    struct TestChannel;
 
-        // Responder can return the response back to the sender if nobody is listening for the response.
-        responder.send(2).unwrap();
+    #[derive(Clone, Copy, Eq, PartialEq, Debug)]
+    struct IntRequest(i32);
 
-        // Receivers can await the response.
-        let response = receiver.await.unwrap();
-        assert_eq!(response, 2);
+    #[derive(Clone, Debug)]
+    struct IntsResponse(HashMap<i32, mpsc::Sender<TestChannel>>);
 
-        // When all handles to the request are dropped, the whole allocation is released.
+    #[derive(PartialEq, Eq, Hash, Debug)]
+    struct IntPipelineKey(i32);
+
+    impl IntoResults<TestChannel> for Error {
+        #[inline]
+        fn into_results(self) -> <TestChannel as Chan>::Results {
+            Err(self)
+        }
+    }
+
+    impl Chan for TestChannel {
+        type Parameters = IntRequest;
+        type Error = Error;
+        type Results = Result<IntsResponse, Error>;
+        type PipelineKey = IntPipelineKey;
+        type Pipeline = IntsResponse;
+    }
+
+    impl PipelineResolver<TestChannel> for IntsResponse {
+        fn resolve(&self, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
+            let Some(results) = self.0.get(&key.0) else {
+                channel.close(Error::failed("unknown pipeline"));
+                return
+            };
+
+            if let Err(c) = channel.forward_to(results) {
+                // If it's an infinite loop, close it with an error
+                c.close(Error::failed("infinite loop"));
+            }
+        }
+
+        fn pipeline(&self, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
+            match self.0.get(&key.0) {
+                Some(c) => c.clone(),
+                None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
+            }
+        }
+    }
+
+    impl PipelineResolver<TestChannel> for Result<IntsResponse, Error> {
+        fn resolve(&self, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
+            match self {
+                Ok(r) => r.resolve(key, channel),
+                Err(err) => channel.close(err.clone()),
+            }
+        }
+
+        fn pipeline(&self, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
+            match self {
+                Ok(r) => match r.0.get(&key.0) {
+                    Some(c) => c.clone(),
+                    None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
+                }
+                Err(err) => mpsc::broken(TestChannel, err.clone())
+            }
+        }
+    }
+
+    #[test]
+    fn sync_request_response() {
+        // Make a request and respond, then receive the result and check it.
+
+        let input = IntRequest(1);
+        let (req, resp) = request_response::<TestChannel>(input);
+        assert_eq!(req.usage(), RequestUsage::Response);
+
+        let (params, responder) = req.respond();
+        assert_eq!(input, params);
+
+        assert!(!responder.is_closed());
+        responder.respond(Ok(IntsResponse(HashMap::new())));
+
+        let results = resp.try_recv().unwrap();
+        let response = (*results).as_ref().unwrap();
+
+        assert!(response.0.is_empty());
+    }
+
+    #[test]
+    fn sync_close_request() {
+        // Make a request, but drop the request, and make sure the receiver becomes aware of it.
+
+        let input = IntRequest(1);
+        let (req, resp) = request_response::<TestChannel>(input);
+        drop(req);
+
+        assert_matches!(resp.try_recv(), Err(TryRecvError::Closed));
     }
 }

@@ -5,69 +5,14 @@ use core::ptr::NonNull;
 
 use crate::alloc::ElementCount;
 use crate::list::ElementSize;
-use crate::{ty, IntoFamily};
-use crate::{internal::Sealed, Family};
+use crate::internal::Sealed;
+use crate::{ty, IntoFamily, Family};
 
 pub mod ptr {
-    use core::marker::PhantomData;
-    use core::ptr::NonNull;
-    use crate::alloc::ElementCount;
-
-    #[derive(Clone, Copy)]
-    pub struct Reader<'a> {
-        a: PhantomData<&'a [u8]>,
-        data: NonNull<u8>,
-        len: ElementCount,
-    }
-
-    impl Reader<'_> {
-        #[inline]
-        pub const fn empty() -> Self {
-            Self {
-                a: PhantomData,
-                data: NonNull::dangling(),
-                len: ElementCount::MIN,
-            }
-        }
-
-        #[inline]
-        pub const unsafe fn new_unchecked(data: NonNull<u8>, len: ElementCount) -> Self {
-            Self { a: PhantomData, data, len }
-        }
-
-        #[inline]
-        pub const fn data(&self) -> NonNull<u8> {
-            self.data
-        }
-
-        #[inline]
-        pub const fn len(&self) -> ElementCount {
-            self.len
-        }
-    }
-
-    pub struct Builder<'a> {
-        a: PhantomData<&'a mut [u8]>,
-        data: NonNull<u8>,
-        len: ElementCount,
-    }
-
-    impl Builder<'_> {
-        #[inline]
-        pub unsafe fn new_unchecked(data: NonNull<u8>, len: ElementCount) -> Self {
-            Self { a: PhantomData, data, len }
-        }
-
-        #[inline]
-        pub const fn data(&self) -> NonNull<u8> {
-            self.data
-        }
-
-        #[inline]
-        pub const fn len(&self) -> ElementCount {
-            self.len
-        }
-    }
+    pub use crate::ptr::{
+        BlobReader as Reader,
+        BlobBuilder as Builder,
+    };
 }
 
 #[derive(Clone, Copy)]
@@ -119,7 +64,7 @@ impl<'a> Reader<'a> {
         let count = ElementCount::new(len as u32).unwrap();
         unsafe {
             let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
-            Some(Self(ptr::Reader::new_unchecked(ptr, count)))
+            Some(Self(ptr::Reader::new(ptr, count)))
         }
     }
 
@@ -211,7 +156,7 @@ impl<'a> From<Builder<'a>> for ptr::Builder<'a> {
 impl<'a> Builder<'a> {
     #[inline]
     pub fn as_reader<'b>(&'b self) -> Reader<'b> {
-        Data(unsafe { ptr::Reader::new_unchecked(self.0.data(), self.0.len()) })
+        Data(unsafe { ptr::Reader::new(self.0.data(), self.0.len()) })
     }
 
     #[inline]

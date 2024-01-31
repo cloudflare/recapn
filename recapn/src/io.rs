@@ -23,7 +23,7 @@ enum Table {
 }
 
 impl Table {
-    pub const fn empty() -> Self {
+    pub const fn new() -> Self {
         Table::Inline {
             len: 1,
             array: [Word::NULL; INLINE_TABLE_SIZE],
@@ -75,14 +75,10 @@ pub struct StreamTable {
 }
 
 impl StreamTable {
-    /// Creates an "empty" stream table.
-    /// 
-    /// Though this table is considered "empty", it isn't actually empty to match the invariants
-    /// of StreamTableRef, which requires that the table have at least one Word. This Word is
-    /// NULL, which makes the table have one empty segment.
+    /// Creates a new stream table of one empty segment.
     #[inline]
-    pub const fn empty() -> Self {
-        Self { table: Table::empty(), }
+    pub const fn new() -> Self {
+        Self { table: Table::new(), }
     }
 
     /// Returns the size of the streaming table in [`Word`]s
@@ -119,13 +115,13 @@ impl StreamTable {
         count.set(segments.len() - 1);
 
         lens.into_iter()
-            .zip(segments)
-            .for_each(|(len_value, segment)| len_value.set(segment.len() as u32));
+            .zip(*segments)
+            .for_each(|(len_value, segment)| len_value.set(segment.len()));
     }
 
     #[inline]
-    pub fn new(segments: &MessageSegments) -> Self {
-        let mut table = Self::empty();
+    pub fn from_segments(segments: &MessageSegments) -> Self {
+        let mut table = Self::new();
         table.write_segments(segments);
         table
     }
@@ -230,7 +226,7 @@ impl ToOwned for StreamTableRef {
     type Owned = StreamTable;
 
     fn to_owned(&self) -> Self::Owned {
-        let mut table = StreamTable::empty();
+        let mut table = StreamTable::new();
         self.clone_into(&mut table);
         table
     }
@@ -261,7 +257,7 @@ pub struct SegmentLenReader(WireValue<u32>);
 
 impl SegmentLenReader {
     #[inline]
-    pub fn get_raw(&self) -> u32 {
+    pub fn raw(&self) -> u32 {
         self.0.get()
     }
 
