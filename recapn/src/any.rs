@@ -27,13 +27,13 @@
 //    * Default
 //    * PartialEq (readers + builders)
 
-use crate::field::{Struct, Capability};
+use crate::field::Struct;
 use crate::internal::Sealed;
-use crate::list::{self, List};
-use crate::ptr::{MessageSize, StructSize, PtrElementSize};
-use crate::rpc::{self, Capable, Empty, PipelineBuilder, Pipelined, Table, CapTable, BreakableCapSystem};
-use crate::ty::FromPtr;
-use crate::{ty, Family, IntoFamily, Result};
+use crate::list::{self, List, ElementSize};
+use crate::ptr::{ElementCount, CopySize, ErrorHandler, IgnoreErrors, MessageSize, PtrElementSize, StructSize};
+use crate::rpc::{self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, PipelineBuilder, Pipelined, Table};
+use crate::ty::{self, FromPtr, StructReader as _};
+use crate::{data, text, Family, IntoFamily, Result};
 
 pub mod ptr {
     pub use crate::ptr::{
@@ -41,14 +41,7 @@ pub mod ptr {
     };
 }
 
-pub use crate::ptr::PtrType;
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum PtrEquality {
-    NotEqual,
-    Equal,
-    ContainsCaps,
-}
+pub use crate::ptr::{PtrType, PtrEquality};
 
 /// A safe wrapper around any pointer type.
 ///
@@ -171,23 +164,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
 
     #[inline]
     pub fn equality(&self, other: &PtrReader<'_, impl Table>) -> Result<PtrEquality> {
-        let ptr_type = self.ptr_type()?;
-        if other.ptr_type()? != ptr_type {
-            return Ok(PtrEquality::NotEqual)
-        }
-
-        todo!()
-
-        /*
-        match ptr_type {
-            PtrType::Null => Ok(PtrEquality::Equal),
-            PtrType::Struct => self.try_read_as::<AnyStruct>()?
-                .equality(&other.try_read_as::<AnyStruct>()?),
-            PtrType::List => self.try_read_as::<AnyList>()?
-                .equality(&other.try_read_as::<AnyList>()?),
-            PtrType::Capability => Ok(PtrEquality::ContainsCaps),
-        }
-        */
+        self.0.equality(&other.0)
     }
 
     #[inline]
@@ -248,7 +225,7 @@ impl<'a, T: CapTable + BreakableCapSystem> PtrReader<'a, T> {
         let cap = match self.0.try_to_capability() {
             Ok(Some(c)) => c,
             Ok(None) => return None,
-            Err(err) => T::broken(err.to_string()),
+            Err(err) => T::broken(&err),
         };
         Some(C::from_client(cap))
     }
@@ -258,7 +235,7 @@ impl<'a, T: CapTable + BreakableCapSystem> PtrReader<'a, T> {
         let cap = match self.0.try_to_capability() {
             Ok(Some(c)) => c,
             Ok(None) => T::null(),
-            Err(err) => T::broken(err.to_string()),
+            Err(err) => T::broken(&err),
         };
         C::from_client(cap)
     }
@@ -329,8 +306,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn target_size(&self) {
-        todo!()
+    pub fn target_size(&self) -> MessageSize {
+        self.0.target_size()
     }
 
     #[inline]
@@ -367,8 +344,6 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     pub fn clear(&mut self) {
         self.0.clear()
     }
-
-    // TODO init, set, orphan APIs
 
     #[inline]
     pub fn read_as<'b, U: FromPtr<PtrReader<'b, T>>>(&'b self) -> U::Output {
@@ -411,6 +386,123 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         let ptr = self.0.init_struct(size);
         AnyStruct(ptr)
     }
+
+    #[inline]
+    pub fn init_list<V: ty::ListValue>(self, count: u32) -> list::Builder<'a, V, T> {
+        let count = ElementCount::new(count).expect("too many elements for list");
+        list::Builder::new(self.0.init_list(V::ELEMENT_SIZE, count))
+    }
+
+    #[inline]
+    pub fn init_any_struct_list(self, size: StructSize, count: u32) -> list::Builder<'a, AnyStruct, T> {
+        let count = ElementCount::new(count).expect("too many elements for list");
+        list::Builder::new(self.0.init_list(ElementSize::InlineComposite(size), count))
+    }
+
+    #[inline]
+    pub fn init_any_list(self, element_size: ElementSize, count: u32) -> ListBuilder<'a, T> {
+        let count = ElementCount::new(count).expect("too many elements for list");
+        AnyList(self.0.init_list(element_size, count))
+    }
+
+    #[inline]
+    pub fn init_data(self, count: u32) -> data::Builder<'a> {
+        let count = ElementCount::new(count).expect("too many elements for list");
+        self.0.init_blob(count).into()
+    }
+
+    #[inline]
+    pub fn init_text(self, count: u32) -> text::Builder<'a> {
+        let count = ElementCount::new(count).expect("too many elements for list");
+        text::Builder::new_unchecked(self.0.init_blob(count))
+    }
+
+    #[inline]
+    pub fn try_set_struct<S: ty::Struct, T2, E>(
+        &mut self,
+        reader: &S::Reader<'_, T2>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.0.try_set_struct(reader.as_ptr(), CopySize::Minimum(S::SIZE), err_handler)
+    }
+
+    #[inline]
+    pub fn try_set_any_struct<T2, E>(
+        &mut self,
+        reader: &StructReader<'_, T2>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.0.try_set_struct(reader.as_ptr(), CopySize::FromValue, err_handler)
+    }
+
+    #[inline]
+    pub fn try_set_list<V, T2, E>(
+        &mut self,
+        reader: &list::Reader<'_, V, T2>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        V: ty::DynListValue,
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.0.try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
+    }
+
+    #[inline]
+    pub fn try_set_any_list<T2, E>(
+        &mut self,
+        reader: &ListReader<'_, T2>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.0.try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
+    }
+
+    #[inline]
+    pub fn set_data(self, value: data::Reader) -> data::Builder<'a> {
+        self.0.set_blob(value.into()).into()
+    }
+
+    #[inline]
+    pub fn set_text(self, value: text::Reader) -> text::Builder<'a> {
+        text::Builder::new_unchecked(self.0.set_blob(value.into()))
+    }
+
+    #[inline]
+    pub fn try_set<T2, E>(
+        &mut self,
+        reader: &PtrReader<'_, T2>,
+        canonical: bool,
+        err_handler: E
+    ) -> Result<(), E::Error>
+    where
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.0.try_copy_from(reader.as_ref(), canonical, err_handler)
+    }
+
+    #[inline]
+    pub fn set<T2>(&mut self, reader: &PtrReader<'_, T2>, canonical: bool)
+    where
+        T2: InsertableInto<T>,
+    {
+        self.try_set(reader, canonical, IgnoreErrors).unwrap()
+    }
+
+    // TODO orphan APIs
 }
 
 impl<'a, T: Table, T2: Table> PartialEq<PtrReader<'a, T2>> for PtrBuilder<'a, T> {
@@ -583,6 +675,11 @@ impl<'a, T: Table> StructReader<'a, T> {
     }
 
     #[inline]
+    pub fn ptr_count(&self) -> u16 {
+        self.0.ptr_count()
+    }
+
+    #[inline]
     pub fn ptr_section(&self) -> list::Reader<'a, AnyPtr, T> {
         list::Reader::new(self.0.ptr_section())
     }
@@ -599,7 +696,7 @@ impl<'a, T: Table> StructReader<'a, T> {
 
     #[inline]
     pub fn equality(&self, other: &StructReader<'_, impl Table>) -> Result<PtrEquality> {
-        todo!()
+        self.0.equality(&other.0)
     }
 
     /// Interprets the struct as the given type
@@ -675,6 +772,11 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
+    pub fn total_size(&self) -> MessageSize {
+        self.0.total_size()
+    }
+
+    #[inline]
     pub fn size(&self) -> StructSize {
         self.0.size()
     }
@@ -702,6 +804,15 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     #[inline]
     pub fn equality(&self, other: &StructReader<'_, impl Table>) -> Result<PtrEquality> {
         self.as_reader().equality(other)
+    }
+
+    #[inline]
+    pub fn try_get_as<S: ty::Struct>(self) -> Result<S::Builder<'a, T>, Self> {
+        if S::SIZE.fits_inside(self.size()) {
+            Ok(unsafe { ty::StructBuilder::from_ptr(self.0) })
+        } else {
+            Err(self)
+        }
     }
 }
 
@@ -790,19 +901,110 @@ impl ty::ListValue for AnyList {
 // ListReader impls
 
 impl<'a, T: Table> AsRef<ptr::ListReader<'a, T>> for ListReader<'a, T> {
+    #[inline]
     fn as_ref(&self) -> &ptr::ListReader<'a, T> {
         &self.0
     }
 }
 
+impl<'a, T: Table> From<ptr::ListReader<'a, T>> for ListReader<'a, T> {
+    #[inline]
+    fn from(reader: ptr::ListReader<'a, T>) -> Self {
+        Self(reader)
+    }
+}
+
+impl<'a, T: Table> From<ListReader<'a, T>> for ptr::ListReader<'a, T> {
+    #[inline]
+    fn from(reader: ListReader<'a, T>) -> Self {
+        reader.0
+    }
+}
+
+impl<'a, T: Table> ty::FromPtr<ListReader<'a, T>> for AnyList {
+    type Output = ListReader<'a, T>;
+
+    #[inline]
+    fn get(ptr: ListReader<'a, T>) -> Self::Output { ptr }
+}
+
+impl<'a, T: Table> ty::FromPtr<PtrReader<'a, T>> for AnyList {
+    type Output = ListReader<'a, T>;
+
+    fn get(AnyPtr(reader): PtrReader<'a, T>) -> Self::Output {
+        match reader.to_list(None) {
+            Ok(Some(s)) => AnyList(s),
+            _ => ListReader::empty(ElementSize::Void).imbue_from(&reader),
+        }
+    }
+}
+
+impl<'a, T: Table> ty::ReadPtr<PtrReader<'a, T>> for AnyList {
+    #[inline]
+    fn try_get_option(AnyPtr(reader): PtrReader<'a, T>) -> Result<Option<Self::Output>> {
+        match reader.to_list(None) {
+            Ok(Some(r)) => Ok(Some(AnyList(r))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+    #[inline]
+    fn try_get(AnyPtr(reader): PtrReader<'a, T>) -> Result<Self::Output> {
+        match reader.to_list(None) {
+            Ok(Some(r)) => Ok(AnyList(r)),
+            Ok(None) => Ok(ListReader::empty(ElementSize::Void).imbue_from(&reader)),
+            Err(err) => Err(err),
+        }
+    }
+    #[inline]
+    fn get_option(AnyPtr(reader): PtrReader<'a, T>) -> Option<Self::Output> {
+        match reader.to_list(None) {
+            Ok(Some(r)) => Some(AnyList(r)),
+            _ => None,
+        }
+    }
+}
+
+impl<'a, T: Table> ty::TypedPtr for ListReader<'a, T> {
+    type Ptr = ptr::ListReader<'a, T>;
+}
+
+impl ListReader<'_> {
+    #[inline]
+    pub fn empty(element_size: ElementSize) -> Self {
+        Self(ptr::ListReader::empty(element_size))
+    }
+}
+
 impl<'a, T: Table> ListReader<'a, T> {
+    #[inline]
+    pub fn total_size(&self) -> Result<MessageSize> {
+        self.0.total_size()
+    }
+
     #[inline]
     pub fn len(&self) -> u32 {
         self.0.len().get()
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn element_size(&self) -> ElementSize {
+        self.0.element_size()
+    }
+
+    #[inline]
+    pub fn equality(&self, other: &ListReader<'_, impl Table>) -> Result<PtrEquality> {
+        self.0.equality(&other.0)
+    }
+
     /// Attempts to cast the list into a value of the specified type.
-    pub fn try_typed_as<V: ty::DynListValue>(self) -> Result<list::Reader<'a, V, T>, Self> {
+    #[inline]
+    pub fn try_get_as<V: ty::DynListValue>(self) -> Result<list::Reader<'a, V, T>, Self> {
         let size = self.0.element_size();
         if size.upgradable_to(PtrElementSize::size_of::<V>()) {
             Ok(list::List::new(self.0))
@@ -813,15 +1015,6 @@ impl<'a, T: Table> ListReader<'a, T> {
 }
 
 // ListBuilder impls
-
-impl<'a, T: Table> ListBuilder<'a, T> {
-}
-
-impl<'a, T: Table> From<ptr::ListReader<'a, T>> for ListReader<'a, T> {
-    fn from(reader: ptr::ListReader<'a, T>) -> Self {
-        Self(reader)
-    }
-}
 
 impl<'a, T: Table> AsRef<ptr::ListBuilder<'a, T>> for ListBuilder<'a, T> {
     fn as_ref(&self) -> &ptr::ListBuilder<'a, T> {
@@ -841,14 +1034,59 @@ impl<'a, T: Table> From<ptr::ListBuilder<'a, T>> for ListBuilder<'a, T> {
     }
 }
 
-impl<'a, T: Table> FromPtr<PtrReader<'a, T>> for AnyList {
-    type Output = ListReader<'a, T>;
+impl<'a, T: Table> From<ListBuilder<'a, T>> for ptr::ListBuilder<'a, T> {
+    fn from(builder: ListBuilder<'a, T>) -> Self {
+        builder.0
+    }
+}
 
-    fn get(reader: PtrReader<'a, T>) -> Self::Output {
-        let ptr = match reader.0.to_list(None) {
-            Ok(Some(ptr)) => ptr,
-            _ => ptr::ListReader::empty(list::ElementSize::Void).imbue_from(&reader),
-        };
-        ptr.into()
+impl<'a, T: Table> ListBuilder<'a, T> {
+    #[inline]
+    pub fn as_reader(&self) -> ListReader<T> {
+        self.0.as_reader().into()
+    }
+
+    #[inline]
+    pub fn by_ref(&mut self) -> ListBuilder<T> {
+        self.0.by_ref().into()
+    }
+
+    #[inline]
+    pub fn total_size(&self) -> MessageSize {
+        self.0.total_size()
+    }
+
+    #[inline]
+    pub fn len(&self) -> u32 {
+        self.0.len().get()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn element_size(&self) -> ElementSize {
+        self.0.element_size()
+    }
+
+    #[inline]
+    pub fn equality(&self, other: &ListReader<'_, impl Table>) -> Result<PtrEquality> {
+        self.as_reader().equality(other)
+    }
+}
+
+impl<'a, T: Table, T2: Table> PartialEq<ListReader<'a, T2>> for ListBuilder<'a, T> {
+    #[inline]
+    fn eq(&self, other: &ListReader<'a, T2>) -> bool {
+        matches!(self.equality(other), Ok(PtrEquality::Equal))
+    }
+}
+
+impl<'a, T: Table, T2: Table> PartialEq<ListBuilder<'a, T2>> for ListReader<'a, T> {
+    #[inline]
+    fn eq(&self, other: &ListBuilder<'a, T2>) -> bool {
+        matches!(other.equality(self), Ok(PtrEquality::Equal))
     }
 }

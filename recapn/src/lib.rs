@@ -3,19 +3,18 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(const_option)]
 #![feature(slice_from_ptr_range)]
+#![feature(ptr_sub_ptr)]
+#![cfg_attr(feature = "std", feature(write_all_vectored))]
 
 use core::fmt::{self, Display};
+use crate::alloc::AllocLen;
 use ptr::{PtrElementSize, WirePtr};
-use thiserror::Error;
 
 #[doc(hidden)]
 extern crate self as recapn;
 
-#[cfg(feature = "std")]
-extern crate std as alloc_crate;
-
-#[cfg(not(feature = "std"))]
-extern crate alloc as alloc_crate;
+#[cfg(feature = "alloc")]
+extern crate alloc as rustalloc;
 
 mod internal {
     pub trait Sealed {}
@@ -27,13 +26,16 @@ mod internal {
 
 // Layer 0 : Messages and segments
 
+pub mod num;
 pub mod alloc;
+pub mod arena;
 pub mod message;
 pub mod io;
 
 // Layer 1 : Typeless primitives (structs, lists, caps)
 
 pub mod ptr;
+pub mod orphan;
 pub mod data;
 pub mod text;
 pub mod rpc;
@@ -47,10 +49,9 @@ pub mod field;
 
 // Layer 3 : Extensions
 
-// pub mod orphan;
 // pub mod schema;
 // pub mod compiler;
-// pub mod dynamic;
+    // pub mod dynamic;
 
 /// A type that is the reader of a struct type.
 pub type ReaderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Reader<'a, Table>;
@@ -88,59 +89,71 @@ pub trait IntoFamily {
 
 /// Errors that can occur while reading and writing in Cap'n Proto serialization format.
 #[non_exhaustive]
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub(crate) enum ErrorKind {
     /// The nesting limit has been exceeded, either because the message is too deeply-nested or
     /// it contains cycles. See [message::ReaderOptions].
-    #[error("nesting limit exceeded")]
     NestingLimitExceeded,
     /// A pointer points to a value outside the bounds of the message or segment.
-    #[error("pointer out of bounds")]
     PointerOutOfBounds,
     /// The read limit has been exceeded.
-    #[error("read limit exceeded")]
     ReadLimitExceeded,
     /// A list of inline composite elements overran its word count.
-    #[error("inline composite word count overrun")]
     InlineCompositeOverrun,
     /// An inline composite element tag was a pointer to something other than a struct.
-    #[error("unsupported inline composite element tag")]
     UnsupportedInlineCompositeElementTag,
     /// We expected to read an pointer of a specific type, but found something else instead.
-    #[error("{0}")]
     UnexpectedRead(ptr::FailedRead),
     /// The existing list value is incompatible with the expected type. This can happen if
     /// we validate a list pointer which has upgraded to an inline composite, but has no data
     /// section when the list element size is one, two, four, or eight bytes, or has no pointer
     /// section when the list element is a pointer.
-    #[error("{0}")]
     IncompatibleUpgrade(ptr::IncompatibleUpgrade),
     /// Capabilities are not allowed in this context, likely because it is canonical or it has an empty cap table.
-    #[error("capability not allowed in this context")]
     CapabilityNotAllowed,
     /// A capability pointer in the message pointed to a capability in the cap table that doesn't
     /// exist.
-    #[error("invalid capability pointer ({0})")]
     InvalidCapabilityPointer(u32),
     /// The message contained text that is not NUL-terminated, or wasn't large enough to contain one.
-    #[error("text wasn't NUL terminated")]
     TextNotNulTerminated,
     /// When reading a message, we followed a far pointer to another segment, but the segment
     /// didn't exist.
-    #[error("missing segment {0}")]
     MissingSegment(u32),
     /// We followed a far pointer to build something, but it pointed to a read-only segment.
-    #[error("read-only segment")]
     WritingNotAllowed,
     /// An attempt was made to allocate something that cannot be represented in a Cap'n Proto message.
-    #[error("allocation too large")]
     AllocTooLarge,
+    /// An attempt was made to allocate something of the specified size, but the underlying allocator failed.
+    AllocFailed(AllocLen),
+    /// An attempt was made to adopt an orphan from a different message.
+    OrphanFromDifferentMessage,
 }
 
-#[derive(Debug, Error)]
-#[error(transparent)]
+#[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            ErrorKind::NestingLimitExceeded => write!(f, "nesting limit exceeded"),
+            ErrorKind::PointerOutOfBounds => write!(f, "pointer out of bounds"),
+            ErrorKind::ReadLimitExceeded => write!(f, "read limit exceeded"),
+            ErrorKind::InlineCompositeOverrun => write!(f, "inline composite word count overrun"),
+            ErrorKind::UnsupportedInlineCompositeElementTag => write!(f, "unsupported inline composite element tag"),
+            ErrorKind::UnexpectedRead(read) => Display::fmt(read, f),
+            ErrorKind::IncompatibleUpgrade(upgrade) => Display::fmt(upgrade, f),
+            ErrorKind::CapabilityNotAllowed => write!(f, "capability not allowed in this context"),
+            ErrorKind::InvalidCapabilityPointer(index) => write!(f, "invalid capability pointer ({index})"),
+            ErrorKind::TextNotNulTerminated => write!(f, "text wasn't NUL terminated"),
+            ErrorKind::MissingSegment(id) => write!(f, "missing segment {id}"),
+            ErrorKind::WritingNotAllowed => write!(f, "attempted to write to read-only segment"),
+            ErrorKind::AllocTooLarge => write!(f, "allocation too large"),
+            ErrorKind::AllocFailed(size) => write!(f, "failed to allocate {size} words in message"),
+            ErrorKind::OrphanFromDifferentMessage => write!(f, "orphan from different message"),
+        }
+    }
 }
 
 impl Error {
@@ -184,7 +197,7 @@ impl From<ErrorKind> for Error {
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// A type representing a union or enum variant that doesn't exist in the Cap'n Proto schema.
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub struct NotInSchema(pub u16);
 
 impl Display for NotInSchema {
@@ -192,3 +205,6 @@ impl Display for NotInSchema {
         write!(f, "variant {} was not present in the schema", self.0)
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for NotInSchema {}

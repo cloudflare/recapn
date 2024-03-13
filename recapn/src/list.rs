@@ -10,22 +10,22 @@
 //! * A list of structs is a `List<field::Struct<T>>` where T is the struct type.
 //! * A list of lists is a `List<List<T>>` where T is the inner list type.
 
-use crate::alloc::ElementCount;
 use crate::any::{self, AnyList, AnyPtr, AnyStruct};
 use crate::data::{self, Data};
-use crate::ptr::CopySize;
+use crate::ptr::{CopySize, ErrorHandler, IgnoreErrors};
 use crate::text::{self, Text};
-use crate::field::{Enum, EnumResult, Struct};
+use crate::field::{Enum, Struct, Capability};
 use crate::internal::Sealed;
-use crate::ptr::{internal::FieldData, PtrElementSize, StructSize, WriteNull, write_null};
+use crate::ptr::{internal::FieldData, PtrElementSize, StructSize};
 use crate::rpc::{self, Capable, InsertableInto, Table};
-use crate::{ty, Error, Family, IntoFamily, Result, ErrorKind};
+use crate::ty::{self, EnumResult};
+use crate::{Error, Family, IntoFamily, Result, ErrorKind};
 
-use core::convert::{self, TryFrom, Infallible};
+use core::convert::TryFrom;
 use core::marker::PhantomData;
-use core::ops::{ControlFlow, Range};
+use core::ops::Range;
 
-pub use crate::ptr::ElementSize;
+pub use crate::ptr::{ElementSize, ElementCount};
 
 pub mod ptr {
     pub use crate::ptr::{
@@ -37,6 +37,15 @@ pub mod ptr {
 
 pub type Reader<'a, V, T = rpc::Empty> = List<V, ptr::Reader<'a, T>>;
 pub type Builder<'a, V, T = rpc::Empty> = List<V, ptr::Builder<'a, T>>;
+
+pub type StructListReader<'a, S, T = rpc::Empty> = Reader<'a, Struct<S>, T>;
+pub type StructListBuilder<'a, S, T = rpc::Empty> = Builder<'a, Struct<S>, T>;
+
+pub type EnumListReader<'a, E, T = rpc::Empty> = Reader<'a, Enum<E>, T>;
+pub type EnumListBuilder<'a, E, T = rpc::Empty> = Builder<'a, Enum<E>, T>;
+
+pub type CapabilityListReader<'a, C, T = rpc::Empty> = Reader<'a, Capability<C>, T>;
+pub type CapabilityListBuilder<'a, C, T = rpc::Empty> = Builder<'a, Capability<C>, T>;
 
 /// A Cap'n Proto list.
 pub struct List<V, T = Family> {
@@ -138,7 +147,7 @@ impl<'a, V: ty::DynListValue, T: Table> ty::FromPtr<any::ListReader<'a, T>> for 
     /// Converts from a AnyList reader to a List<V> reader. In the case of an invalid upgrade
     /// between types, this returns an empty list.
     fn get(ptr: any::ListReader<'a, T>) -> Self::Output {
-        match ptr.try_typed_as::<V>() {
+        match ptr.try_get_as::<V>() {
             Ok(ptr) => ptr,
             Err(old) => Reader::empty().imbue_from(&old),
         }
@@ -221,6 +230,18 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
         }
     }
 
+    #[inline]
+    pub fn try_copy_from<E>(
+        &mut self,
+        other: Reader<'_, V, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        E: ErrorHandler,
+    {
+        self.as_mut().try_copy_from(other.as_ref(), err_handler)
+    }
+
     /// Gets a mutable view of the element at the specified index, or None if the index is out of range.
     #[inline]
     pub fn try_at<'b>(&'b mut self, index: u32) -> Option<ElementBuilder<'a, 'b, V, T>>
@@ -271,6 +292,24 @@ pub type ElementReader<'a, 'b, V, T = rpc::Empty> =
 pub type ElementBuilder<'a, 'b, V, T = rpc::Empty> =
     <V as ListAccessable<&'b mut Builder<'a, V, T>>>::View;
 
+/// A helper used to provide element views into a list. Depending on the value type, this may simply
+/// return the value itself, or an element view which can be used to access one of the other getters
+/// or setters.
+///
+/// Some types have multiple ways of reading values which account for error handling or provide safe
+/// defaults. For example, reading a pointer field can return an error, but many don't want to
+/// handle that error and would accept a safe default. But to hide the error completely would be
+/// taking it too far, since some might want to perform strict validation and error out if any
+/// incorrect data is read. So we provide both.
+///
+/// But other types can't return errors and are simple arithmetic, so we don't bother returning a
+/// view with multiple possible accessors, since really only one exists.
+pub trait ListAccessable<T> {
+    type View;
+
+    unsafe fn get(list: T, index: u32) -> Self::View;
+}
+
 impl<'a, 'b, V, T> BuilderElement<'a, 'b, V, T>
 where
     T: Table,
@@ -297,6 +336,38 @@ where
             list: &mut *self.list,
             idx: self.idx,
         }
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
+    type View = ();
+
+    #[inline]
+    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View { () }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for () {
+    type View = ();
+
+    #[inline]
+    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View { () }
+}
+
+impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for V {
+    type View = V;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        list.as_ref().data_unchecked(idx)
+    }
+}
+
+impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b mut Builder<'a, Self, T>> for V {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element { list, idx }
     }
 }
 
@@ -341,6 +412,25 @@ impl<'a, 'b, T: Table> BuilderElement<'a, 'b, f64, T> {
     }
 }
 
+impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b Reader<'a, Self, T>> for Enum<E> {
+    type View = EnumResult<E>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        let value = list.as_ref().data_unchecked(idx);
+        E::try_from(value)
+    }
+}
+
+impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b mut Builder<'a, Self, T>> for Enum<E> {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
 impl<'a, 'b, E: ty::Enum, T: Table> BuilderElement<'a, 'b, Enum<E>, T>
 where
     T: Table,
@@ -355,6 +445,24 @@ where
     pub fn set(&mut self, value: E) {
         let value = value.into();
         unsafe { self.list.as_mut().set_data_unchecked::<u16>(self.idx, value) }
+    }
+}
+
+impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b Reader<'a, Self, T>> for Struct<S> {
+    type View = S::Reader<'a, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
+    }
+}
+
+impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b mut Builder<'a, Self, T>> for Struct<S> {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -382,21 +490,37 @@ where
     /// If an error occurs while reading the struct, null is written instead. If you want a falible
     /// set, use `try_set_with_caveats`.
     #[inline]
-    pub fn set_with_caveats(&mut self, reader: &S::Reader<'_, impl InsertableInto<T>>) {
-        self.try_set_with_caveats::<convert::Infallible, _>(reader, |_| ControlFlow::Continue(WriteNull))
-            .unwrap()
+    pub fn set_with_caveats(self, reader: &S::Reader<'_, impl InsertableInto<T>>) -> S::Builder<'b, T> {
+        self.try_set_with_caveats(reader, IgnoreErrors).unwrap()
     }
 
     #[inline]
-    pub fn try_set_with_caveats<E, F>(
-        &mut self,
+    pub fn try_set_with_caveats<E: ErrorHandler>(
+        self,
         reader: &S::Reader<'_, impl InsertableInto<T>>,
-        err_handler: F,
-    ) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
-        todo!()
+        err_handler: E,
+    ) -> Result<S::Builder<'b, T>, E::Error> {
+        let mut elem = self.get();
+        elem.as_mut().try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
+        Ok(elem)
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyStruct {
+    type View = any::StructReader<'b, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyStruct {
+    type View = BuilderElement<'a, 'b, AnyStruct, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -423,21 +547,28 @@ where
     /// If an error occurs while reading the struct, null is written instead. If you want a falible
     /// set, use `try_set_with_caveats`.
     #[inline]
-    pub fn set_with_caveats(&mut self, reader: &any::StructReader<'_, impl Table>) {
-        self.try_set_with_caveats::<convert::Infallible, _>(reader, |_| ControlFlow::Continue(WriteNull))
-            .unwrap()
+    pub fn set_with_caveats(self, reader: &any::StructReader<'_, impl InsertableInto<T>>) -> any::StructBuilder<'b, T> {
+        self.try_set_with_caveats(reader, IgnoreErrors).unwrap()
     }
 
     #[inline]
-    pub fn try_set_with_caveats<E, F>(
-        &mut self,
-        reader: &any::StructReader<'_, impl Table>,
-        err_handler: F,
-    ) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
-        todo!()
+    pub fn try_set_with_caveats<E: ErrorHandler>(
+        self,
+        reader: &any::StructReader<'_, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<any::StructBuilder<'b, T>, E::Error> {
+        let mut elem = self.get();
+        elem.as_mut().try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
+        Ok(elem)
+    }
+}
+
+impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b Reader<'a, Self, T>> for List<V> {
+    type View = ReaderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -502,6 +633,15 @@ where
             Ok(None) => Ok(None),
             Err(err) => Err(err),
         }
+    }
+}
+
+impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b mut Builder<'a, Self, T>> for List<V> {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -574,24 +714,29 @@ where
         List::new(self.into_ptr_builder().init_list(V::ELEMENT_SIZE, count))
     }
 
+    /// Initialize a new instance with the given element size.
+    /// 
+    /// The element size must be a valid upgrade from `V::ELEMENT_SIZE`. That is, calling
+    /// `V::ELEMENT_SIZE.upgrade_to(size)` must yield `Some(size)`.
     #[inline]
-    pub fn try_set<F, E>(
-        self,
-        value: &Reader<V, impl InsertableInto<T>>,
-        err_handler: F,
-    ) -> Result<Builder<'b, V, T>, E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
-        self.into_ptr_builder()
-            .try_set_list(&value.repr, V::ELEMENT_SIZE, err_handler)
-            .map(List::new)
-            .map_err(|(err, _)| err)
+    pub fn init_with_size(self, count: u32, size: ElementSize) -> Builder<'b, V, T> {
+        assert_eq!(V::ELEMENT_SIZE.upgrade_to(size), Some(size));
+        let count = ElementCount::new(count).expect("too many elements for list");
+        List::new(self.into_ptr_builder().init_list(size, count))
     }
 
     #[inline]
-    pub fn set(self, value: &Reader<V, impl InsertableInto<T>>) -> Builder<'b, V, T> {
-        self.try_set(value, write_null).unwrap()
+    pub fn try_set<E: ErrorHandler>(
+        &mut self,
+        value: &Reader<V, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<(), E::Error> {
+        self.ptr_builder().try_set_list(&value.repr, CopySize::Minimum(V::ELEMENT_SIZE), err_handler)
+    }
+
+    #[inline]
+    pub fn set(&mut self, value: &Reader<V, impl InsertableInto<T>>) {
+        self.try_set(value, IgnoreErrors).unwrap()
     }
 
     #[inline]
@@ -672,35 +817,55 @@ where
             .init_list(ElementSize::InlineComposite(size), count))
     }
 
+    /// Initializes the element as a list with the specified element count. This clears any
+    /// pre-existing value.
+    ///
+    /// If the number of struct elements is too large for a Cap'n Proto message, this returns
+    /// an Err.
     #[inline]
-    pub fn try_set<F, E>(
+    pub fn try_init(
         self,
-        value: &Reader<AnyStruct, impl InsertableInto<T>>,
-        desired_size: Option<StructSize>,
-        err_handler: F,
-    ) -> Result<Builder<'b, AnyStruct, T>, E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
-        let copy_size = match desired_size {
-            Some(size) => ElementSize::InlineComposite(size),
-            None => value.repr.element_size(),
-        };
-
+        size: StructSize,
+        count: ElementCount,
+    ) -> Result<Builder<'b, AnyStruct, T>> {
         self.into_ptr_builder()
-            .try_set_list(&value.repr, copy_size, err_handler)
+            .try_init_list(ElementSize::InlineComposite(size), count)
             .map(List::new)
             .map_err(|(err, _)| err)
     }
 
     #[inline]
-    pub fn set(self, value: &Reader<AnyStruct, impl InsertableInto<T>>, desired_size: Option<StructSize>) -> Builder<'b, AnyStruct, T> {
-        self.try_set(value, desired_size, write_null).unwrap()
+    pub fn try_set<E: ErrorHandler>(
+        self,
+        value: &Reader<AnyStruct, impl InsertableInto<T>>,
+        desired_size: Option<StructSize>,
+        err_handler: E,
+    ) -> Result<(), E::Error> {
+        let copy_size = match desired_size {
+            Some(size) => CopySize::Minimum(ElementSize::InlineComposite(size)),
+            None => CopySize::FromValue,
+        };
+
+        self.into_ptr_builder().try_set_list(&value.repr, copy_size, err_handler)
+    }
+
+    #[inline]
+    pub fn set(self, value: &Reader<AnyStruct, impl InsertableInto<T>>, desired_size: Option<StructSize>) {
+        self.try_set(value, desired_size, IgnoreErrors).unwrap()
     }
 
     #[inline]
     pub fn clear(&mut self) {
         self.ptr_builder().clear()
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyList {
+    type View = ReaderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -767,6 +932,15 @@ where
     }
 }
 
+impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyList {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
 impl<'a, 'b, T> BuilderElement<'a, 'b, AnyList, T>
 where
     T: Table,
@@ -829,28 +1003,32 @@ where
     }
 
     #[inline]
-    pub fn try_set<F, E>(
+    pub fn try_set<E: ErrorHandler>(
         self,
         value: &any::ListReader<impl InsertableInto<T>>,
-        err_handler: F,
-    ) -> Result<any::ListBuilder<'b, T>, E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+        err_handler: E,
+    ) -> Result<(), E::Error> {
         self.into_ptr_builder()
-            .try_set_list(value.as_ref(), value.as_ref().element_size(), err_handler)
-            .map(any::ListBuilder::from)
-            .map_err(|(err, _)| err)
+            .try_set_list(value.as_ref(), CopySize::Minimum(ElementSize::Pointer), err_handler)
     }
 
     #[inline]
-    pub fn set(self, value: &any::ListReader<impl InsertableInto<T>>) -> any::ListBuilder<'b, T> {
-        self.try_set(value, write_null).unwrap()
+    pub fn set(self, value: &any::ListReader<impl InsertableInto<T>>) {
+        self.try_set(value, IgnoreErrors).unwrap()
     }
 
     #[inline]
     pub fn clear(&mut self) {
         self.ptr_builder().clear()
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Data {
+    type View = ReaderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -912,6 +1090,15 @@ where
     }
 }
 
+impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Data {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
 impl<'a, 'b, T> BuilderElement<'a, 'b, Data, T>
 where
     T: Table,
@@ -930,7 +1117,7 @@ where
     pub fn get(self) -> data::Builder<'b> {
         match self.into_ptr_builder().to_blob_mut() {
             Ok(b) => b.into(),
-            Err(_) => todo!(),
+            Err(_) => data::Builder::empty(),
         }
     }
 
@@ -949,13 +1136,22 @@ where
     }
 
     #[inline]
-    pub fn set(self, value: &data::Reader) -> data::Builder<'b> {
-        self.into_ptr_builder().set_blob(value.as_ref()).into()
+    pub fn set(self, value: data::Reader) -> data::Builder<'b> {
+        self.into_ptr_builder().set_blob(value.into()).into()
     }
 
     #[inline]
     pub fn clear(&mut self) {
         self.ptr_builder().clear()
+    }
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Text {
+    type View = ReaderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
@@ -1019,6 +1215,15 @@ where
     }
 }
 
+impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Text {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
 impl<'a, 'b, T> BuilderElement<'a, 'b, Text, T>
 where
     T: Table,
@@ -1035,22 +1240,35 @@ where
 
     #[inline]
     pub fn get(self) -> text::Builder<'b> {
-        todo!()
+        match self.try_get_option() {
+            Ok(Some(text)) => text,
+            _ => text::Builder::empty(),
+        }
     }
 
     #[inline]
     pub fn try_get_option(self) -> Result<Option<text::Builder<'b>>> {
-        todo!()
+        match self.into_ptr_builder().to_blob_mut() {
+            Ok(blob) => match text::Builder::new(blob) {
+                Some(text) => Ok(Some(text)),
+                None => Err(ErrorKind::TextNotNulTerminated.into()),
+            },
+            Err((None, _)) => Ok(None),
+            Err((Some(err), _)) => Err(err),
+        }
     }
 
     #[inline]
     pub fn init(self, count: text::ByteCount) -> text::Builder<'b> {
-        todo!()
+        let blob = self.into_ptr_builder().init_blob(count.into());
+        text::Builder::new_unchecked(blob)
     }
 
     #[inline]
     pub fn set(self, value: &text::Reader) -> text::Builder<'b> {
-        todo!()
+        let mut new = self.init(value.byte_count());
+        new.as_bytes_mut().copy_from_slice(value.as_bytes());
+        new
     }
 
     /// Set the text element to a copy of the given string.
@@ -1084,183 +1302,6 @@ where
     }
 }
 
-/// A helper used to provide element views into a list. Depending on the value type, this may simply
-/// return the value itself, or an element view which can be used to access one of the other getters
-/// or setters.
-///
-/// Some types have multiple ways of reading values which account for error handling or provide safe
-/// defaults. For example, reading a pointer field can return an error, but many don't want to
-/// handle that error and would accept a safe default. But to hide the error completely would be
-/// taking it too far, since some might want to perform strict validation and error out if any
-/// incorrect data is read. So we provide both.
-///
-/// But other types can't return errors and are simple arithmetic, so we don't bother returning a
-/// view with multiple possible accessors, since really only one exists.
-pub trait ListAccessable<T> {
-    type View;
-
-    unsafe fn get(list: T, index: u32) -> Self::View;
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
-    type View = ();
-
-    #[inline]
-    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View { () }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for () {
-    type View = ();
-
-    #[inline]
-    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View { () }
-}
-
-impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for V {
-    type View = V;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        list.as_ref().data_unchecked(idx)
-    }
-}
-
-impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b mut Builder<'a, Self, T>> for V {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element { list, idx }
-    }
-}
-
-impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b Reader<'a, Self, T>> for Enum<E> {
-    type View = EnumResult<E>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        let value = list.as_ref().data_unchecked(idx);
-        E::try_from(value)
-    }
-}
-
-impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b mut Builder<'a, Self, T>> for Enum<E> {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b Reader<'a, Self, T>> for Struct<S> {
-    type View = S::Reader<'a, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
-    }
-}
-
-impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b mut Builder<'a, Self, T>> for Struct<S> {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyStruct {
-    type View = any::StructReader<'b, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyStruct {
-    type View = BuilderElement<'a, 'b, AnyStruct, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b Reader<'a, Self, T>> for List<V> {
-    type View = ReaderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b mut Builder<'a, Self, T>> for List<V> {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyList {
-    type View = ReaderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyList {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Data {
-    type View = ReaderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Data {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Text {
-    type View = ReaderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Text {
-    type View = BuilderElement<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
-    }
-}
-
 impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyPtr {
     type View = any::PtrReader<'a, T>;
 
@@ -1276,6 +1317,131 @@ impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyPtr {
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
         list.repr.ptr_mut_unchecked(idx).into()
+    }
+}
+
+impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Capability<C> {
+    type View = ReaderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
+impl<'a, 'b, C, T, Client> ReaderElement<'a, 'b, Capability<C>, T>
+where
+    C: ty::Capability<Client = Client>,
+    T: rpc::CapTable<Cap = Client>,
+{
+    #[inline]
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
+        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    }
+
+    #[inline]
+    pub fn is_null(&self) -> bool {
+        self.ptr_reader().is_null()
+    }
+
+    #[inline]
+    pub fn try_get_option(&self) -> Result<Option<C>> {
+        match self.ptr_reader().try_to_capability() {
+            Ok(Some(cap)) => Ok(Some(C::from_client(cap))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl<'a, 'b, C, T, Client> ReaderElement<'a, 'b, Capability<C>, T>
+where
+    C: ty::Capability<Client = Client>,
+    T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
+{
+    #[inline]
+    pub fn get(&self) -> C {
+        match self.try_get_option() {
+            Ok(Some(client)) => client,
+            Ok(None) => C::from_client(T::null()),
+            Err(err) => C::from_client(T::broken(&err)),
+        }
+    }
+
+    #[inline]
+    pub fn get_option(&self) -> Option<C> {
+        match self.try_get_option() {
+            Ok(Some(client)) => Some(client),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn try_get(&self) -> Result<C> {
+        match self.try_get_option() {
+            Ok(Some(client)) => Ok(client),
+            Ok(None) => Ok(C::from_client(T::null())),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Capability<C> {
+    type View = BuilderElement<'a, 'b, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
+impl<'a, 'b, C, T, Client> BuilderElement<'a, 'b, Capability<C>, T>
+where
+    C: ty::Capability<Client = Client>,
+    T: rpc::CapTable<Cap = Client>,
+{
+    #[inline]
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<T> {
+        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    }
+
+    #[inline]
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+    }
+
+    #[inline]
+    pub fn is_null(&self) -> bool {
+        self.ptr_reader().is_null()
+    }
+
+    #[inline]
+    pub fn try_get_option(&self) -> Result<Option<C>> {
+        match self.ptr_reader().try_to_capability() {
+            Ok(Some(cap)) => Ok(Some(C::from_client(cap))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
+    #[inline]
+    pub fn set(&mut self, client: C) {
+        self.ptr_builder().set_cap(client.into_inner());
+    }
+}
+
+impl<'a, 'b, C, T, Client> BuilderElement<'a, 'b, Capability<C>, T>
+where
+    C: ty::Capability<Client = Client>,
+    T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
+{
+    #[inline]
+    pub fn get(&self) -> C {
+        match self.try_get_option() {
+            Ok(Some(client)) => client,
+            Ok(None) => C::from_client(T::null()),
+            Err(err) => C::from_client(T::broken(&err)),
+        }
     }
 }
 

@@ -7,9 +7,10 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use recapn::{ReaderOf, ty};
-use recapn::alloc::Alloc;
+use recapn::alloc::{Alloc, Global, Growing};
+use recapn::arena::ReadArena;
 use recapn::any::{AnyStruct, self};
-use recapn::message::{Message, SegmentSource};
+use recapn::message::Message;
 use recapn::rpc::Capable;
 
 mod local;
@@ -18,7 +19,7 @@ mod queue;
 pub use local::{Dispatch, Dispatcher};
 
 pub type LocalMessage = Box<Message<'static, dyn Alloc + Send>>;
-pub type ExternalMessage = Box<dyn SegmentSource + Send>;
+pub type ExternalMessage = Box<dyn ReadArena + Send>;
 
 pub struct RpcMessage {
     payload: MessagePayload,
@@ -35,9 +36,9 @@ pub enum MessagePayload {
 }
 
 impl MessagePayload {
-    pub fn segments(&self) -> &dyn SegmentSource {
+    pub fn segments(&self) -> &dyn ReadArena {
         match self {
-            MessagePayload::Local(m) => m,
+            MessagePayload::Local(m) => m.as_read_arena(),
             MessagePayload::External(m) => m,
         }
     }

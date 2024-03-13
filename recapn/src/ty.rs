@@ -13,6 +13,8 @@ use crate::{NotInSchema, IntoFamily, Result};
 /// An enum marker trait.
 pub trait Enum: Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
 
+pub type EnumResult<E> = Result<E, NotInSchema>;
+
 /// A capability marker trait.
 pub trait Capability: 'static {
     /// The typeless client this type is a wrapper around.

@@ -6,6 +6,8 @@
 //! be written and dropped in. Sadly this means users may have to explicitly think about what
 //! RPC system their code is using, even if no RPC system is used.
 
+use core::fmt::Display;
+
 pub(crate) mod internal {
     use super::{
         CapSystem, CapTable, CapTableBuilder, CapTableReader, CapTranslator, Empty, Table,
@@ -21,13 +23,13 @@ pub(crate) mod internal {
     }
 
     pub trait CapPtrBuilder: CapPtrReader {
-        fn set_cap(&self, cap: Self::Cap) -> Result<u32>;
+        fn set_cap(&self, cap: Self::Cap) -> Result<Option<u32>>;
         fn clear_cap(&self, index: u32) -> Result<()>;
         fn as_reader(&self) -> <Self::Table as Table>::Reader;
     }
 
     pub trait InsertableInto<T: Table>: Table {
-        fn copy(reader: &Self::Reader, index: u32, builder: &T::Builder) -> Result<u32>;
+        fn copy(reader: &Self::Reader, index: u32, builder: &T::Builder) -> Result<Option<u32>>;
     }
 
     impl CapPtrReader for Empty {
@@ -40,7 +42,7 @@ pub(crate) mod internal {
     }
 
     impl CapPtrBuilder for Empty {
-        fn set_cap(&self, cap: Infallible) -> Result<u32> {
+        fn set_cap(&self, cap: Infallible) -> Result<Option<u32>> {
             match cap {}
         }
         fn clear_cap(&self, _: u32) -> Result<()> {
@@ -52,7 +54,8 @@ pub(crate) mod internal {
     }
 
     impl<T: Table> InsertableInto<T> for Empty {
-        fn copy(_: &Self::Reader, _: u32, _: &T::Builder) -> Result<u32> {
+        #[inline]
+        fn copy(_: &Self::Reader, _: u32, _: &T::Builder) -> Result<Option<u32>> {
             Err(ErrorKind::CapabilityNotAllowed.into())
         }
     }
@@ -61,7 +64,8 @@ pub(crate) mod internal {
     // above. But that's fine since no types other than Empty actually implement Table and not
     // CapTable.
     impl<C: CapTable> InsertableInto<Empty> for C {
-        fn copy(_: &Self::Reader, _: u32, _: &Empty) -> Result<u32> {
+        #[inline]
+        fn copy(_: &Self::Reader, _: u32, _: &Empty) -> Result<Option<u32>> {
             Err(ErrorKind::CapabilityNotAllowed.into())
         }
     }
@@ -72,7 +76,8 @@ pub(crate) mod internal {
         D: CapTable,
         D::TableBuilder: CapTranslator<C::Cap>,
     {
-        fn copy(reader: &Self::Reader, index: u32, builder: &D::TableBuilder) -> Result<u32> {
+        #[inline]
+        fn copy(reader: &Self::Reader, index: u32, builder: &D::TableBuilder) -> Result<Option<u32>> {
             let cap = reader
                 .extract_cap(index)
                 .ok_or_else(|| ErrorKind::InvalidCapabilityPointer(index))?;
@@ -92,7 +97,7 @@ pub(crate) mod internal {
     }
 
     impl<T: CapTableBuilder> CapPtrBuilder for T {
-        fn set_cap(&self, cap: Self::Cap) -> Result<u32> {
+        fn set_cap(&self, cap: Self::Cap) -> Result<Option<u32>> {
             Ok(self.inject_cap(cap))
         }
         fn clear_cap(&self, index: u32) -> Result<()> {
@@ -228,7 +233,7 @@ impl<T: CapTable> Table for T {
 /// from messages for when a default is requested.
 pub trait BreakableCapSystem: CapSystem {
     /// Gets a capability that is considered broken by the capability system.
-    fn broken(reason: String) -> Self::Cap;
+    fn broken<T: Display + ?Sized>(reason: &T) -> Self::Cap;
 
     /// Gets a capability that can be used in place of a null pointer when reading
     /// a capnp message.
@@ -246,9 +251,7 @@ pub trait CapTableBuilder: CapTableReader {
     /// Add the capability to the message and return its index. If the same cap is injected
     /// twice, this may return the same index both times, but in this case drop_cap() needs to be
     /// called an equal number of times to actually remove the cap.
-    // TODO(someday): Make this return Option<u32> to indicate that the cap was some "none" value
-    // and that the pointer should be cleared.
-    fn inject_cap(&self, cap: <Self::System as CapSystem>::Cap) -> u32;
+    fn inject_cap(&self, cap: <Self::System as CapSystem>::Cap) -> Option<u32>;
 
     /// Remove a capability injected earlier. Called when the pointer is overwritten or zero'd out.
     fn drop_cap(&self, index: u32);
@@ -258,7 +261,7 @@ pub trait CapTableBuilder: CapTableReader {
 
 /// Represents a cap table that can inject external capabilities of type T into this table.
 pub trait CapTranslator<T>: CapTableBuilder {
-    fn inject_cap(&self, cap: T) -> u32;
+    fn inject_cap(&self, cap: T) -> Option<u32>;
 }
 
 impl<C, S, T> CapTranslator<C> for T
@@ -266,7 +269,7 @@ where
     S: CapSystem<Cap = C>,
     T: CapTableBuilder<System = S>,
 {
-    fn inject_cap(&self, cap: C) -> u32 {
+    fn inject_cap(&self, cap: C) -> Option<u32> {
         CapTableBuilder::inject_cap(self, cap)
     }
 }

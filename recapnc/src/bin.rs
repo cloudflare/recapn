@@ -1,14 +1,15 @@
 use anyhow::{Result, Context};
 
 use quote::ToTokens;
-use recapn::message::{Reader, ReaderOptions, StreamOptions, SegmentSet};
+use recapn::message::{Reader, ReaderOptions};
+use recapn::io::{self, StreamOptions};
 use recapnc::generator::GeneratorContext;
 use recapnc::gen::capnp_schema_capnp::CodeGeneratorRequest;
 
 fn main() -> Result<()> {
     let mut stdin = std::io::stdin().lock();
-    let message = SegmentSet::from_read(&mut stdin, StreamOptions::default())?;
-    let reader = Reader::new(message, ReaderOptions::default());
+    let message = io::read_from_stream(&mut stdin, StreamOptions::default())?;
+    let reader = Reader::new(&message, ReaderOptions::default());
     let request = reader.root().read_as_struct::<CodeGeneratorRequest>();
 
     let context = GeneratorContext::new(&request)?;

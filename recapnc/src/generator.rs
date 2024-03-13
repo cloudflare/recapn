@@ -39,11 +39,18 @@ struct StructInfo {
     pub mod_ident: syn::Ident,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Debug, Hash)]
 struct ModScope {
     pub id: u64,
     pub mod_ident: syn::Ident,
 }
+
+impl PartialEq for ModScope {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl Eq for ModScope {}
 
 type TypeScope = Scope<ModScope>;
 
@@ -56,6 +63,10 @@ struct TypeInfo {
 }
 
 impl TypeInfo {
+    /// Resolve a path to this type from the given reference scope.
+    /// 
+    /// For example in the case where we want to refer to A from B, B is the ref scope we're
+    /// resolving from.
     pub fn resolve_path(&self, ref_scope: &TypeScope) -> syn::Path {
         let Self { type_ident, scope } = self;
         if ref_scope == scope {
@@ -63,18 +74,30 @@ impl TypeInfo {
             return syn::Path::from(type_ident.clone())
         }
 
-        // TODO: Support simple one level diff references.
-        // For example, given the types `file::long_scope::A` and `file::long_scope::a::B`,
-        // if B refers to A in the immediate scope above it, we can reference it with
-        // `super` instead of going back to the start of the file module (`super::A`
-        // instead of `file::long_scope::A`). Same going the other way from A to B, we can
-        // simply refer to the scope B is in as `a::B` instead of its full path.
-
         let mut segments: Punctuated<PathSegment, _> = Punctuated::new();
+        let mut mod_path = scope.types.as_slice();
         if ref_scope.file == scope.file {
-            // We're referencing this type from the same file, so we can refer to it with the full path
-            // using the `__file` import.
-            segments.push(syn::parse_quote!(__file));
+            // First, check if we're attempting to refer to a type *in* the parent scope.
+            if let Some((_, ref_parent_types)) = ref_scope.types.split_last() {
+                if mod_path == ref_parent_types {
+                    // It's the parent scope! So we can use `super` directly instead of `__file`
+                    return syn::parse_quote!(super::#type_ident)
+                }
+            }
+
+            // Next, check if we're referring to something *from* a parent scope.
+            // In that case, we can simply refer to the type starting from what module we're in.
+            if let Some(suffix) = mod_path.strip_prefix(ref_scope.types.as_slice()) {
+                mod_path = suffix;
+
+                // todo(someday): cousin scopes? In set A(B(C), D(E)), refer to C from E
+                // using super::b::C instead of __file::a::b::c. Might not be worth it.
+            } else {
+                // If none of those work, we can can always just use the full path from the
+                // `__file` import. We're referencing this type from the same file, so we can
+                // refer to it with the full path using the `__file` import.
+                segments.push(syn::parse_quote!(__file));
+            }
         } else {
             // We're referencing this type from a different file, so we refer to it with the full path
             // including file module using the `__imports` import.
@@ -82,7 +105,7 @@ impl TypeInfo {
             segments.push(PathSegment::from(scope.file.mod_ident.clone()));
         }
 
-        segments.extend(scope.types.iter().map(|s| PathSegment::from(s.mod_ident.clone())));
+        segments.extend(mod_path.iter().map(|s| PathSegment::from(s.mod_ident.clone())));
         segments.push(PathSegment::from(type_ident.clone()));
 
         syn::Path { leading_colon: None, segments }
@@ -515,7 +538,7 @@ impl<'a> GeneratorContext<'a> {
             TypeKind::List(list) => {
                 let element_type = self.resolve_type(scope, &list.element_type().get())?;
                 let any = value.and_then(|v| v.list().field())
-                    .map(|v| v.get().read_as::<AnyList>());
+                    .map(|v| v.read_as::<AnyList>());
                 match any {
                     Some(list) if list.len() != 0 => {
                         todo!("implement list defaults")
@@ -539,7 +562,7 @@ impl<'a> GeneratorContext<'a> {
             }
             TypeKind::Struct(_) => {
                 let any = value.and_then(|v| v.r#struct().field())
-                    .and_then(|v| v.get().try_read_option_as::<AnyStruct>().ok().flatten());
+                    .and_then(|v| v.try_read_option_as::<AnyStruct>().ok().flatten());
                 match any {
                     Some(_) => {
                         todo!("implement struct defaults")
@@ -552,7 +575,6 @@ impl<'a> GeneratorContext<'a> {
             }
             TypeKind::AnyPointer(kind) => {
                 let ptr = value.and_then(|v| v.any_pointer().field())
-                    .map(|f| f.get())
                     .filter(|p| !p.is_null());
                 match kind.which()? {
                     AnyPtrKind::Unconstrained(unconstrained) => match (unconstrained.which()?, ptr) {

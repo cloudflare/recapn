@@ -2,7 +2,7 @@
 name = "recapn-rpc"
 version = "0.0.0"
 authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 recapn = { path = "../recapn" }

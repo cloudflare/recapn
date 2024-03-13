@@ -3,7 +3,7 @@
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
-use crate::alloc::ElementCount;
+use crate::ptr::ElementCount;
 use crate::list::ElementSize;
 use crate::internal::Sealed;
 use crate::{ty, IntoFamily, Family};
@@ -52,19 +52,22 @@ impl<'a> Reader<'a> {
         Self(ptr::Reader::empty())
     }
 
-    /// Creates a data reader from a slice of bytes, returning None if the slice is too large to
-    /// be contained within a Cap'n Proto message.
+    /// Creates a data reader from a slice of bytes.
+    /// 
+    /// # Panics
+    /// 
+    /// If the slice is too large to be in a message, this function panics.
     #[inline]
-    pub const fn from_slice(slice: &'a [u8]) -> Option<Self> {
+    pub const fn from_slice(slice: &'a [u8]) -> Self {
         let len = slice.len();
         if len > ElementCount::MAX_VALUE as usize {
-            return None;
+            panic!("slice is too large to be contained within a cap'n proto message")
         }
 
         let count = ElementCount::new(len as u32).unwrap();
         unsafe {
             let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
-            Some(Self(ptr::Reader::new(ptr, count)))
+            Self(ptr::Reader::new(ptr, count))
         }
     }
 
@@ -155,8 +158,13 @@ impl<'a> From<Builder<'a>> for ptr::Builder<'a> {
 
 impl<'a> Builder<'a> {
     #[inline]
+    pub fn empty() -> Self {
+        Data(ptr::Builder::empty())
+    }
+
+    #[inline]
     pub fn as_reader<'b>(&'b self) -> Reader<'b> {
-        Data(unsafe { ptr::Reader::new(self.0.data(), self.0.len()) })
+        Data(ptr::Reader::new(self.0.data(), self.0.len()))
     }
 
     #[inline]

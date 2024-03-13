@@ -2,15 +2,12 @@
 name = "recapn"
 version = "0.1.0"
 authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["std"]
-std = ["tinyvec"]
-compiler = []
-compat = ["rpc"]
-rpc = []
+alloc = []
+std = ["tinyvec", "alloc"]
 
 [dependencies]
-thiserror = "1.0"
 tinyvec = { version = "1.6", features = ["rustc_1_40", "alloc"], optional = true }

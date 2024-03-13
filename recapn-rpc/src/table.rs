@@ -75,11 +75,11 @@ impl<'a> recapn::rpc::CapTableReader for TableBuilder<'a> {
 }
 
 impl<'a> recapn::rpc::CapTableBuilder for TableBuilder<'a> {
-    fn inject_cap(&self, cap: Client) -> u32 {
+    fn inject_cap(&self, cap: Client) -> Option<u32> {
         let vec = unsafe { &mut *self.0.get() };
         let next_id = u32::try_from(vec.len()).expect("too many capabilities in table");
         vec.push(Some(cap));
-        next_id
+        Some(next_id)
     }
 
     fn drop_cap(&self, index: u32) {

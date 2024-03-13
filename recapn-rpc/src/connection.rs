@@ -1,10 +1,12 @@
 //! An RPC connection primitive.
 
 use fnv::FnvHashMap;
-use recapn::alloc::{AllocLen, ObjectLen};
+use recapn::alloc::AllocLen;
+use recapn::arena::ReadArena;
 use recapn::field::Struct;
 use recapn::{any, list, BuilderOf, NotInSchema, ReaderOf};
-use recapn::message::{Message, ReaderOptions, SegmentSource};
+use recapn::message::{Message, ReaderOptions};
+use recapn::ptr::ObjectLen;
 use tokio::select;
 use tokio::sync::oneshot;
 use tokio::sync::mpsc as tokio_mpsc;
@@ -212,8 +214,7 @@ pub struct OwnedIncomingMessage {
     pub message: ExternalMessage,
 }
 
-pub trait IncomingMessage: SegmentSource {
-    fn total_size(&self) -> ObjectLen;
+pub trait IncomingMessage: ReadArena {
     fn into_owned(self) -> OwnedIncomingMessage;
 }
 
@@ -634,7 +635,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                 todo!()
             }
             _ => {
-                let size = AllocLen::new(incoming.total_size().get()).unwrap_or(AllocLen::MIN);
+                let size = AllocLen::new(incoming.size_in_words() as u32).unwrap_or(AllocLen::MIN);
                 let mut message = self.outbound.new_estimated(size);
                 let mut builder = message.builder().init_struct_root::<rpc_capnp::Message>();
                 builder.unimplemented().set(&reader);
@@ -658,7 +659,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         let client = self.bootstrap.most_resolved().0.clone();
         let export = self.write_cap_descriptor(&client, &mut descriptor);
 
-        results.content().as_mut().set_capability(0);
+        results.content().as_mut().set_capability_ptr(0);
 
         let answer_value = Answer::Bootstrap { export, client };
 

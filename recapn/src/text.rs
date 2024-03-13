@@ -4,17 +4,28 @@ use core::ptr::NonNull;
 use core::slice;
 use core::str::Utf8Error;
 
-use crate::alloc::ElementCount;
+use crate::ptr::ElementCount;
 use crate::list::ElementSize;
 use crate::ty;
 use crate::{internal::Sealed, Family};
 
-pub type ByteCount = crate::alloc::NonZeroU29;
+pub type ByteCount = crate::num::NonZeroU29;
 
 pub mod ptr {
     pub use crate::ptr::{
         BlobReader as Reader,
         BlobBuilder as Builder,
+    };
+}
+
+/// Concatenates literals into a static text reader.
+/// 
+/// Internally this uses `core::concat!` and adds an extra nul byte. The resulting bytes
+/// are passed directly to `text::Reader::from_slice`.
+#[macro_export]
+macro_rules! text {
+    ($($e:expr),* $(,)?) => {
+        $crate::text::Reader::from_slice(core::concat!($($e),*, '\0').as_bytes())
     };
 }
 
@@ -61,13 +72,17 @@ impl<'a> Reader<'a> {
     #[inline]
     pub const fn from_slice(s: &'a [u8]) -> Self {
         match s {
-            [.., 0] if s.len() < ByteCount::MAX_VALUE as usize => {
+            [.., 0] if s.len() <= ByteCount::MAX_VALUE as usize => {
                 let ptr = unsafe { NonNull::new_unchecked(s.as_ptr().cast_mut()) };
                 let len = ElementCount::new(s.len() as u32).unwrap();
                 Self(ptr::Reader::new(ptr, len))
             },
             _ => panic!("attempted to make invalid text blob from slice"),
         }
+    }
+
+    pub const fn byte_count(&self) -> ByteCount {
+        ByteCount::new(self.0.len().get()).unwrap()
     }
 
     /// The length of the text (including the null terminator)
@@ -137,6 +152,30 @@ impl PartialEq<Reader<'_>> for str {
 }
 
 impl<'a> Builder<'a> {
+    pub(crate) const fn new_unchecked(blob: ptr::Builder<'a>) -> Self {
+        Self(blob)
+    }
+
+    /// Interprets a given blob builder as text. This requires that the blob has at least one byte
+    /// and that the last byte is NUL.
+    #[inline]
+    pub const fn new(blob: ptr::Builder<'a>) -> Option<Self> {
+        match blob.as_slice() {
+            [.., 0] => Some(Self(blob)),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn empty() -> Self {
+        // This is safe since we never expose the NUL byte for mutation. All functions that
+        // return mutable slices for mutating the buffer take one byte off the end to make sure
+        // the NUL byte is left untouched.
+        let ptr = NonNull::new(EMPTY_SLICE.as_ptr().cast_mut()).unwrap();
+        let len = ElementCount::new(1).unwrap();
+        Self(ptr::Builder::new(ptr, len))
+    }
+
     #[inline]
     pub fn as_reader<'b>(&'b self) -> Reader<'b> {
         Text(self.0.as_reader())

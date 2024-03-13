@@ -32,61 +32,6 @@
 //! for i in ty.bar().try_get()? {}
 //! ```
 //!
-//! These wouldn't be possible with standard accessor methods (without bloating generated code).
-//! But how do we implement them? Well, with a trait of course. We need an abstract way to represent
-//! our "accessable" struct implementations. While a Reader is different from a Builder, a reference
-//! to a Builder should be functionally the same as a Reader. Like having a &&mut.
-//!
-//! To that end, the Accessable trait is born (and sibling trait: AccessableMut).
-//! Accessable is used to provide a central entrypoint into the library's type system for creating
-//! accessors for fields in user structs.
-//!
-//! Through these types we only need to specify two impl blocks in generated code. One for read-only
-//! accessors, and one for read-write.
-//!
-//! ```
-//! impl Foo {
-//!     pub const fn bar_descriptor() -> &'static Descriptor<u32> {
-//!         &Descriptor::<u32> {
-//!             slot: 0,
-//!             default: 0,
-//!         }
-//!     }
-//! }
-//!
-//! impl<T: Accessable> Foo<T> {
-//!     pub fn bar(&self) -> Accessor<A, u32> {
-//!         unsafe { u32::get(self, Foo::bar_descriptor()) }
-//!     }
-//! }
-//!
-//! impl<T: AccessableMut> Foo<T> {
-//!     pub fn bar_mut(&mut self) -> AccessorMut<A, u32> {
-//!         unsafe { u32::get(self, Foo::bar_descriptor()) }
-//!     }
-//! }
-//! ```
-//!
-//! Oneofs act in the same way, we need one enum to describe a oneof.
-//!
-//! Given the following defintion
-//! ```text
-//! struct Foo {
-//!     union {
-//!         bar @0 :UInt32;
-//!         baz @1 :Uint64;
-//!     }
-//! }
-//! ```
-//!
-//! We get a definition like this:
-//! ```
-//! pub enum Which<T: Viewable> {
-//!     Bar(ViewOf<T, u32>),
-//!     Baz(ViewOf<T, u64>),
-//! }
-//! ```
-//! 
 //! In most of this API you'll see lots of explicit references to lifetimes `'b` and `'p`.
 //! These lifetimes are short for 'borrow' and 'pointer' and are used for the borrow and pointer
 //! lifetimes respectively. So `&'b ptr::StructReader<'p, T>` could be extended to
@@ -94,18 +39,16 @@
 
 use core::convert::{TryFrom, TryInto};
 use core::marker::PhantomData;
-use core::ops::ControlFlow;
 use core::str::Utf8Error;
 
-use crate::alloc::ElementCount;
 use crate::any::{AnyList, AnyPtr, AnyStruct};
 use crate::data::Data;
 use crate::internal::Sealed;
 use crate::list::{self, ElementSize, List, InfalliblePtrs};
-use crate::ptr::{self, StructSize, WriteNull, write_null};
+use crate::ptr::{self, ElementCount, ErrorHandler, CopySize, IgnoreErrors, StructSize, UnwrapErrors};
 use crate::rpc::{Capable, Empty, InsertableInto, Table};
 use crate::text::Text;
-use crate::ty::{self, ListValue, Value, StructView, StructReader as _};
+use crate::ty::{self, EnumResult, ListValue, Value, StructView, StructReader as _};
 use crate::{any, data, text, NotInSchema, Error, Family, Result, ErrorKind};
 
 pub type StructReader<'b, 'p, T> = &'b ptr::StructReader<'p, T>;
@@ -203,7 +146,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 /// ```
 /// pub enum Which<'a, T: AccessableMut> {
 ///     Foo(Field<'a, u32, &'a mut T>),
-///     Foo(Field<'a, u64, &'a mut T>),
+///     Bar(Field<'a, u64, &'a mut T>),
 /// }
 /// ```
 pub trait Viewable {
@@ -318,31 +261,13 @@ pub struct Capability<C: ty::Capability> {
     c: PhantomData<fn() -> C>,
 }
 
-impl<E: ty::Capability> Sealed for Capability<E> {}
-impl<E: ty::Capability> Value for Capability<E> {
+impl<C: ty::Capability> Sealed for Capability<C> {}
+impl<C: ty::Capability> Value for Capability<C> {
     /// Capabilities don't have defaults
     type Default = ();
 }
-impl<E: ty::Capability> ListValue for Capability<E> {
+impl<C: ty::Capability> ListValue for Capability<C> {
     const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
-}
-
-impl<C: ty::Capability> FieldType for Capability<C> {
-    type Descriptor = FieldInfo<Self>;
-
-    type Reader<'b, 'p: 'b, T: Table + 'p> = Field<Self, StructReader<'b, 'p, T>>;
-
-    #[inline]
-    unsafe fn reader<'b, 'p: 'b, T: Table + 'p>(s: StructReader<'b, 'p, T>, d: &'static Descriptor<Self>) -> Self::Reader<'b, 'p, T> {
-        Field { repr: s, descriptor: d }
-    }
-
-    type Builder<'b, 'p: 'b, T: Table + 'p> = Field<Self, StructBuilder<'b, 'p, T>>;
-
-    #[inline]
-    unsafe fn builder<'b, 'p: 'b, T: Table + 'p>(s: StructBuilder<'b, 'p, T>, d: &'static Descriptor<Self>) -> Self::Builder<'b, 'p, T> {
-        Field { repr: s, descriptor: d }
-    }
 }
 
 pub struct Field<V: FieldType, Repr> {
@@ -353,11 +278,12 @@ pub struct Field<V: FieldType, Repr> {
 pub type FieldReader<'b, 'p, T, V> = Field<V, StructReader<'b, 'p, T>>;
 pub type FieldBuilder<'b, 'p, T, V> = Field<V, StructBuilder<'b, 'p, T>>;
 
-impl<'b, 'p: 'b, V, T> FieldBuilder<'b, 'p, T, V>
+impl<'b, 'p: 'b, T: Table + 'p, V> FieldBuilder<'b, 'p, T, V>
 where
     V: FieldType,
-    T: Table + 'p,
 {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
     #[inline]
     pub fn by_ref<'c>(&'c mut self) -> FieldBuilder<'c, 'p, T, V> {
         Field {
@@ -367,6 +293,7 @@ where
     }
 }
 
+/// A base type for accessing union variant fields.
 pub struct VariantField<V: FieldType, Repr> {
     descriptor: &'static VariantDescriptor<V>,
     repr: Repr,
@@ -378,9 +305,8 @@ impl<V: FieldType, Repr> VariantField<V, Repr> {
     }
 }
 
-impl<'b, 'p: 'b, T, V> Variant<'b, 'p, T, V>
+impl<'b, 'p: 'b, T: Table + 'p, V> Variant<'b, 'p, T, V>
 where
-    T: Table + 'p,
     V: FieldType,
 {
     /// Returns a bool indicating whether or not this field is set in the union
@@ -407,9 +333,8 @@ where
     }
 }
 
-impl<'b, 'p: 'b, T, V> VariantMut<'b, 'p, T, V>
+impl<'b, 'p: 'b, T: Table + 'p, V> VariantMut<'b, 'p, T, V>
 where
-    T: Table + 'p,
     V: FieldType,
 {
     /// Returns a bool indicating whether or not this field is set in the union
@@ -444,7 +369,8 @@ where
         V::builder(self.repr, &self.descriptor.field)
     }
 
-    fn init_case(self) -> AccessorMut<'b, 'p, T, V> {
+    #[inline]
+    pub fn init_case(self) -> AccessorMut<'b, 'p, T, V> {
         let VariantInfo { slot, case } = self.descriptor.variant;
         unsafe {
             self.repr.set_field_unchecked(slot as usize, case);
@@ -557,13 +483,11 @@ impl<E: ty::Enum> ListValue for Enum<E> {
     const ELEMENT_SIZE: ElementSize = ElementSize::TwoBytes;
 }
 
-pub type EnumResult<E> = Result<E, NotInSchema>;
-
 impl<E: ty::Enum> FieldType for Enum<E> {
     type Descriptor = FieldInfo<Self>;
 
     type Reader<'b, 'p: 'b, T: Table + 'p> = EnumResult<E>;
-    
+
     #[inline]
     unsafe fn reader<'b, 'p: 'b, T: Table + 'p>(s: StructReader<'b, 'p, T>, d: &'static Descriptor<Self>) -> Self::Reader<'b, 'p, T> {
         let FieldInfo { slot, default } = *d;
@@ -578,7 +502,10 @@ impl<E: ty::Enum> FieldType for Enum<E> {
     }
 }
 
-impl<'b, 'p: 'b, E: ty::Enum, T: Table + 'p> FieldBuilder<'b, 'p, T, Enum<E>> {
+impl<'b, 'p: 'b, T: Table + 'p, E> FieldBuilder<'b, 'p, T, Enum<E>>
+where
+    E: ty::Enum,
+{
     #[inline]
     pub fn get(&self) -> EnumResult<E> {
         let FieldInfo { slot, default } = *self.descriptor;
@@ -596,18 +523,24 @@ impl<'b, 'p: 'b, E: ty::Enum, T: Table + 'p> FieldBuilder<'b, 'p, T, Enum<E>> {
     }
 }
 
-impl<'b, 'p: 'b, E: ty::Enum, T: Table + 'p> Variant<'b, 'p, T, Enum<E>> {
+impl<'b, 'p: 'b, T: Table + 'p, E> Variant<'b, 'p, T, Enum<E>>
+where
+    E: ty::Enum,
+{
     #[inline]
     pub fn get_or_default(&self) -> EnumResult<E> {
         self.field().unwrap_or(Ok(self.descriptor.field.default))
     }
 }
 
-impl<'b, 'p: 'b, E: ty::Enum, T: Table + 'p> VariantMut<'b, 'p, T, Enum<E>> {
+impl<'b, 'p: 'b, T: Table + 'p, E> VariantMut<'b, 'p, T, Enum<E>>
+where
+    E: ty::Enum,
+{
     #[inline]
     pub fn get(&self) -> Option<EnumResult<E>> {
-        let FieldInfo { slot, default } = self.descriptor.field;
         if self.is_set() {
+            let FieldInfo { slot, default } = self.descriptor.field;
             Some(unsafe {
                 self.repr
                     .data_field_with_default_unchecked::<u16>(slot as usize, default.into())
@@ -654,14 +587,12 @@ impl<V: 'static> FieldType for List<V> {
     field_type_items!{}
 }
 
-impl<'b, 'p, V, T> FieldReader<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V> FieldReader<'b, 'p, T, List<V>>
 where
     V: ty::DynListValue,
-    T: Table,
 {
-    /// Returns the default value of the field
     #[inline]
-    pub fn default(&self) -> list::Reader<'static, V, T> {
+    fn default(&self) -> list::Reader<'static, V, T> {
         self.descriptor.default.clone().imbue_from(self.repr)
     }
 
@@ -695,7 +626,7 @@ where
     pub fn try_get_option(&self) -> Result<Option<list::Reader<'p, V, T>>> {
         match self
             .ptr()
-            .to_list(Some(list::ptr::ElementSize::size_of::<V>()))
+            .to_list(Some(V::PTR_ELEMENT_SIZE))
         {
             Ok(Some(ptr)) => Ok(Some(List::new(ptr))),
             Ok(None) => Ok(None),
@@ -704,9 +635,8 @@ where
     }
 }
 
-impl<'b, 'p, T, V> FieldReader<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V> FieldReader<'b, 'p, T, List<V>>
 where
-    T: Table,
     V: ty::DynListValue + for<'lb> list::ListAccessable<&'lb list::Reader<'p, V, T>>,
 {
     #[inline]
@@ -718,11 +648,10 @@ where
     }
 }
 
-impl<'b, 'p, T, V, Item> IntoIterator for FieldReader<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V, Item> IntoIterator for FieldReader<'b, 'p, T, List<V>>
 where
     V: ty::DynListValue + for<'lb> list::ListAccessable<&'lb list::Reader<'p, V, T>>,
     InfalliblePtrs: for<'lb> list::IterStrategy<V, list::ElementReader<'p, 'lb, V, T>, Item = Item>,
-    T: Table,
 {
     type IntoIter = list::Iter<'p, V, InfalliblePtrs, T>;
     type Item = Item;
@@ -732,9 +661,8 @@ where
     }
 }
 
-impl<'b, 'p, T, V> Variant<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V> Variant<'b, 'p, T, List<V>>
 where
-    T: Table + 'p,
     V: ty::DynListValue,
 {
     #[inline]
@@ -775,9 +703,8 @@ where
     }
 }
 
-impl<'b, 'p, T, V> FieldBuilder<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V> FieldBuilder<'b, 'p, T, List<V>>
 where
-    T: Table + 'p,
     V: ty::DynListValue,
 {
     #[inline]
@@ -808,10 +735,7 @@ where
     }
 
     #[inline]
-    pub fn try_clear<F, E>(&mut self, err_handler: F) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         self.ptr_mut().try_clear(err_handler)
     }
 
@@ -821,9 +745,8 @@ where
     }
 }
 
-impl<'b, 'p, T, V> FieldBuilder<'b, 'p, T, List<V>>
+impl<'b, 'p: 'b, T: Table + 'p, V> FieldBuilder<'b, 'p, T, List<V>>
 where
-    T: Table + 'p,
     V: ty::ListValue,
 {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
@@ -833,35 +756,30 @@ where
         let default = &self.descriptor.default;
         match self.into_ptr().to_list_mut(Some(V::ELEMENT_SIZE)) {
             Ok(ptr) => List::new(ptr),
-            Err((_, ptr)) => todo!(),
+            Err((_, ptr)) => {
+                assert_eq!(default.as_ref().element_size(), V::ELEMENT_SIZE);
+                let mut new_list = ptr.init_list(V::ELEMENT_SIZE, default.as_ref().len());
+                new_list.try_copy_from(default.as_ref(), UnwrapErrors).unwrap();
+                List::new(new_list)
+            }
         }
     }
 
     #[inline]
-    pub fn try_set<T2, F, E>(
-        self,
-        value: &list::Reader<V, T2>,
-        err_handler: F,
-    ) -> Result<list::Builder<'b, V, T>, E>
+    pub fn try_set<E>(
+        &mut self,
+        value: &list::Reader<V, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
     where
-        T2: InsertableInto<T>,
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
+        E: ErrorHandler,
     {
-        match self
-            .into_ptr()
-            .try_set_list(value.as_ref(), V::ELEMENT_SIZE, err_handler)
-        {
-            Ok(ptr) => Ok(List::new(ptr)),
-            Err((err, _)) => Err(err),
-        }
+        self.ptr_mut().try_set_list(value.as_ref(), CopySize::Minimum(V::ELEMENT_SIZE), err_handler)
     }
 
     #[inline]
-    pub fn set<T2>(self, value: &list::Reader<V, T2>) -> list::Builder<'b, V, T>
-    where
-        T2: InsertableInto<T>,
-    {
-        self.try_set(value, write_null).unwrap()
+    pub fn set(&mut self, value: &list::Reader<V, impl InsertableInto<T>>) {
+        self.try_set(value, IgnoreErrors).unwrap()
     }
 
     #[inline]
@@ -869,30 +787,43 @@ where
         let count = ElementCount::new(count).expect("too many elements for list");
         List::new(self.into_ptr().init_list(V::ELEMENT_SIZE, count))
     }
+
+    /// Initialize a new instance with the given element size.
+    /// 
+    /// The element size must be a valid upgrade from `V::ELEMENT_SIZE`. That is, calling
+    /// `V::ELEMENT_SIZE.upgrade_to(size)` must yield `Some(size)`.
+    #[inline]
+    pub fn init_with_size(self, count: u32, size: ElementSize) -> list::Builder<'b, V, T> {
+        assert_eq!(V::ELEMENT_SIZE.upgrade_to(size), Some(size));
+        let count = ElementCount::new(count).expect("too many elements for list");
+        List::new(self.into_ptr().init_list(size, count))
+    }
 }
 
-impl<'b, 'p, T> FieldBuilder<'b, 'p, T, List<AnyStruct>>
-where
-    T: Table + 'p,
-{
+impl<'b, 'p: 'b, T: Table + 'p,> FieldBuilder<'b, 'p, T, List<AnyStruct>> {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self, expected_size: Option<StructSize>) -> list::Builder<'b, AnyStruct, T> {
-        let default = &self.descriptor.default;
+        let default = self.descriptor.default.as_ref();
         let ptr = match self
             .into_ptr()
             .to_list_mut(expected_size.map(ElementSize::InlineComposite))
         {
             Ok(ptr) => ptr,
             Err((_, ptr)) => {
-                let copy_size = match expected_size {
-                    Some(size) => ElementSize::InlineComposite(size),
-                    None => default.as_ref().element_size(),
+                let default_size = default.element_size();
+                let size = match expected_size {
+                    Some(e) => {
+                        let expected = ElementSize::InlineComposite(e);
+                        default_size.upgrade_to(expected)
+                            .expect("default value can't be upgraded to struct list!")
+                    },
+                    None => default_size,
                 };
-                ptr.try_set_list(default.as_ref(), copy_size, write_null)
-                    .map_err(|(i, _)| i)
-                    .unwrap()
+                let mut builder = ptr.init_list(size, default.len());
+                builder.try_copy_from(default, UnwrapErrors).unwrap();
+                builder
             }
         };
         List::new(ptr)
@@ -906,6 +837,15 @@ where
                 .init_list(ElementSize::InlineComposite(size), count),
         )
     }
+    
+    // TODO the rest of the accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p, V> VariantMut<'b, 'p, T, List<V>>
+where
+    V: ty::DynListValue,
+{
+    // TODO acceessors
 }
 
 impl<S: ty::Struct> FieldType for Struct<S> {
@@ -925,13 +865,12 @@ impl<S: ty::Struct, Repr> Field<Struct<S>, Repr> {
     }
 }
 
-impl<'b, 'p, T, S> FieldReader<'b, 'p, T, Struct<S>>
+impl<'b, 'p: 'b, T: Table + 'p, S> FieldReader<'b, 'p, T, Struct<S>>
 where
-    T: Table + 'b,
     S: ty::Struct,
 {
     #[inline]
-    fn default_ptr_imbued(&self) -> ptr::StructReader<'static, T> {
+    fn default_imbued_ptr(&self) -> ptr::StructReader<'static, T> {
         self.default_ptr().imbue_from(self.repr)
     }
 
@@ -947,13 +886,10 @@ where
 
     #[inline]
     pub fn get(&self) -> S::Reader<'b, T> {
-        let ptr = self
-            .ptr()
-            .to_struct()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| self.default_ptr_imbued());
-        ty::StructReader::from_ptr(ptr)
+        ty::StructReader::from_ptr(match self.ptr().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            _ => self.default_imbued_ptr(),
+        })
     }
 
     #[inline]
@@ -963,12 +899,11 @@ where
 
     #[inline]
     pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
-        let ptr = match self.ptr().to_struct() {
+        Ok(ty::StructReader::from_ptr(match self.ptr().to_struct() {
             Ok(Some(ptr)) => ptr,
-            Ok(None) => self.default_ptr_imbued(),
+            Ok(None) => self.default_imbued_ptr(),
             Err(err) => return Err(err),
-        };
-        Ok(ty::StructReader::from_ptr(ptr))
+        }))
     }
 
     #[inline]
@@ -981,9 +916,8 @@ where
     }
 }
 
-impl<'b, 'p, T, S> FieldBuilder<'b, 'p, T, Struct<S>>
+impl<'b, 'p: 'b, T: Table + 'p, S> FieldBuilder<'b, 'p, T, Struct<S>>
 where
-    T: Table + 'p,
     S: ty::Struct,
 {
     #[inline]
@@ -1006,7 +940,11 @@ where
         let default = &self.descriptor.default;
         let ptr = match self.into_ptr().to_struct_mut(Some(S::SIZE)) {
             Ok(ptr) => ptr,
-            Err((_, ptr)) => ptr.set_struct(default, ptr::CopySize::Minimum(S::SIZE)),
+            Err((_, ptr)) => {
+                let mut builder = ptr.init_struct(S::SIZE);
+                builder.copy_with_caveats(default, false);
+                builder
+            }
         };
         unsafe { ty::StructBuilder::from_ptr(ptr) }
     }
@@ -1024,51 +962,86 @@ where
         unsafe { ty::StructBuilder::from_ptr(ptr) }
     }
 
+    /// Try to set this field to a copy of the given value.
+    ///
+    /// If an error occurs while reading the input value, it's passed to the error handler, which
+    /// can choose to write null instead or return an error.
     #[inline]
-    pub fn try_set<T2, F, E>(
+    pub fn try_set<T2, E>(
         self,
         value: &S::Reader<'_, T2>,
-        err_handler: F,
-    ) -> Result<S::Builder<'b, T>, E>
+        err_handler: E,
+    ) -> Result<(), E::Error>
     where
         T2: InsertableInto<T>,
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
+        E: ErrorHandler,
     {
-        match self
-            .into_ptr()
-            .try_set_struct(value.as_ptr(), ptr::CopySize::Minimum(S::SIZE), err_handler)
-        {
-            Ok(ptr) => Ok(unsafe { ty::StructBuilder::from_ptr(ptr) }),
-            Err((err, _)) => Err(err),
-        }
+        self.into_ptr().try_set_struct(value.as_ptr(), ptr::CopySize::Minimum(S::SIZE), err_handler)
     }
 
     #[inline]
-    pub fn set<T2>(self, value: &S::Reader<'_, T2>) -> S::Builder<'b, T>
+    pub fn set<T2>(self, value: &S::Reader<'_, T2>)
     where
         T2: InsertableInto<T>,
     {
-        let ptr = self.into_ptr().set_struct(value.as_ptr(), ptr::CopySize::Minimum(S::SIZE));
-        unsafe { ty::StructBuilder::from_ptr(ptr) }
+        self.try_set(value, IgnoreErrors).unwrap()
     }
 
     #[inline]
-    pub fn try_clear<F, E>(&mut self, err_handler: F) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         self.ptr_mut().try_clear(err_handler)
     }
 
     #[inline]
     pub fn clear(&mut self) {
-        self.ptr_mut().clear()
+        self.try_clear(IgnoreErrors).unwrap()
     }
 }
 
-impl<'b, 'p, T, S> VariantMut<'b, 'p, T, Struct<S>>
+impl<'b, 'p: 'b, T: Table + 'p, S> Variant<'b, 'p, T, Struct<S>>
 where
-    T: Table + 'p,
+    S: ty::Struct,
+{
+    #[inline]
+    fn default(&self) -> S::Reader<'b, T> {
+        self.descriptor.field.default.clone().imbue_from(self.repr).into()
+    }
+
+    #[inline]
+    pub fn is_null(&self) -> bool {
+        self.field().map(|field| field.is_null()).unwrap_or(true)
+    }
+
+    #[inline]
+    pub fn get_or_default(&self) -> S::Reader<'b, T> {
+        self.try_get_option()
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| self.default())
+    }
+
+    #[inline]
+    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+        self.try_get_option().ok().flatten()
+    }
+
+    #[inline]
+    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+        self.try_get_option()
+            .map(|op| op.unwrap_or_else(|| self.default()))
+    }
+
+    #[inline]
+    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+        self.field()
+            .map(|r| r.try_get_option())
+            .transpose()
+            .map(Option::flatten)
+    }
+}
+
+impl<'b, 'p: 'b, T: Table + 'p, S> VariantMut<'b, 'p, T, Struct<S>>
+where
     S: ty::Struct,
 {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
@@ -1091,39 +1064,31 @@ where
     }
 
     #[inline]
-    pub fn try_set<T2, F, E>(
+    pub fn try_set<E>(
         self,
-        value: &S::Reader<'_, T2>,
-        err_handler: F,
-    ) -> Result<S::Builder<'b, T>, E>
+        value: &S::Reader<'_, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
     where
-        T2: InsertableInto<T>,
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
+        E: ErrorHandler,
     {
         self.init_case().try_set(value, err_handler)
     }
 
     #[inline]
-    pub fn set<T2>(self, value: &S::Reader<'_, T2>) -> S::Builder<'b, T>
-    where
-        T2: InsertableInto<T>,
-    {
+    pub fn set(self, value: &S::Reader<'_, impl InsertableInto<T>>) {
         self.init_case().set(value)
     }
 
     #[inline]
-    pub fn try_clear<F, E>(&mut self, err_handler: F) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         let Some(mut field) = self.by_ref().field() else { return Ok(()) };
         field.try_clear(err_handler)
     }
 
     #[inline]
     pub fn clear(&mut self) {
-        let Some(mut field) = self.by_ref().field() else { return };
-        field.clear()
+        self.try_clear(IgnoreErrors).unwrap()
     }
 }
 
@@ -1139,10 +1104,7 @@ impl<Repr> Field<Text, Repr> {
     }
 }
 
-impl<'b, 'p, T> FieldReader<'b, 'p, T, Text>
-where
-    T: Table,
-{
+impl<'b, 'p: 'b, T: Table + 'p> FieldReader<'b, 'p, T, Text> {
     #[inline]
     fn ptr(&self) -> ptr::PtrReader<'b, T> {
         self.repr.ptr_field(self.descriptor.slot as u16)
@@ -1194,10 +1156,7 @@ where
     }
 }
 
-impl<'b, 'p, T> FieldBuilder<'b, 'p, T, Text>
-where
-    T: Table,
-{
+impl<'b, 'p: 'b, T: Table + 'p> FieldBuilder<'b, 'p, T, Text> {
     #[inline]
     fn ptr(&self) -> ptr::PtrReader<T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
@@ -1225,26 +1184,34 @@ where
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> text::Builder<'b> {
-        let default = &self.descriptor.default;
+        let default = self.descriptor.default;
         let blob = match self.into_ptr().to_blob_mut() {
             Ok(b) => b,
             Err((_, ptr)) => ptr.set_blob(default),
         };
 
-        todo!()
+        text::Builder::new_unchecked(blob)
+    }
+
+    /// Creates a text builder with the given length in bytes including the null terminator.
+    /// 
+    /// # Panics
+    /// 
+    /// If the length is zero or greater than text::ByteCount::MAX this function will
+    /// panic.
+    #[inline]
+    pub fn init(self, len: u32) -> text::Builder<'b> {
+        self.init_byte_count(text::ByteCount::new(len).expect("invalid text field size"))
     }
 
     #[inline]
-    pub fn init(self, count: text::ByteCount) -> text::Builder<'b> {
-        let blob = self.into_ptr().init_blob(count.into());
-        todo!()
+    pub fn init_byte_count(self, len: text::ByteCount) -> text::Builder<'b> {
+        text::Builder::new_unchecked(self.into_ptr().init_blob(len.into()))
     }
 
     #[inline]
-    pub fn set(self, value: &text::Reader) -> text::Builder<'b> {
-        let blob = self.into_ptr().set_blob(value.as_ref());
-
-        todo!()
+    pub fn set(self, value: text::Reader) -> text::Builder<'b> {
+        text::Builder::new_unchecked(self.into_ptr().set_blob(value.into()))
     }
 
     /// Set the text element to a copy of the given string.
@@ -1262,21 +1229,17 @@ where
 
     #[inline]
     pub fn try_set_str(self, value: &str) -> Result<text::Builder<'b>, Self> {
-        let len = u32::try_from(value.len() + 1).ok().and_then(text::ByteCount::new);
-        let Some(len) = len else {
+        let Some(len) = u32::try_from(value.len() + 1).ok().and_then(text::ByteCount::new) else {
             return Err(self)
         };
 
-        let mut builder = self.init(len);
+        let mut builder = self.init_byte_count(len);
         builder.as_bytes_mut().copy_from_slice(value.as_bytes());
         Ok(builder)
     }
 
     #[inline]
-    pub fn try_clear<F, E>(&mut self, err_handler: F) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         self.ptr_mut().try_clear(err_handler)
     }
 
@@ -1284,6 +1247,14 @@ where
     pub fn clear(&mut self) {
         self.ptr_mut().clear()
     }
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> Variant<'b, 'p, T, Text> {
+
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> VariantMut<'b, 'p, T, Text> {
+
 }
 
 impl FieldType for Data {
@@ -1298,10 +1269,7 @@ impl<Repr> Field<Data, Repr> {
     }
 }
 
-impl<'b, 'p, T> FieldReader<'b, 'p, T, Data>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table + 'p> FieldReader<'b, 'p, T, Data> {
     #[inline]
     fn ptr(&self) -> ptr::PtrReader<'b, T> {
         self.repr.ptr_field(self.descriptor.slot as u16)
@@ -1338,10 +1306,7 @@ where
     }
 }
 
-impl<'b, 'p, T> FieldBuilder<'b, 'p, T, Data>
-where
-    T: Table,
-{
+impl<'b, 'p: 'b, T: Table + 'p> FieldBuilder<'b, 'p, T, Data> {
     #[inline]
     fn ptr(&self) -> ptr::PtrReader<T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
@@ -1369,7 +1334,7 @@ where
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> data::Builder<'b> {
-        let default = &self.descriptor.default;
+        let default = self.descriptor.default;
         match self.into_ptr().to_blob_mut() {
             Ok(data) => data,
             Err((_, ptr)) => ptr.set_blob(default),
@@ -1382,8 +1347,8 @@ where
     }
 
     #[inline]
-    pub fn set(self, value: &data::Reader) -> data::Builder<'b> {
-        self.into_ptr().set_blob(value.as_ref()).into()
+    pub fn set(self, value: data::Reader) -> data::Builder<'b> {
+        self.into_ptr().set_blob(value.into()).into()
     }
 
     /// Set the data element to a copy of the given slice.
@@ -1412,10 +1377,7 @@ where
     }
 
     #[inline]
-    pub fn try_clear<F, E>(&mut self, err_handler: F) -> Result<(), E>
-    where
-        F: FnMut(Error) -> ControlFlow<E, WriteNull>,
-    {
+    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         self.ptr_mut().try_clear(err_handler)
     }
 
@@ -1423,6 +1385,14 @@ where
     pub fn clear(&mut self) {
         self.ptr_mut().clear()
     }
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> Variant<'b, 'p, T, Data> {
+    // TODO accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> VariantMut<'b, 'p, T, Data> {
+    // TODO accessors
 }
 
 impl FieldType for AnyPtr {
@@ -1439,6 +1409,14 @@ impl FieldType for AnyPtr {
     unsafe fn builder<'b, 'p: 'b, T: Table + 'p>(s: StructBuilder<'b, 'p, T>, d: &'static Descriptor<Self>) -> Self::Builder<'b, 'p, T> {
         unsafe { s.ptr_field_mut_unchecked(d.slot as u16).into() }
     }
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> Variant<'b, 'p, T, AnyPtr> {
+    // TODO accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> VariantMut<'b, 'p, T, AnyPtr> {
+    // TODO accessors
 }
 
 impl FieldType for AnyStruct {
@@ -1459,10 +1437,7 @@ impl<Repr> Field<AnyStruct, Repr> {
     }
 }
 
-impl<'b, 'p, T> FieldReader<'b, 'p, T, AnyStruct>
-where
-    T: Table,
-{
+impl<'b, 'p: 'b, T: Table + 'p> FieldReader<'b, 'p, T, AnyStruct> {
     #[inline]
     fn default_imbued(&self) -> any::StructReader<'static, T> {
         self.default().imbue_from(self.repr)
@@ -1504,11 +1479,16 @@ where
     }
 }
 
-impl<'b, 'p, T> FieldBuilder<'b, 'p, T, AnyStruct>
-where
-    T: Table,
-{
-    
+impl<'b, 'p: 'b, T: Table + 'p> FieldBuilder<'b, 'p, T, AnyStruct> {
+    // TODO accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> Variant<'b, 'p, T, AnyStruct> {
+    // TODO accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> VariantMut<'b, 'p, T, AnyStruct> {
+    // TODO accessors
 }
 
 impl FieldType for AnyList {
@@ -1529,10 +1509,7 @@ impl<Repr> Field<AnyList, Repr> {
     }
 }
 
-impl<'b, 'p, T> FieldReader<'b, 'p, T, AnyList>
-where
-    T: Table,
-{
+impl<'b, 'p: 'b, T: Table + 'p> FieldReader<'b, 'p, T, AnyList> {
     #[inline]
     fn default_imbued(&self) -> any::ListReader<'static, T> {
         self.default().imbue_from(self.repr)
@@ -1574,11 +1551,50 @@ where
     }
 }
 
-impl<'b, 'p, T> FieldBuilder<'b, 'p, T, AnyList>
-where
-    T: Table,
-{
-    
+impl<'b, 'p: 'b, T: Table + 'p> FieldBuilder<'b, 'p, T, AnyList> {
+    // TODO accessors
 }
 
-// TODO(soon): Add support for capability fields
+impl<'b, 'p: 'b, T: Table + 'p> Variant<'b, 'p, T, AnyList> {
+    // TODO accessors
+}
+
+impl<'b, 'p: 'b, T: Table + 'p> VariantMut<'b, 'p, T, AnyList> {
+    // TODO accessors
+}
+
+impl<C: ty::Capability> FieldType for Capability<C> {
+    field_type_items!{}
+}
+
+impl<'b, 'p, T, C> FieldReader<'b, 'p, T, Capability<C>>
+where
+    T: Table,
+    C: ty::Capability,
+{
+    // TODO accessors
+}
+
+impl<'b, 'p, T, C> FieldBuilder<'b, 'p, T, Capability<C>>
+where
+    T: Table,
+    C: ty::Capability,
+{
+    // TODO accessors
+}
+
+impl<'b, 'p, T, C> Variant<'b, 'p, T, Capability<C>>
+where
+    T: Table,
+    C: ty::Capability,
+{
+    // TODO accessors
+}
+
+impl<'b, 'p, T, C> VariantMut<'b, 'p, T, Capability<C>>
+where
+    T: Table,
+    C: ty::Capability,
+{
+    // TODO accessors
+}

@@ -1,12 +1,18 @@
 //! Segment allocation APIs and other primitives.
 
-use alloc_crate::alloc::{self, Layout};
 use core::cmp;
 use core::fmt::{self, Debug};
 use core::marker::PhantomData;
-use core::num::NonZeroU32;
 use core::ops::Range;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
+use crate::num::{u29, NonZeroU29, i30};
+
+#[cfg(feature = "alloc")]
+use rustalloc::{
+    alloc::{self, Layout},
+    boxed::Box,
+    vec,
+};
 
 /// An aligned 64-bit word type.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -41,13 +47,13 @@ impl Word {
         // this would overflow a 32-bit counter, so we need to accept
         // u64. However, 32 bits is enough for the returned
         // byte counts and word counts.
-        ((bits + 63) / 64u64) as u32
+        bits.div_ceil(64) as u32
     }
 
     /// Round up a byte count to words.
     #[inline]
     pub const fn round_up_byte_count(bytes: u32) -> u32 {
-        (bytes + 7) / 8
+        bytes.div_ceil(8)
     }
 
     /// Converts a slice of Words into a slice of bytes
@@ -77,187 +83,12 @@ impl Default for Word {
     }
 }
 
-/// A simple macro to implement cmp traits using the inner type gotten through a get() function
-macro_rules! get_cmp {
-    ($ty1:ty, $ty2:ty) => {
-        impl PartialEq<$ty1> for $ty2 {
-            fn eq(&self, other: &$ty1) -> bool {
-                self.get().eq(&other.get())
-            }
-        }
-
-        impl PartialOrd<$ty1> for $ty2 {
-            fn partial_cmp(&self, other: &$ty1) -> Option<cmp::Ordering> {
-                self.get().partial_cmp(&other.get())
-            }
-        }
-    };
-}
-
-/// A 29 bit integer. It cannot be zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NonZeroU29(NonZeroU32);
-
-impl NonZeroU29 {
-    pub const MIN_VALUE: u32 = 1;
-    pub const MAX_VALUE: u32 = 2u32.pow(29) - 1;
-
-    pub const MIN: Self = Self(NonZeroU32::new(Self::MIN_VALUE).unwrap());
-    pub const MAX: Self = Self(NonZeroU32::new(Self::MAX_VALUE).unwrap());
-
-    #[inline]
-    pub const fn new(n: u32) -> Option<Self> {
-        if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub const unsafe fn new_unchecked(n: u32) -> Self {
-        Self(NonZeroU32::new_unchecked(n))
-    }
-
-    #[inline]
-    pub const fn get(self) -> u32 {
-        self.0.get()
-    }
-}
-
-/// The length of an allocation made in a message. This cannot be zero.
-pub type AllocLen = NonZeroU29;
-
-/// A 29 bit integer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[allow(non_camel_case_types)]
-pub struct u29(u32);
-
-impl u29 {
-    pub const MIN_VALUE: u32 = 0;
-    pub const MAX_VALUE: u32 = 2u32.pow(29) - 1;
-
-    pub const MIN: Self = Self(Self::MIN_VALUE);
-    pub const MAX: Self = Self(Self::MAX_VALUE);
-
-    pub const ZERO: Self = Self::MIN;
-
-    #[inline]
-    pub const fn new(n: u32) -> Option<Self> {
-        if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub const unsafe fn new_unchecked(n: u32) -> Self {
-        Self(n)
-    }
-
-    #[inline]
-    pub const fn get(self) -> u32 {
-        self.0
-    }
-}
-
-impl From<NonZeroU29> for u29 {
-    fn from(value: NonZeroU29) -> Self {
-        Self(value.get())
-    }
-}
-
-impl From<u29> for u32 {
-    fn from(v: u29) -> Self {
-        v.get()
-    }
-}
-
-impl From<Option<NonZeroU29>> for u29 {
-    fn from(value: Option<NonZeroU29>) -> Self {
-        match value {
-            Some(value) => Self(value.get()),
-            None => Self(0),
-        }
-    }
-}
-
-impl From<u16> for u29 {
-    fn from(v: u16) -> Self {
-        Self(v as u32)
-    }
-}
-
-impl From<u29> for i30 {
-    fn from(u29(v): u29) -> Self {
-        Self(v as i32)
-    }
-}
-
 /// The length of a segment in a message
 pub type SegmentLen = u29;
 
-/// The length of an object (pointer, struct, list) within a message
-pub type ObjectLen = u29;
-pub type ObjectLenBytes = u32;
-
-/// An offset from the start of a segment to an object within it.
-pub type SegmentOffset = u29;
-pub type SegmentOffsetBytes = u32;
-
-pub type ElementCount = u29;
-
-get_cmp!(NonZeroU29, u29);
-get_cmp!(u29, NonZeroU29);
-
-/// A 30 bit signed integer describing the offset of data in a segment in words.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[allow(non_camel_case_types)]
-pub struct i30(i32);
-
-impl i30 {
-    pub const MIN_VALUE: i32 = (2i32.pow(30) / 2) * -1;
-    pub const MAX_VALUE: i32 = (2i32.pow(30) / 2) - 1;
-
-    pub const MIN: Self = Self(Self::MIN_VALUE);
-    pub const MAX: Self = Self(Self::MAX_VALUE);
-
-    #[inline]
-    pub const fn new(n: i32) -> Option<Self> {
-        if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub const unsafe fn new_unchecked(n: i32) -> Self {
-        Self(n)
-    }
-
-    #[inline]
-    pub const fn get(self) -> i32 {
-        self.0
-    }
-}
-
-pub type SignedSegmentOffset = i30;
-
-impl From<u16> for i30 {
-    fn from(v: u16) -> Self {
-        Self(v as i32)
-    }
-}
-
-impl From<i16> for i30 {
-    fn from(v: i16) -> Self {
-        Self(v as i32)
-    }
-}
-
-/// A segment of Words.
+/// A segment of Words. This can be conceived of as a slice of [`Word`]s but without an
+/// attached lifetime. Many lower level APIs use this type and have different safety
+/// requirements depending on the use-case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
     pub data: NonNull<Word>,
@@ -268,7 +99,7 @@ impl Segment {
     #[inline]
     pub const fn to_ptr_range(&self) -> Range<*const Word> {
         let start = self.data.as_ptr() as *const Word;
-        let end = unsafe { start.add(self.len.get() as usize) };
+        let end = start.wrapping_add(self.len.get() as usize);
         start..end
     }
 
@@ -278,51 +109,186 @@ impl Segment {
     }
 
     #[inline]
-    pub unsafe fn as_slice(&self) -> &[Word] {
+    pub unsafe fn as_slice<'a>(&self) -> &'a [Word] {
         core::slice::from_raw_parts(self.data.as_ptr() as *const _, self.len.get() as usize)
     }
 
     #[inline]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [Word] {
+    pub unsafe fn as_mut_slice<'a>(&mut self) -> &'a mut [Word] {
         core::slice::from_raw_parts_mut(self.data.as_ptr() as *mut _, self.len.get() as usize)
     }
 
     #[inline]
-    pub unsafe fn as_bytes(&self) -> &[u8] {
+    pub unsafe fn as_bytes<'a>(&self) -> &'a [u8] {
         Word::slice_to_bytes(self.as_slice())
     }
 
     #[inline]
-    pub unsafe fn as_mut_bytes(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_bytes<'a>(&mut self) -> &'a mut [u8] {
         Word::slice_to_bytes_mut(self.as_mut_slice())
     }
 }
 
-/// A segment of Words with an attached lifetime.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RefSegment<'a> {
-    segment: Segment,
-    a: PhantomData<&'a [Word]>,
+/// An offset from the start of a segment to an object within it.
+pub type SegmentOffset = u29;
+pub type SegmentOffsetBytes = u32;
+
+pub type SignedSegmentOffset = i30;
+
+/// An unchecked pointer into a segment. This can't be derefed normally. It must be checked and
+/// turned into a `SegmentRef`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SegmentPtr<'a> {
+    a: PhantomData<&'a Word>,
+    ptr: *mut Word,
 }
 
-impl<'a> RefSegment<'a> {
-    #[inline]
-    pub const fn len(&self) -> SegmentLen {
-        self.segment.len
+impl<'a> SegmentPtr<'a> {
+    pub const fn null() -> Self {
+        Self::new(core::ptr::null_mut())
+    }
+
+    pub const fn new(ptr: *mut Word) -> Self {
+        Self {
+            a: PhantomData,
+            ptr,
+        }
+    }
+
+    pub const fn as_ptr(self) -> *const Word {
+        self.ptr.cast_const()
+    }
+
+    pub const fn as_ptr_mut(self) -> *mut Word {
+        self.ptr
+    }
+
+    pub const fn offset(self, offset: SegmentOffset) -> Self {
+        Self::new(self.ptr.wrapping_add(offset.get() as usize))
+    }
+
+    pub const fn signed_offset(self, offset: SignedSegmentOffset) -> Self {
+        Self::new(self.ptr.wrapping_offset(offset.get() as isize))
+    }
+
+    pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> Self {
+        const ONE: SignedSegmentOffset = SignedSegmentOffset::new(1).unwrap();
+
+        self.signed_offset(ONE).signed_offset(offset)
+    }
+
+    pub const unsafe fn as_ref_unchecked(self) -> SegmentRef<'a> {
+        SegmentRef {
+            a: PhantomData,
+            ptr: NonNull::new_unchecked(self.ptr),
+        }
     }
 }
+
+/// A checked reference to a location in a segment. This cannot be null.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SegmentRef<'a> {
+    a: PhantomData<&'a Word>,
+    ptr: NonNull<Word>,
+}
+
+impl<'a> SegmentRef<'a> {
+    /// Creates a dangling ref. This does not refer to any valid word, so it must not be
+    /// derefed. Useful for zero-sized types such as empty lists or empty structs.
+    #[inline]
+    pub const unsafe fn dangling() -> Self {
+        Self::new_unchecked(NonNull::dangling())
+    }
+
+    #[inline]
+    pub const unsafe fn new_unchecked(ptr: NonNull<Word>) -> Self {
+        Self {
+            a: PhantomData,
+            ptr,
+        }
+    }
+
+    #[inline]
+    pub const fn as_segment_ptr(self) -> SegmentPtr<'a> {
+        SegmentPtr::new(self.as_ptr_mut())
+    }
+
+    #[inline]
+    pub const fn as_ptr(self) -> *const Word {
+        self.ptr.as_ptr().cast_const()
+    }
+
+    #[inline]
+    pub const fn as_ptr_mut(self) -> *mut Word {
+        self.ptr.as_ptr()
+    }
+
+    #[inline]
+    pub const fn as_inner(self) -> NonNull<Word> {
+        self.ptr
+    }
+
+    #[inline]
+    pub const fn offset(self, offset: SegmentOffset) -> SegmentPtr<'a> {
+        self.as_segment_ptr().offset(offset)
+    }
+
+    #[inline]
+    pub const fn signed_offset(self, offset: SignedSegmentOffset) -> SegmentPtr<'a> {
+        self.as_segment_ptr().signed_offset(offset)
+    }
+
+    #[inline]
+    pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> SegmentPtr<'a> {
+        self.as_segment_ptr().signed_offset_from_end(offset)
+    }
+}
+
+impl AsRef<Word> for SegmentRef<'_> {
+    #[inline]
+    fn as_ref(&self) -> &Word {
+        unsafe { self.as_inner().as_ref() }
+    }
+}
+
+impl From<SegmentRef<'_>> for SegmentPtr<'_> {
+    #[inline]
+    fn from(value: SegmentRef<'_>) -> Self {
+        Self::new(value.as_ptr_mut())
+    }
+}
+
+/// The length of an allocation made in a message. This cannot be zero.
+pub type AllocLen = NonZeroU29;
 
 /// An allocation trait that can be used to get a builder to allocate segments for an arena.
 pub unsafe trait Alloc {
     /// Allocates a [`Segment`] of memory that can fit at least `size` [`Word`]s.
     /// The returned segment must be zeroed.
     ///
-    /// [`Word`]: Word
-    /// [`Segment`]: Segment
-    unsafe fn alloc(&mut self, size: AllocLen) -> Segment;
+    /// If the segment cannot be allocated, `None` is returned instead.
+    unsafe fn alloc(&mut self, size: AllocLen) -> Option<Segment>;
 
     /// Deallocs the segment. This segment must be previously allocated by this allocator.
     unsafe fn dealloc(&mut self, segment: Segment);
+}
+
+/// An allocator that never allocates, it always returns None.
+///
+/// This can be useful as a backing allocator to a Scratch allocator to make sure
+/// nothing is ever allocated.
+#[derive(Default, Clone, Copy, Debug)]
+pub struct Never;
+
+unsafe impl Alloc for Never {
+    #[inline]
+    unsafe fn alloc(&mut self, _: AllocLen) -> Option<Segment> {
+        None
+    }
+    #[inline]
+    unsafe fn dealloc(&mut self, _: Segment) {
+        unimplemented!()
+    }
 }
 
 /// An allocator that uses the global allocator to allocate segments.
@@ -331,18 +297,17 @@ pub unsafe trait Alloc {
 /// always allocate the minimum size requested. Instead you probably want
 /// to layer another allocator on top, like a Growing or Fixed allocator.
 #[derive(Default, Clone, Copy, Debug)]
+#[cfg(feature = "alloc")]
 pub struct Global;
 
+#[cfg(feature = "alloc")]
 unsafe impl Alloc for Global {
     #[inline]
-    unsafe fn alloc(&mut self, size: AllocLen) -> Segment {
-        let layout = Layout::array::<Word>(size.get() as usize).expect("Segment too large!");
+    unsafe fn alloc(&mut self, size: AllocLen) -> Option<Segment> {
+        let layout = Layout::array::<Word>(size.get() as usize).ok()?;
         let ptr = alloc::alloc_zeroed(layout);
-        if let Some(ptr) = NonNull::new(ptr) {
-            Segment { data: ptr.cast(), len: size.into() }
-        } else {
-            alloc::handle_alloc_error(layout);
-        }
+        let ptr = NonNull::new(ptr)?;
+        Some(Segment { data: ptr.cast(), len: size.into() })
     }
     #[inline]
     unsafe fn dealloc(&mut self, segment: Segment) {
@@ -369,7 +334,7 @@ impl<A> Fixed<A> {
 
 unsafe impl<A: Alloc> Alloc for Fixed<A> {
     #[inline]
-    unsafe fn alloc(&mut self, size: AllocLen) -> Segment {
+    unsafe fn alloc(&mut self, size: AllocLen) -> Option<Segment> {
         self.inner.alloc(cmp::max(size, self.size))
     }
     #[inline]
@@ -407,7 +372,7 @@ impl<A: Default> Default for Growing<A> {
 
 unsafe impl<A: Alloc> Alloc for Growing<A> {
     #[inline]
-    unsafe fn alloc(&mut self, size: AllocLen) -> Segment {
+    unsafe fn alloc(&mut self, size: AllocLen) -> Option<Segment> {
         let alloc_size = cmp::max(size, self.next_segment);
 
         let next_size = self.next_segment.get().saturating_add(alloc_size.get());
@@ -421,7 +386,11 @@ unsafe impl<A: Alloc> Alloc for Growing<A> {
 }
 
 /// Scratch space that can be passed to a [Scratch] allocator.
-pub struct Space<const N: usize>([Word; N]);
+pub struct Space<const N: usize> {
+    /// Indicates if this space has been used and needs to be cleared.
+    dirty: bool,
+    space: [Word; N],
+}
 
 impl<const N: usize> Space<N> {
     #[inline]
@@ -432,7 +401,26 @@ impl<const N: usize> Space<N> {
             "Scratch space is too large!"
         );
 
-        Self([Word::NULL; N])
+        Self {
+            dirty: false,
+            space: [Word::NULL; N],
+        }
+    }
+
+    #[inline]
+    pub(crate) fn clean(&mut self) {
+        if self.dirty {
+            self.space.fill(Word::NULL);
+        }
+    }
+
+    #[inline]
+    pub(crate) fn segment(&mut self) -> Segment {
+        self.clean();
+        let len = AllocLen::new(N as u32).unwrap().into();
+        let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
+
+        Segment { data, len }
     }
 }
 
@@ -452,8 +440,10 @@ impl<const N: usize> Space<N> {
 pub const fn space<const N: usize>() -> Space<N> { Space::new() }
 
 /// Scratch space with a dynamic length that can be passed to a [Scratch] allocator.
+#[cfg(feature = "alloc")]
 pub struct DynSpace(Box<[Word]>);
 
+#[cfg(feature = "alloc")]
 impl DynSpace {
     #[inline]
     pub fn new(len: SegmentLen) -> Self {
@@ -475,12 +465,9 @@ impl<'s, A> Scratch<'s, A> {
     /// Creates a new scratch space allocator for the given statically allocated space.
     #[inline]
     pub fn with_space<const N: usize>(space: &'s mut Space<N>, alloc: A) -> Self {
-        let size = AllocLen::new(N as u32).unwrap();
-        let start = NonNull::new(space.0.as_mut_ptr()).unwrap();
-
         Self {
             s: PhantomData,
-            segment: Segment { data: start, len: size.into() },
+            segment: space.segment(),
             used: false,
             next: alloc,
         }
@@ -488,6 +475,7 @@ impl<'s, A> Scratch<'s, A> {
 
     /// Creates a new scratch space allocator for the given dynamically allocated space.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn with_dyn_space(space: &'s mut DynSpace, alloc: A) -> Self {
         let size = AllocLen::new(space.0.len() as u32).unwrap();
         let start = NonNull::new(space.0.as_mut_ptr()).unwrap();
@@ -505,8 +493,8 @@ impl<'s, A> Scratch<'s, A> {
     /// 
     /// # Safety
     /// 
-    /// The segment data must last as long as the lifetime of the scratch allocator, otherwise
-    /// this allocator may exhibit **undefined behavior**.
+    /// The segment data must last as long as the lifetime of the scratch allocator and be
+    /// completely zeroed, otherwise this allocator may exhibit **undefined behavior**.
     #[inline]
     pub unsafe fn with_segment(segment: Segment, alloc: A) -> Self {
         Self {
@@ -520,12 +508,12 @@ impl<'s, A> Scratch<'s, A> {
 
 unsafe impl<A: Alloc> Alloc for Scratch<'_, A> {
     #[inline]
-    unsafe fn alloc(&mut self, size: AllocLen) -> Segment {
+    unsafe fn alloc(&mut self, size: AllocLen) -> Option<Segment> {
         if self.used || self.segment.len < size {
             self.next.alloc(size)
         } else {
             self.used = true;
-            self.segment.clone()
+            Some(self.segment.clone())
         }
     }
     #[inline]
@@ -533,15 +521,16 @@ unsafe impl<A: Alloc> Alloc for Scratch<'_, A> {
         if segment != self.segment {
             self.next.dealloc(segment)
         } else {
-            let bytes = segment.as_mut_bytes();
-            ptr::write_bytes(bytes.as_mut_ptr(), 0, bytes.len())
+            segment.as_mut_slice().fill(Word::NULL);
         }
     }
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 mod tests {
     use super::*;
+    use crate::ptr::ObjectLen;
 
     #[test]
     fn word_rounding() {
@@ -570,7 +559,7 @@ mod tests {
         ($alloc:expr, $size:expr, $func:expr) => {{
             let alloc = &mut $alloc;
             unsafe {
-                let segment = alloc.alloc(AllocLen::new($size).unwrap());
+                let segment = alloc.alloc(AllocLen::new($size).unwrap()).unwrap();
                 $func(segment.clone());
                 alloc.dealloc(segment);
             }
@@ -598,7 +587,7 @@ mod tests {
 
     #[test]
     fn growing_alloc() {
-        let mut growing = Growing::new(AllocLen::MIN, Global);
+        let mut growing = Growing::new(AllocLen::ONE, Global);
         alloc!(growing, 1, |segment: Segment| {
             assert_eq!(segment.as_slice(), &[Word::NULL; 1]);
         });
@@ -635,6 +624,6 @@ mod tests {
         }
         assert_eq!(&static_space as *const _ as usize, addr);
         // make sure the scratch allocator cleared the scratch space
-        assert_eq!(static_space.0, [Word::NULL; 5]);
+        assert_eq!(static_space.space, [Word::NULL; 5]);
     }
 }

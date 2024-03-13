@@ -4,3 +4,4 @@ members = [
     "recapnc",
     "recapn-rpc",
 ]
+resolver = "2"
