@@ -210,7 +210,7 @@ pub mod growing {
     struct ArenaVtable {
         as_read: unsafe fn(*const ()) -> *const dyn ReadArena,
         try_root_and_build: unsafe fn(*const ()) -> Option<(*const ArenaSegment, *const dyn BuildArena)>,
-        root_and_build: unsafe fn(*const ()) -> (*const ArenaSegment, *const dyn BuildArena),
+        root_and_build: unsafe fn(*mut ()) -> (*const ArenaSegment, *const dyn BuildArena),
         clear: unsafe fn(*mut ()),
     }
 
@@ -237,14 +237,14 @@ pub mod growing {
                 try_root_and_build: |ptr| unsafe {
                     let this = &*ptr.cast::<Self>();
                     let root = this.root()?;
-                    let obj: *const dyn ReadArena = this;
+                    let obj: *const dyn BuildArena = this;
                     let arena = core::mem::transmute(obj);
                     Some((root, arena))
                 },
                 root_and_build: |ptr| unsafe {
                     let this = &*ptr.cast::<Self>();
                     let root = this.alloc_root();
-                    let obj: *const dyn ReadArena = this;
+                    let obj: *const dyn BuildArena = this;
                     let arena = core::mem::transmute(obj);
                     (root, arena)
                 },
@@ -324,24 +324,30 @@ pub mod growing {
 
     impl<A: Alloc + ?Sized> Arena<A> {
         pub fn as_read(&self) -> &dyn ReadArena {
-            unsafe { &*(self.vtable.as_read)(&*from_ref(self).cast::<()>()) }
+            unsafe { &*(self.vtable.as_read)(from_ref(self).cast::<()>()) }
         }
         pub fn try_root_and_build(&self) -> Option<(&ArenaSegment, &dyn BuildArena)> {
             unsafe {
-                let s = &*from_ref(self).cast::<()>();
+                let s = from_ref(self).cast::<()>();
                 let (segment, arena) = (self.vtable.try_root_and_build)(s)?;
                 Some((&*segment, &*arena))
             }
         }
-        pub fn root_and_build(&self) -> (&ArenaSegment, &dyn BuildArena) {
+        pub fn root_and_build(&mut self) -> (&ArenaSegment, &dyn BuildArena) {
             unsafe {
-                let s = &*from_ref(self).cast::<()>();
+                let s = from_mut(self).cast::<()>();
                 let (segment, arena) = (self.vtable.root_and_build)(s);
                 (&*segment, &*arena)
             }
         }
         pub fn clear(&mut self) {
             unsafe { (self.vtable.clear)(from_mut(self).cast::<()>()) }
+        }
+    }
+
+    impl<A: Alloc + ?Sized> Drop for Arena<A> {
+        fn drop(&mut self) {
+            self.clear();
         }
     }
 
