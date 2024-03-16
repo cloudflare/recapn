@@ -131,8 +131,6 @@ impl Segment {
 
 /// An offset from the start of a segment to an object within it.
 pub type SegmentOffset = u29;
-pub type SegmentOffsetBytes = u32;
-
 pub type SignedSegmentOffset = i30;
 
 /// An unchecked pointer into a segment. This can't be derefed normally. It must be checked and

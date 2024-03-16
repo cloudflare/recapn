@@ -322,8 +322,6 @@ impl StructSize {
 
 /// The length of an object (pointer, struct, list) within a message in Words.
 pub type ObjectLen = u29;
-/// The length of an object (pointer, struct, list) within a message in bytes.
-pub type ObjectLenBytes = u32;
 
 pub type ElementCount = u29;
 
