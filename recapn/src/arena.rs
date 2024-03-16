@@ -193,7 +193,7 @@ pub unsafe trait BuildArena {
 }
 
 #[cfg(feature = "alloc")]
-pub mod growing {
+pub(crate) mod growing {
     use super::*;
     use core::cell::UnsafeCell;
     use core::ptr::{addr_of, addr_of_mut, from_mut, from_ref};
@@ -207,6 +207,11 @@ pub mod growing {
         tail: Vec<NonNull<ArenaSegment>>,
     }
 
+    /// A raw vtable for doing arena operations as a `Message`. This is done with a raw vtable
+    /// instead of a normal dynamic trait because we want the `Message` type to accept an `Alloc`
+    /// implementation while still being unsizable. However, unsized types cannot be coerced into
+    /// other unsized types, so there's no way for us get a `ReadArena` or a `BuildArena` out of
+    /// an `Arena` with an unsized alloc type.
     struct ArenaVtable {
         as_read: unsafe fn(*const ()) -> *const dyn ReadArena,
         try_root_and_build: unsafe fn(*const ()) -> Option<(*const ArenaSegment, *const dyn BuildArena)>,
@@ -230,8 +235,9 @@ pub mod growing {
             let vtable = &ArenaVtable {
                 as_read: |ptr| unsafe {
                     let obj: *const dyn ReadArena = &*ptr.cast::<Self>();
-                    // Transmute the implied lifetime attached to dyn ReadArena.
-                    // This is safe since our caller will add back in the lifetime
+                    // Transmute the implied lifetime attached to the obj dyn ReadArena.
+                    // This is safe since our caller will add back in the lifetime and
+                    // make an equivalent type.
                     core::mem::transmute(obj)
                 },
                 try_root_and_build: |ptr| unsafe {
