@@ -5,19 +5,21 @@ pub mod packing;
 
 use {
     core::{
-        fmt::{self, Display, Debug},
+        fmt::{self, Debug, Display},
         ptr::NonNull,
     },
     crate::{
         alloc::{Segment, Word},
-        arena::{SegmentId, ReadArena},
+        arena::{ReadArena, SegmentId},
         message::ReaderOptions,
     },
-    stream::{StreamTableRef, TableReadError}
+    self::packing::StopReason,
+    self::stream::{StreamTableRef, SegmentLenReader, TableReadError},
 };
 
 #[cfg(feature = "alloc")]
 use {
+    core::ops::Bound,
     rustalloc::{
         boxed::Box,
         vec::Vec,
@@ -31,7 +33,7 @@ use {
     std::io,
     crate::message::MessageSegments,
     stream::StreamTable,
-    packing::{Packer, PackResult},
+    packing::{Packer, Unpacker},
 };
 
 #[derive(Debug)]
@@ -43,6 +45,8 @@ pub enum ReadError {
         /// The ID of the segment
         segment: SegmentId,
     },
+    /// The message was too large
+    MessageTooLarge,
     /// The message was incomplete
     Incomplete,
 }
@@ -52,6 +56,7 @@ impl Display for ReadError {
         match self {
             ReadError::Table(e) => Display::fmt(e, f),
             ReadError::SegmentTooLarge { .. } => write!(f, "segment too large"),
+            ReadError::MessageTooLarge => write!(f, "message too large"),
             ReadError::Incomplete => write!(f, "incomplete message"),
         }
     }
@@ -122,6 +127,74 @@ unsafe impl ReadArena for TableSegmentSet<'_> {
     }
 }
 
+/// A generic table of segment locations where all segments are contiguously laid out in a
+/// flat slice.
+/// 
+/// This is used in combination with `SegmentSet` to create a generic arena type for
+/// reading messages from slices or streams.
+#[derive(Debug)]
+#[cfg(feature = "alloc")]
+pub struct SegmentSetTable {
+    /// The table. This contains the start positions of every segment except the first one
+    /// (since it's always implied to be 0). The end of the last segment must be determined
+    /// by the user by using the length of the whole slice.
+    table: Box<[usize]>,
+}
+
+#[inline]
+fn segment_len_to_usize(len: &SegmentLenReader, id: SegmentId) -> Result<usize, ReadError> {
+    match len.try_get() {
+        Some(len) => Ok(len.get() as usize),
+        None => Err(ReadError::SegmentTooLarge { segment: id }),
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl SegmentSetTable {
+    /// Reads a stream table of any size. This returns a table and the length of the whole
+    /// message.
+    pub fn from_stream(table: &StreamTableRef, limit: usize) -> Result<(Self, usize), ReadError> {
+        let (first, remainder) = table.split_first();
+        let mut current_pos = segment_len_to_usize(first, 0)?;
+        if current_pos > limit {
+            return Err(ReadError::MessageTooLarge)
+        }
+
+        let mut start_idxs = Vec::with_capacity(remainder.len());
+        for (len, id) in remainder.into_iter().zip(1u32..) {
+            let len = segment_len_to_usize(len, id)?;
+            let Some(new_pos) = current_pos.checked_add(len).filter(|&new| new <= limit) else {
+                return Err(ReadError::MessageTooLarge)
+            };
+
+            start_idxs.push(current_pos);
+            current_pos = new_pos;
+        }
+
+        let table = start_idxs.into_boxed_slice();
+        Ok((Self { table }, current_pos))
+    }
+
+    /// Returns the start and end bounds for the given segment.
+    pub fn segment_bounds(&self, id: SegmentId) -> Option<(Bound<usize>, Bound<usize>)> {
+        let idx = id as usize;
+        let start = match id {
+            0 => 0,
+            _ => *self.table.get(idx - 1)?,
+        };
+        let end = match self.table.get(idx) {
+            Some(end) => Bound::Excluded(*end),
+            None => Bound::Unbounded,
+        };
+
+        Some((Bound::Included(start), end))
+    }
+
+    fn last_start(&self) -> usize {
+        self.table.last().copied().unwrap_or(0)
+    }
+}
+
 /// A set of read-only segments used by a message `Reader`.
 ///
 /// This is a generic backing source type provided by the library.
@@ -129,26 +202,23 @@ unsafe impl ReadArena for TableSegmentSet<'_> {
 #[cfg(feature = "alloc")]
 pub struct SegmentSet<S> {
     slice: S,
-    /// The location of the first segment. For borrowed slices this is always 0.
-    first_segment: usize,
-    segment_starts: Box<[usize]>,
+    table: SegmentSetTable,
+}
+
+#[cfg(feature = "alloc")]
+impl SegmentSet<Box<[Word]>> {
+    pub fn new(table: SegmentSetTable, data: Box<[Word]>) -> Self {
+        assert!(table.last_start() < data.len(), "incomplete data!");
+
+        Self { slice: data, table }
+    }
 }
 
 #[cfg(feature = "alloc")]
 unsafe impl<'a> ReadArena for SegmentSet<&'a [Word]> {
     fn segment(&self, id: SegmentId) -> Option<Segment> {
-        let slice = match id {
-            0 => if let Some(&end) = self.segment_starts.first() {
-                &self.slice[self.first_segment..end]
-            } else {
-                self.slice
-            },
-            _ => match self.segment_starts.get((id as usize - 1)..)? {
-                [start, end, ..] => &self.slice[*start..*end],
-                [start] => &self.slice[*start..],
-                [] => return None,
-            }
-        };
+        let bounds = self.table.segment_bounds(id)?;
+        let slice = &self.slice[bounds];
 
         let len = SegmentLen::new(slice.len() as u32).unwrap();
         let data = NonNull::new(slice.as_ptr().cast_mut()).unwrap();
@@ -162,18 +232,8 @@ unsafe impl<'a> ReadArena for SegmentSet<&'a [Word]> {
 #[cfg(feature = "alloc")]
 unsafe impl ReadArena for SegmentSet<Box<[Word]>> {
     fn segment(&self, id: SegmentId) -> Option<Segment> {
-        let slice = match id {
-            0 => if let Some(&end) = self.segment_starts.first() {
-                &self.slice[self.first_segment..end]
-            } else {
-                &*self.slice
-            },
-            _ => match self.segment_starts.get((id as usize - 1)..)? {
-                [start, end, ..] => &self.slice[*start..*end],
-                [start] => &self.slice[*start..],
-                [] => return None,
-            }
-        };
+        let bounds = self.table.segment_bounds(id)?;
+        let slice = &self.slice[bounds];
 
         let len = SegmentLen::new(slice.len() as u32).unwrap();
         let data = NonNull::new(slice.as_ptr().cast_mut()).unwrap();
@@ -236,13 +296,13 @@ pub struct StreamOptions {
     /// The max number of segments that are allowed to be contained in the message.
     pub segment_limit: u32,
     /// The max amount of words that can be read from the input stream
-    pub read_limit: u64,
+    pub read_limit: usize,
 }
 
 impl StreamOptions {
     pub const DEFAULT: Self = Self {
         segment_limit: 512,
-        read_limit: ReaderOptions::DEFAULT.traversal_limit,
+        read_limit: ReaderOptions::DEFAULT.traversal_limit as usize,
     };
 }
 
@@ -258,75 +318,30 @@ impl Default for StreamOptions {
 /// the message.
 ///
 /// If the content is incomplete or invalid, this returns Err
-#[inline]
 #[cfg(feature = "alloc")]
 pub fn read_from_slice<'a>(slice: &'a [Word]) -> Result<(SegmentSet<&'a [Word]>, &'a [Word]), ReadError> {
     let (table, content) = StreamTableRef::try_read(slice)?;
-    let segments = table.segments();
-
-    let mut remainder = content;
-    let mut current_pos = 0;
-    let mut start_idxs = Vec::with_capacity(segments.len() - 1);
-    for (len, id) in segments.into_iter().zip(1u32..) {
-        let Some(len) = len.try_get() else {
-            return Err(ReadError::SegmentTooLarge {
-                segment: id,
-            })
-        };
-        let len = len.get() as usize;
-        let new_pos = current_pos + len;
-        if content.len() < new_pos {
-            return Err(ReadError::Incomplete)
-        }
-
-        start_idxs.push(current_pos);
-        current_pos = new_pos;
-        remainder = &content[current_pos..];
+    let (table, message_len) = SegmentSetTable::from_stream(table, content.len())?;
+    if content.len() < message_len {
+        return Err(ReadError::Incomplete)
     }
 
+    let (content, remainder) = content.split_at(message_len);
     let set = SegmentSet {
-        slice: &content[..current_pos],
-        first_segment: 0,
-        segment_starts: start_idxs.into_boxed_slice(),
+        slice: content,
+        table,
     };
     Ok((set, remainder))
 }
 
-/// Read a message from a boxed slice of words. This consumes the whole slice and does not return
-/// any trailing words after the message itself.
-/// 
-/// The table is separate from the actual message content. This is intended to be used by reading
-/// the whole segment table into a seperate allocation, calculating the total size of the message,
-/// then allocating a space large enough to contain the whole message.
 #[inline]
-#[cfg(feature = "alloc")]
-pub fn read_from_box(table: &StreamTableRef, slice: Box<[Word]>) -> Result<SegmentSet<Box<[Word]>>, ReadError> {
-    let segments = table.segments();
-
-    let mut current_pos = 0;
-    let mut start_idxs = Vec::with_capacity(segments.len() - 1);
-    for (len, id) in segments.into_iter().zip(1u32..) {
-        let Some(len) = len.try_get() else {
-            return Err(ReadError::SegmentTooLarge {
-                segment: id,
-            })
-        };
-        let len = len.get() as usize;
-        let new_pos = current_pos + len;
-        if slice.len() < new_pos {
-            return Err(ReadError::Incomplete)
-        }
-
-        start_idxs.push(current_pos);
-        current_pos = new_pos;
+fn map_read_err(err: ReadError) -> StreamError {
+    match err {
+        ReadError::Table(err) => StreamError::Table(err),
+        ReadError::SegmentTooLarge { segment } => StreamError::SegmentTooLarge { segment },
+        ReadError::MessageTooLarge => StreamError::MessageTooLarge,
+        ReadError::Incomplete => unreachable!(),
     }
-
-    let set = SegmentSet {
-        slice,
-        first_segment: 0,
-        segment_starts: start_idxs.into_boxed_slice(),
-    };
-    Ok(set)
 }
 
 #[cfg(feature = "std")]
@@ -359,34 +374,116 @@ pub fn read_from_stream<R: io::Read>(r: &mut R, options: StreamOptions) -> Resul
         Err(err @ TableReadError::TooManySegments) => return Err(StreamError::Table(err)),
         Err(TableReadError::Empty) => unreachable!(),
     };
+    let (table, message_len) = SegmentSetTable::from_stream(segment_table, options.read_limit)
+        .map_err(map_read_err)?;
 
-    let mut total_words = 0u64;
-    for (id, size) in segment_table.segments().into_iter().enumerate() {
-        let Some(size) = size.try_get() else {
-            return Err(StreamError::SegmentTooLarge {
-                segment: id as u32,
-            })
-        };
+    let mut data = vec![Word::NULL; message_len].into_boxed_slice();
+    r.read_exact(Word::slice_to_bytes_mut(&mut data))?;
 
-        total_words += size.get() as u64;
+    Ok(SegmentSet::new(table, data))
+}
 
-        if total_words > options.read_limit {
-            return Err(StreamError::MessageTooLarge);
-        }    
-    }
-
-    let mut data = vec![Word::NULL; total_words as usize].into_boxed_slice();
-    r.read_exact(Word::slice_to_bytes_mut(data.as_mut()))?;
-
-    let set = read_from_box(segment_table, data)
-        .expect("failed to read message from slice");
-
-    Ok(set)
+/// A `BufRead` paired with an unpacker.
+/// 
+/// This allows for easily reading words from a packed input stream.
+#[cfg(feature = "std")]
+pub struct PackedStream<R> {
+    unpacker: Unpacker,
+    stream: R,
 }
 
 #[cfg(feature = "std")]
-pub fn read_packed_from_stream<R: io::Read>(r: &mut R) -> Result<SegmentSet<Box<[Word]>>, io::Error> {
-    todo!()
+impl<R: io::BufRead> PackedStream<R> {
+    pub const fn new(stream: R) -> Self {
+        Self { unpacker: Unpacker::new(), stream }
+    }
+
+    pub fn read(&mut self, out: &mut [Word]) -> Result<usize, io::Error> {
+        if out.is_empty() {
+            return Ok(0)
+        }
+
+        loop {
+            let buf = self.stream.fill_buf()?;
+            if buf.is_empty() {
+                return match self.unpacker.finish() {
+                    Ok(()) => Ok(0),
+                    Err(err) => Err(io::Error::new(io::ErrorKind::UnexpectedEof, err)),
+                }
+            }
+
+            let result = self.unpacker.unpack(buf, out);
+            self.stream.consume(result.bytes_read);
+
+            match result.reason {
+                StopReason::NeedInput if result.words_written == 0 => continue,
+                _ => break Ok(result.words_written),
+            }
+        }
+    }
+
+    pub fn read_exact(&mut self, mut out: &mut [Word]) -> Result<(), io::Error> {
+        while !out.is_empty() {
+            match self.read(out) {
+                Ok(0) => break,
+                Ok(n) => {
+                    out = &mut out[n..];
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !out.is_empty() {
+            Err(io::Error::from(io::ErrorKind::UnexpectedEof))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Deconstruct the packed stream into its unpacker and backing `BufRead` instance.
+    pub fn into_parts(self) -> (Unpacker, R) {
+        (self.unpacker, self.stream)
+    }
+}
+
+#[cfg(feature = "std")]
+pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
+    let mut first = [Word::NULL; 1];
+    let segment_table_buffer: tinyvec::TinyVec<[Word; 32]>;
+
+    stream.read_exact(&mut first)?;
+
+    let table = match StreamTableRef::try_read(&first) {
+        Ok((table, _)) => table,
+        Err(TableReadError::Empty) => unreachable!(),
+        Err(err @ TableReadError::TooManySegments) => return Err(StreamError::Table(err)),
+        Err(TableReadError::Incomplete { count, required }) => {
+            if count >= options.segment_limit {
+                return Err(StreamError::Table(TableReadError::TooManySegments));
+            }
+
+            let mut buffer = tinyvec::tiny_vec!();
+            buffer.resize(required + 1, Word::NULL);
+            let (buffer_first, rest) = buffer.split_first_mut().unwrap();
+            *buffer_first = first[0];
+
+            stream.read_exact(rest)?;
+
+            segment_table_buffer = buffer;
+
+            StreamTableRef::try_read(&segment_table_buffer)
+                .expect("failed to read segment table")
+                .0
+        }
+    };
+
+    let (table, message_len) = SegmentSetTable::from_stream(table, options.read_limit as usize)
+        .map_err(map_read_err)?;
+
+    let mut data = vec![Word::NULL; message_len].into_boxed_slice();
+    stream.read_exact(&mut data)?;
+
+    Ok(SegmentSet::new(table, data))
 }
 
 #[cfg(feature = "std")]
@@ -411,9 +508,9 @@ pub fn write_message_packed<W: io::Write>(w: &mut W, segments: &MessageSegments)
     for segment in segments {
         let mut packer = Packer::new(segment);
         loop {
-            let PackResult { completed, bytes_written } = packer.pack(&mut buffer);
-            w.write_all(&buffer[..bytes_written])?;
-            if completed {
+            let result = packer.pack(&mut buffer);
+            w.write_all(&buffer[..result.bytes_written])?;
+            if result.completed {
                 break
             }
         }

@@ -30,11 +30,46 @@ pub struct PackResult {
 }
 
 #[inline]
-fn take_byte<'a>(buf: &mut &'a mut [u8]) -> &'a mut u8 {
-    let (first, remainder) = core::mem::take(buf).split_first_mut().unwrap();
-    *buf = remainder;
+fn take_first<'a, T>(src: &mut &'a [T]) -> &'a T {
+    let old = mem::take(src);
+    let (first, remainder) = old.split_first().unwrap();
+    *src = remainder;
     first
 }
+
+#[inline]
+fn try_take_first<'a, T>(src: &mut &'a [T]) -> Option<&'a T> {
+    let old = mem::take(src);
+    let (first, remainder) = old.split_first()?;
+    *src = remainder;
+    Some(first)
+}
+
+#[inline]
+fn take_at<'a, T>(src: &mut &'a [T], idx: usize) -> &'a [T] {
+    let old = mem::take(src);
+    let (first, second) = old.split_at(idx);
+    *src = second;
+    first
+}
+
+#[inline]
+fn take_first_mut<'a, T>(src: &mut &'a mut [T]) -> &'a mut T {
+    let old = mem::take(src);
+    let (first, remainder) = old.split_first_mut().unwrap();
+    *src = remainder;
+    first
+}
+
+#[inline]
+fn take_at_mut<'a, T>(src: &mut &'a mut [T], idx: usize) -> &'a mut [T] {
+    let old = mem::take(src);
+    let (first, second) = old.split_at_mut(idx);
+    *src = second;
+    first
+}
+
+use take_first_mut as take_byte;
 
 #[inline]
 fn write_byte(buf: &mut &mut [u8], value: u8) {
@@ -172,246 +207,428 @@ pub struct UnpackResult {
 }
 
 /// The reason the unpacker stopped unpacking.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StopReason {
     /// The unpacker needs more input.
-    NeedInput {
-        /// A partial unpack result. This can be used to resume unpacking with a new
-        /// set of input or finish unpacking if no input is left.
-        partial: PartialUnpack,
-    },
+    NeedInput,
     /// The unpacker needs more output to write to.
     NeedOutput,
 }
 
 #[derive(Debug)]
 pub struct IncompleteError {
+    /// The number of bytes needed to finish unpacking.
+    /// 
+    /// This value can be 0 in the case that the unpacker had remaining null words to write.
     pub bytes_needed: usize,
 }
 
 impl fmt::Display for IncompleteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "incomplete packed input, {} bytes required to unpack", self.bytes_needed)
+        if self.bytes_needed != 0 {
+            write!(f, "incomplete packed input, {} bytes required to unpack", self.bytes_needed)
+        } else {
+            write!(f, "unfinished packed input, more data remaining in unpacker")
+        }
     }
 }
 
 #[cfg(feature = "std")]
 impl std::error::Error for IncompleteError {}
 
-pub struct PartialUnpack {
-    bytes_needed: usize,
-    state: Option<PartialState>,
+#[derive(Clone, Copy, Debug)]
+enum WrittenBytes {
+    Zero,
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
 }
 
-enum PartialState {
-    WritingNulls(u8),
-    WritingUncompressed(u8),
-}
-
-impl PartialUnpack {
-    /// Resume a partial unpack by providing a new input slice.
-    pub fn resume<'b>(self, input: &'b [u8]) -> Unpacker<'b> {
-        Unpacker { input, state: self.state }
+impl WrittenBytes {
+    #[inline]
+    const fn needed_for_full(self) -> usize {
+        use WrittenBytes::*;
+        match self {
+            Zero => 8,
+            One => 7,
+            Two => 6,
+            Three => 5,
+            Four => 4,
+            Five => 3,
+            Six => 2,
+            Seven => 1,
+        }
     }
 
-    /// Finish the unpack, returning an error if bytes were needed to continue reading.
-    pub fn finish(self) -> Result<(), IncompleteError> {
-        if self.bytes_needed == 0 {
-            Ok(())
-        } else {
-            Err(IncompleteError { bytes_needed: self.bytes_needed })
+    #[inline]
+    const fn bytes(self) -> usize {
+        use WrittenBytes::*;
+        match self {
+            Zero => 0,
+            One => 1,
+            Two => 2,
+            Three => 3,
+            Four => 4,
+            Five => 5,
+            Six => 6,
+            Seven => 7,
+        }
+    }
+
+    #[inline]
+    const fn from_bytes(bytes: usize) -> Self {
+        use WrittenBytes::*;
+        match bytes {
+            0 => Zero,
+            1 => One,
+            2 => Two,
+            3 => Three,
+            4 => Four,
+            5 => Five,
+            6 => Six,
+            7 => Seven,
+            _ => unreachable!(),
         }
     }
 }
 
-/// Progress the output by count. This doesn't actually write anything since we assume the input
-/// consists entirely of NULL already.
-#[inline]
-fn write_nulls(output: &mut &mut [Word], count: u8) -> u8 {
-    let count_usize = count as usize;
-    if output.len() >= count_usize {
-        *output = &mut mem::take(output)[count_usize..];
-        0
-    } else {
-        let remaining = (count_usize - output.len()) as u8;
-        *output = &mut [];
-        remaining
-    }
+#[derive(Clone, Copy, Debug)]
+struct PartialWord {
+    buf: [u8; 8],
+    written_bytes: WrittenBytes,
 }
 
-#[inline]
-fn write_uncompressed(
-    input: &mut &[u8],
-    output: &mut &mut [Word],
-    count: u8,
-) -> Option<(u8, StopReason)> {
-    let count_usize = count as usize;
+impl PartialWord {
+    pub fn needed_bytes(&self) -> usize {
+        self.written_bytes.needed_for_full()
+    }
 
-    let full_words = input.len() / 8;
-    let enough_input = full_words >= count_usize;
-    let words_to_read = if enough_input { count_usize } else { full_words };
-    let enough_output = words_to_read < output.len();
+    pub fn start(src: &[u8]) -> Self {
+        let written_bytes = WrittenBytes::from_bytes(src.len());
+        let mut buf = [0u8; 8];
+        buf[..src.len()].copy_from_slice(src);
+        Self { buf, written_bytes }
+    }
 
-    let (out_words, result) = if !enough_output {
-        // Takes the output buffer and replaces it with an empty slice.
-        let out = mem::take(output);
-        let remaining_words = (count_usize - out.len()) as u8;
-
-        (out, Some((remaining_words, StopReason::NeedOutput)))
-    } else {
-        let (out, remainder) = mem::take(output).split_at_mut(words_to_read);
-        *output = remainder;
-
-        let partial = if !enough_input {
-            let remaining_words = (count_usize - full_words) as u8;
-            let reason = StopReason::NeedInput {
-                partial: PartialUnpack {
-                    bytes_needed: (remaining_words as usize) * 8,
-                    state: Some(PartialState::WritingUncompressed(remaining_words)),
-                },
-            };
-            Some((remaining_words, reason))
+    pub fn finish(mut self, src: &mut &[u8], dst: &mut &mut [Word]) -> Result<(), PartialWord> {
+        let needed = self.written_bytes.needed_for_full();
+        let buf_start = self.written_bytes.bytes();
+        if needed <= src.len() {
+            let to_copy = take_at(src, needed);
+            self.buf[buf_start..].copy_from_slice(to_copy);
+            *take_first_mut(dst) = Word(u64::from_ne_bytes(self.buf));
+            Ok(())
         } else {
-            None
-        };
-
-        (out, partial)
-    };
-
-    let out_bytes = Word::slice_to_bytes_mut(out_words);
-    let (to_copy, remainder) = input.split_at(out_bytes.len());
-    *input = remainder;
-
-    out_bytes.copy_from_slice(to_copy);
-
-    result
+            let to_copy = mem::take(src);
+            let copy_len = to_copy.len();
+            self.buf[buf_start..copy_len].copy_from_slice(to_copy);
+            self.written_bytes = WrittenBytes::from_bytes(buf_start + copy_len);
+            Err(self)
+        }
+    }
 }
 
-pub struct Unpacker<'b> {
-    input: &'b [u8],
-    state: Option<PartialState>,
+#[derive(Clone, Copy, Debug)]
+struct PartialTaggedWord {
+    buf: [u8; 8],
+    tag: u8,
+    written_bytes: WrittenBytes,
 }
 
-impl<'b> Unpacker<'b> {
-    #[inline]
-    pub fn new(input: &'b [u8]) -> Self {
-        Self { input, state: None }
+impl PartialTaggedWord {
+    pub fn needed_bytes(&self) -> usize {
+        self.tag.count_ones() as usize
     }
 
-    /// Unpack words from the input into the specified buffer. The buffer should
-    /// be made up entirely of Word::NULL.
-    pub fn unpack(&mut self, mut buf: &mut [Word]) -> UnpackResult {
-        let original_input_len = self.input.len();
-        let original_buf_len = buf.len();
+    pub fn start(mut tag: u8, mut src: &[u8]) -> Self {
+        let mut buf = [0u8; 8];
+        let mut dst_idx = 0;
+        while tag != 0 {
+            if (tag | 1) != 0 {
+                let Some(&byte) = try_take_first(&mut src) else { break };
+                buf[dst_idx] = byte;
+            }
 
-        // Attempt to resume a previous write operation
+            tag >>= 1;
+            dst_idx += 1;
+        }
+        Self { buf, tag, written_bytes: WrittenBytes::from_bytes(dst_idx) }
+    }
+
+    pub fn finish(self, src: &mut &[u8], dst: &mut &mut [Word]) -> Result<(), PartialTaggedWord> {
+        let Self { mut buf, mut tag, written_bytes } = self;
+        let mut dst_idx = written_bytes.bytes();
+        while tag != 0 {
+            if (tag | 1) != 0 {
+                let Some(&byte) = try_take_first(src) else { break };
+                buf[dst_idx] = byte;
+            }
+
+            tag >>= 1;
+            dst_idx += 1;
+        }
+
+        if tag == 0 {
+            *take_first_mut(dst) = Word(u64::from_ne_bytes(buf));
+            Ok(())
+        } else {
+            Err(PartialTaggedWord {
+                buf,
+                tag,
+                written_bytes: WrittenBytes::from_bytes(dst_idx),
+            })
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum IncompleteState {
+    /// The unpacker is reading a Word.
+    PartialWord(PartialTaggedWord),
+    /// The unpacker is reading a Word. This may transition into a `NeedUncompressedCount`
+    /// after finishing the word.
+    PartialUncompressed(PartialWord),
+    /// The unpacker is expecting one byte for a null word count
+    NeedNullCount,
+    /// The unpacker is expecting one byte for an uncompressed word count
+    NeedUncompressedCount,
+    /// The unpacker is writing null words to the output
+    WritingNulls(u8),
+    /// The unpacker is writing uncompressed words to the output
+    WritingUncompressed {
+        remaining: u8,
+        partial: Option<PartialWord>,
+    },
+}
+
+pub struct Unpacker {
+    state: Option<IncompleteState>,
+}
+
+impl Unpacker {
+    #[inline]
+    pub const fn new() -> Self {
+        Self { state: None }
+    }
+
+    /// Unpack words from the input into the specified buffer. The output buffer should
+    /// be made up entirely of Word::NULL. If the output buffer is empty this immediately
+    /// returns.
+    #[inline]
+    pub fn unpack(&mut self, mut src: &[u8], mut dst: &mut [Word]) -> UnpackResult {
+        let original_src_len = src.len();
+        let original_dst_len = dst.len();
+
+        let reason = self.unpack_inner(&mut src, &mut dst);
+
+        UnpackResult {
+            bytes_read: original_src_len - src.len(),
+            words_written: original_dst_len - dst.len(),
+            reason,
+        }
+    }
+
+    /// Progress the output by count. This doesn't actually write anything since we assume the input
+    /// consists entirely of NULL already.
+    #[inline]
+    fn write_nulls(&mut self, dst: &mut &mut [Word], count: u8) -> Result<(), StopReason> {
+        let count_usize = count as usize;
+        if dst.len() >= count_usize {
+            *dst = &mut mem::take(dst)[count_usize..];
+            Ok(())
+        } else {
+            let remaining = (count_usize - dst.len()) as u8;
+            *dst = &mut [];
+            self.state = Some(IncompleteState::WritingNulls(remaining));
+            Err(StopReason::NeedOutput)
+        }
+    }
+
+    #[inline]
+    fn write_uncompressed(&mut self, src: &mut &[u8], dst: &mut &mut [Word], count: u8) -> Result<(), StopReason> {
+        if count == 0 {
+            return Ok(())
+        }
+
+        let count_usize = count as usize;
+
+        let (full_words, partial_bytes) = (src.len() / 8, src.len() % 8);
+        let enough_input = full_words >= count_usize;
+        let words_to_read = if enough_input { count_usize } else { full_words };
+        let enough_output = words_to_read < dst.len();
+
+        if !enough_output {
+            let out = mem::take(dst);
+            let remaining = (count_usize - out.len()) as u8;
+
+            let out_bytes = Word::slice_to_bytes_mut(out);
+            let in_bytes = take_at(src, out_bytes.len());
+            out_bytes.copy_from_slice(in_bytes);
+
+            self.state = Some(IncompleteState::WritingUncompressed { remaining, partial: None });
+
+            return Err(StopReason::NeedOutput)
+        }
+
+        let out = take_at_mut(dst, words_to_read);
+        let out_bytes = Word::slice_to_bytes_mut(out);
+
+        if !enough_input {
+            let has_partial = partial_bytes != 0;
+            let consumed_words = full_words + (has_partial as usize);
+            let remaining = (count_usize - consumed_words) as u8;
+            let full_word_bytes = take_at(src, full_words * 8);
+            out_bytes.copy_from_slice(full_word_bytes);
+
+            let partial = has_partial.then(|| PartialWord::start(mem::take(src)));
+            self.state = Some(IncompleteState::WritingUncompressed { remaining, partial });
+
+            return Err(StopReason::NeedInput)
+        }
+
+        let full_word_bytes = take_at(src, words_to_read * 8);
+        out_bytes.copy_from_slice(full_word_bytes);
+
+        Ok(())
+    }
+
+    fn unpack_inner<'a>(&mut self, src: &mut &[u8], dst: &mut &mut [Word]) -> StopReason {
+        if dst.is_empty() {
+            return StopReason::NeedOutput
+        }
+
+        if src.is_empty() {
+            return StopReason::NeedInput
+        }
+
+        // Attempt to finish a previous read-write first
         match self.state.take() {
-            Some(PartialState::WritingNulls(count)) => {
-                let remaining = write_nulls(&mut buf, count);
-                if remaining != 0 {
-                    self.state = Some(PartialState::WritingNulls(remaining));
-                    return UnpackResult {
-                        bytes_read: 0,
-                        words_written: original_buf_len - buf.len(),
-                        reason: StopReason::NeedOutput,
-                    }
+            Some(IncompleteState::PartialWord(partial)) => {
+                if let Err(partial) = partial.finish(src, dst) {
+                    self.state = Some(IncompleteState::PartialWord(partial))
                 }
             }
-            Some(PartialState::WritingUncompressed(count)) => {
-                let result = write_uncompressed(
-                    &mut self.input,
-                    &mut buf,
-                    count,
-                );
-                if let Some((remaining, stop)) = result {
-                    if remaining != 0 {
-                        self.state = Some(PartialState::WritingUncompressed(remaining));
+            Some(IncompleteState::PartialUncompressed(partial)) => {
+                if let Err(partial) = partial.finish(src, dst) {
+                    self.state = Some(IncompleteState::PartialUncompressed(partial))
+                }
+                
+                if src.is_empty() {
+                    self.state = Some(IncompleteState::NeedUncompressedCount);
+                    return StopReason::NeedInput
+                }
+
+                let count = *take_first(src);
+                if let Err(stop) = self.write_uncompressed(src, dst, count) {
+                    return stop
+                }
+            }
+            Some(IncompleteState::NeedNullCount) => {
+                let count = *take_first(src);
+                if let Err(stop) = self.write_nulls(dst, count) {
+                    return stop
+                }
+            }
+            Some(IncompleteState::NeedUncompressedCount) => {
+                let count = *take_first(src);
+                if let Err(stop) = self.write_uncompressed(src, dst, count) {
+                    return stop
+                }
+            }
+            Some(IncompleteState::WritingNulls(count)) => {
+                if let Err(stop) = self.write_nulls(dst, count) {
+                    return stop
+                }
+            }
+            Some(IncompleteState::WritingUncompressed { remaining, partial }) => {
+                if let Some(partial) = partial {
+                    if let Err(partial) = partial.finish(src, dst) {
+                        self.state = Some(IncompleteState::WritingUncompressed {
+                            remaining,
+                            partial: Some(partial),
+                        })
                     }
-                    return UnpackResult {
-                        bytes_read: original_input_len - self.input.len(),
-                        words_written: original_buf_len - buf.len(),
-                        reason: stop,
-                    }
+                }
+
+                if let Err(stop) = self.write_uncompressed(src, dst, remaining) {
+                    return stop
                 }
             }
             None => {}
         }
 
-        // Maintain separate variables to work around weird lifetime issues.
-        let mut curr_input_len = self.input.len();
-        let mut curr_buf_len = buf.len();
+        // Now begin our normal unpacking loop
+        loop {
+            if src.is_empty() {
+                break StopReason::NeedInput
+            }
 
-        // Now run our normal unpacking loop
-        let stop = loop {
-            let [tag, input_remainder @ ..] = self.input else {
-                break StopReason::NeedInput {
-                    partial: PartialUnpack {
-                        bytes_needed: 0,
-                        state: None,
-                    }
-                }
-            };
-
-            let [word, buf_remainder @ ..] = buf else {
+            if dst.is_empty() {
                 break StopReason::NeedOutput
-            };
-            let word_bytes = Word::slice_to_bytes_mut(slice::from_mut(word));
-
-            let mut bytes_needed = tag.count_ones() as usize;
-            if bytes_needed == 0 || bytes_needed == 8 {
-                bytes_needed += 1;
             }
 
-            if input_remainder.len() < bytes_needed {
-                break StopReason::NeedInput {
-                    partial: PartialUnpack {
-                        bytes_needed,
-                        state: None,
-                    },
-                }
-            }
-
-            let (input_to_read, input_remainder) = input_remainder.split_at(bytes_needed);
-
-            self.input = input_remainder;
-            curr_input_len = self.input.len();
-
-            buf = buf_remainder;
-            curr_buf_len = buf.len();
-
+            let tag = *take_first(src);
             match tag {
                 0x00 => {
                     // A 0 tag followed by the number of zero words.
-                    let num_null_words = input_to_read[0];
-                    let remaining = write_nulls(&mut buf, num_null_words);
-                    if remaining != 0 {
-                        self.state = Some(PartialState::WritingNulls(remaining));
-                        break StopReason::NeedOutput
+
+                    // Skip the first word, since the count byte is the number of *additional*
+                    // null words
+                    take_first_mut(dst);
+
+                    if src.is_empty() {
+                        self.state = Some(IncompleteState::NeedNullCount);
+                        break StopReason::NeedInput
+                    }
+    
+                    let count = *take_first(src);
+                    if let Err(stop) = self.write_nulls(dst, count) {
+                        break stop
                     }
                 }
                 0xff => {
                     // A full word followed by the number of uncompressed words.
-                    let [bytes_to_copy @ .., num_uncompressed_words] = input_to_read else { unreachable!() };
-                    word_bytes.copy_from_slice(bytes_to_copy);
-                    let result = write_uncompressed(
-                        &mut self.input,
-                        &mut buf,
-                        *num_uncompressed_words,
-                    );
-                    if let Some((remaining, stop)) = result {
-                        match &stop {
-                            StopReason::NeedOutput => {
-                                self.state = Some(PartialState::WritingUncompressed(remaining));
-                            },
-                            StopReason::NeedInput { .. } => {},
-                        }
+                    if src.len() < 8 {
+                        let partial = PartialWord::start(mem::take(src));
+                        self.state = Some(IncompleteState::PartialUncompressed(partial));
+                        break StopReason::NeedInput
+                    }
+
+                    let word = take_first_mut(dst);
+                    let word_bytes = Word::slice_to_bytes_mut(slice::from_mut(word));
+                    let src_bytes = take_at(src, 8);
+                    word_bytes.copy_from_slice(src_bytes);
+
+                    if src.is_empty() {
+                        self.state = Some(IncompleteState::NeedUncompressedCount);
+                        break StopReason::NeedInput
+                    }
+
+                    let count = *take_first(src);
+                    if let Err(stop) = self.write_uncompressed(src, dst, count) {
                         break stop
                     }
                 }
-                &(mut tag) => {
+                mut tag => {
+                    let bytes_needed = tag.count_ones() as usize;
+                    if src.len() < bytes_needed {
+                        let partial = PartialTaggedWord::start(tag, mem::take(src));
+                        self.state = Some(IncompleteState::PartialWord(partial));
+                        break StopReason::NeedInput
+                    }
+
+                    let input_to_read = take_at(src, bytes_needed);
+                    let word = take_first_mut(dst);
+                    let word_bytes = Word::slice_to_bytes_mut(slice::from_mut(word));
+
                     let mut input_pos = 0;
-                    for word_pos in 0..8 {
+                    for word_byte in word_bytes.iter_mut() {
                         if (tag | 1) != 0 {
-                            word_bytes[word_pos] = input_to_read[input_pos];
+                            *word_byte = input_to_read[input_pos];
                             input_pos += 1;
                         }
 
@@ -423,12 +640,32 @@ impl<'b> Unpacker<'b> {
                     }
                 }
             }
-        };
-
-        UnpackResult {
-            bytes_read: original_input_len - curr_input_len,
-            words_written: original_buf_len - curr_buf_len,
-            reason: stop,
         }
     }
+
+    /// Finish unpacking. This returns a result with an error if the unpacker wasn't finished and
+    /// had partial state left over.
+    #[inline]
+    pub fn finish(&self) -> Result<(), IncompleteError> {
+        let bytes_needed = match self.state {
+            Some(IncompleteState::PartialWord(partial)) => partial.needed_bytes(),
+            Some(IncompleteState::PartialUncompressed(partial)) => partial.needed_bytes() + 1,
+            Some(IncompleteState::NeedNullCount) => 1,
+            Some(IncompleteState::NeedUncompressedCount) => 1,
+            Some(IncompleteState::WritingNulls(_)) => 0, // Not sure what else to put here?
+            Some(IncompleteState::WritingUncompressed { remaining, partial }) => {
+                let remaining_word_bytes = remaining as usize * 8;
+                let partial = partial.map(|p| p.needed_bytes()).unwrap_or(0);
+                remaining_word_bytes + partial
+            }
+            None => return Ok(())
+        };
+
+        Err(IncompleteError { bytes_needed })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
 }
