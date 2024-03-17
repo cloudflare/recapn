@@ -411,6 +411,7 @@ impl<const N: usize> Space<N> {
             self.space.fill(Word::NULL);
         }
 
+        self.dirty = true;
         let len = AllocLen::new(N as u32).unwrap().into();
         let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
 
@@ -454,6 +455,7 @@ impl DynSpace {
             self.space.fill(Word::NULL);
         }
 
+        self.dirty = true;
         let len = AllocLen::new(self.space.len() as u32).unwrap().into();
         let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
 
