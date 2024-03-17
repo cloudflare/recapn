@@ -85,7 +85,12 @@ pub struct SingleSegmentMessage<'a> {
 
 impl<'a> SingleSegmentMessage<'a> {
     pub fn with_space<const N: usize>(space: &'a mut Space<N>) -> Self {
-        Self { a: PhantomData, arena: SingleSegmentArena::new(space.segment())}
+        Self { a: PhantomData, arena: SingleSegmentArena::new(space.segment()) }
+    }
+
+    #[cfg(feature = "alloc")]
+    pub fn with_dyn_space(space: &'a mut DynSpace) -> Self {
+        Self { a: PhantomData, arena: SingleSegmentArena::new(space.segment()) }
     }
 
     /// Creates a new reader for this message. This reader has no limits placed on it.

@@ -406,15 +406,11 @@ impl<const N: usize> Space<N> {
     }
 
     #[inline]
-    pub(crate) fn clean(&mut self) {
+    pub(crate) fn segment(&mut self) -> Segment {
         if self.dirty {
             self.space.fill(Word::NULL);
         }
-    }
 
-    #[inline]
-    pub(crate) fn segment(&mut self) -> Segment {
-        self.clean();
         let len = AllocLen::new(N as u32).unwrap().into();
         let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
 
@@ -439,13 +435,29 @@ pub const fn space<const N: usize>() -> Space<N> { Space::new() }
 
 /// Scratch space with a dynamic length that can be passed to a [Scratch] allocator.
 #[cfg(feature = "alloc")]
-pub struct DynSpace(Box<[Word]>);
+pub struct DynSpace {
+    dirty: bool,
+    space: Box<[Word]>,
+}
 
 #[cfg(feature = "alloc")]
 impl DynSpace {
     #[inline]
-    pub fn new(len: SegmentLen) -> Self {
-        DynSpace(vec![Word::NULL; len.get() as usize].into_boxed_slice())
+    pub fn new(len: AllocLen) -> Self {
+        let space = vec![Word::NULL; len.get() as usize].into_boxed_slice();
+        DynSpace { dirty: false, space }
+    }
+
+    #[inline]
+    pub(crate) fn segment(&mut self) -> Segment {
+        if self.dirty {
+            self.space.fill(Word::NULL);
+        }
+
+        let len = AllocLen::new(self.space.len() as u32).unwrap().into();
+        let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
+
+        Segment { data, len }
     }
 }
 
@@ -475,12 +487,9 @@ impl<'s, A> Scratch<'s, A> {
     #[inline]
     #[cfg(feature = "alloc")]
     pub fn with_dyn_space(space: &'s mut DynSpace, alloc: A) -> Self {
-        let size = AllocLen::new(space.0.len() as u32).unwrap();
-        let start = NonNull::new(space.0.as_mut_ptr()).unwrap();
-
         Self {
             s: PhantomData,
-            segment: Segment { data: start, len: size.into() },
+            segment: space.segment(),
             used: false,
             next: alloc,
         }
@@ -515,11 +524,9 @@ unsafe impl<A: Alloc> Alloc for Scratch<'_, A> {
         }
     }
     #[inline]
-    unsafe fn dealloc(&mut self, mut segment: Segment) {
+    unsafe fn dealloc(&mut self, segment: Segment) {
         if segment != self.segment {
             self.next.dealloc(segment)
-        } else {
-            segment.as_mut_slice().fill(Word::NULL);
         }
     }
 }
@@ -621,7 +628,5 @@ mod tests {
             });
         }
         assert_eq!(&static_space as *const _ as usize, addr);
-        // make sure the scratch allocator cleared the scratch space
-        assert_eq!(static_space.space, [Word::NULL; 5]);
     }
 }
