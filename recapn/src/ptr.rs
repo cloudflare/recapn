@@ -292,6 +292,19 @@ impl StructSize {
     /// 
     /// This is effectively shorthand for checking if this struct size's data and ptrs
     /// is less than or equal to the data and ptrs of `outer`.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::StructSize;
+    /// 
+    /// let a = StructSize { data: 2, ptrs: 1 };
+    /// let b = StructSize { data: 1, ptrs: 0 };
+    /// 
+    /// // `b` fits inside `a` since both sections of `b` are smaller than the sections of `a`
+    /// assert!(b.fits_inside(a));
+    /// assert!(!a.fits_inside(b));
+    /// ```
     #[inline]
     pub fn fits_inside(self, outer: Self) -> bool {
         self.data <= outer.data && self.ptrs <= outer.ptrs
@@ -365,8 +378,13 @@ impl Parts {
     }
 }
 
+#[inline]
+fn fail_upgrade(from: PtrElementSize, to: PtrElementSize) -> Error {
+    ErrorKind::IncompatibleUpgrade(IncompatibleUpgrade { from, to }).into()
+}
+
 #[derive(Clone, Copy)]
-pub union WirePtr {
+union WirePtr {
     word: Word,
     parts: Parts,
     struct_ptr: StructPtr,
@@ -379,12 +397,24 @@ impl WirePtr {
     pub const NULL: WirePtr = WirePtr { word: Word::NULL };
 
     /// Creates a failed read error based on the expected data we intended to read
+    #[cold]
     fn fail_read(&self, expected: Option<ExpectedRead>) -> Error {
-        Error::fail_read(expected, *self)
-    }
-
-    pub fn null() -> &'static WirePtr {
-        &Self::NULL
+        ErrorKind::UnexpectedRead(FailedRead {
+            expected,
+            actual: {
+                if self.is_null() {
+                    ActualRead::Null
+                } else {
+                    use WireKind::*;
+                    match self.kind() {
+                        Struct => ActualRead::Struct,
+                        Far => ActualRead::Far,
+                        Other => ActualRead::Other,
+                        List => ActualRead::List,
+                    }
+                }
+            },
+        }).into()
     }
 
     fn parts(&self) -> &Parts {
@@ -469,7 +499,7 @@ impl From<WirePtr> for Word {
 }
 
 impl crate::alloc::SegmentRef<'_> {
-    pub fn as_wire_ptr(&self) -> &WirePtr {
+    fn as_wire_ptr(&self) -> &WirePtr {
         self.as_ref().into()
     }
 }
@@ -499,7 +529,7 @@ impl PartialEq for WirePtr {
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct StructPtr {
+struct StructPtr {
     parts: Parts,
 }
 
@@ -558,12 +588,6 @@ impl StructPtr {
             data: self.data_size(),
             ptrs: self.ptr_count(),
         }
-    }
-
-    /// Gets the size of the struct in words as an [ObjectLen]
-    #[inline]
-    pub fn len(&self) -> ObjectLen {
-        self.size().len()
     }
 }
 
@@ -907,7 +931,7 @@ impl PtrElementSize {
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-pub struct ListPtr {
+struct ListPtr {
     parts: Parts,
 }
 
@@ -973,7 +997,7 @@ impl From<ListPtr> for WirePtr {
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-pub struct FarPtr {
+struct FarPtr {
     parts: Parts,
 }
 
@@ -1023,7 +1047,7 @@ impl From<FarPtr> for WirePtr {
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq)]
-pub struct CapabilityPtr {
+struct CapabilityPtr {
     parts: Parts,
 }
 
@@ -1421,7 +1445,7 @@ impl<'a> ObjectReader<'a> {
         Ok(new_ptr)
     }
 
-    pub fn location_of(&mut self, src: SegmentRef<'a>) -> Result<Content<'a>> {
+    fn location_of(&mut self, src: SegmentRef<'a>) -> Result<Content<'a>> {
         let ptr = *src.as_wire_ptr();
         if let Some(far) = ptr.far_ptr() {
             let segment = far.segment();
@@ -1458,7 +1482,7 @@ impl<'a> ObjectReader<'a> {
         }
     }
 
-    pub fn try_read_typed(&mut self, ptr: SegmentRef<'a>) -> Result<TypedContent<'a>> {
+    fn try_read_typed(&mut self, ptr: SegmentRef<'a>) -> Result<TypedContent<'a>> {
         let Content { location, ptr } = self.location_of(ptr)?;
         match ptr.kind() {
             WireKind::Struct => {
@@ -1477,7 +1501,7 @@ impl<'a> ObjectReader<'a> {
         }
     }
 
-    pub fn try_read_struct(&mut self, ptr: SegmentRef<'a>) -> Result<StructContent<'a>> {
+    fn try_read_struct(&mut self, ptr: SegmentRef<'a>) -> Result<StructContent<'a>> {
         let content = self.location_of(ptr)?;
         self.try_read_as_struct_content(content)
     }
@@ -1501,7 +1525,7 @@ impl<'a> ObjectReader<'a> {
         Ok(StructContent { ptr: struct_start, size })
     }
 
-    pub fn try_read_list(
+    fn try_read_list(
         &mut self,
         ptr: SegmentRef<'a>,
         expected_element_size: Option<PtrElementSize>,
@@ -1566,15 +1590,15 @@ impl<'a> ObjectReader<'a> {
             use PtrElementSize::*;
             match expected_element_size {
                 None | Some(Void | InlineComposite) => {}
-                Some(Bit) => return Err(Error::fail_upgrade(InlineComposite, Bit)),
+                Some(Bit) => return Err(fail_upgrade(InlineComposite, Bit)),
                 Some(Pointer) => {
                     if struct_size.ptrs == 0 {
-                        return Err(Error::fail_upgrade(InlineComposite, Pointer));
+                        return Err(fail_upgrade(InlineComposite, Pointer));
                     }
                 }
                 Some(expected @ (Byte | TwoBytes | FourBytes | EightBytes)) => {
                     if struct_size.data == 0 {
-                        return Err(Error::fail_upgrade(expected, Pointer));
+                        return Err(fail_upgrade(expected, Pointer));
                     }
                 }
             }
@@ -1587,7 +1611,7 @@ impl<'a> ObjectReader<'a> {
         } else {
             if let Some(expected) = expected_element_size {
                 if element_size != expected {
-                     return Err(Error::fail_upgrade(element_size, expected))
+                     return Err(fail_upgrade(element_size, expected))
                 }
             }
 
@@ -1624,7 +1648,7 @@ impl<'a> ObjectReader<'a> {
 
 /// Describes the location at some object in the message.
 #[derive(Debug)]
-pub(crate) struct Content<'a> {
+struct Content<'a> {
     /// The wire value that describes the content
     pub ptr: WirePtr,
     /// A location that can be used to find the content
@@ -1632,7 +1656,7 @@ pub(crate) struct Content<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) enum Location<'a> {
+enum Location<'a> {
     /// A near location. The content is in the same segment as the original pointer to the content.
     Near {
         /// The origin an offset can be applied to to find the content in the segment.
@@ -1654,7 +1678,7 @@ pub(crate) enum Location<'a> {
     },
 }
 
-pub(crate) struct StructContent<'a> {
+struct StructContent<'a> {
     pub ptr: SegmentRef<'a>,
     pub size: StructSize,
 }
@@ -1668,13 +1692,13 @@ impl<'a> StructContent<'a> {
     }
 }
 
-pub(crate) struct ListContent<'a> {
+struct ListContent<'a> {
     pub ptr: SegmentRef<'a>,
     pub element_size: ElementSize,
     pub element_count: ElementCount,
 }
 
-pub(crate) enum TypedContent<'a> {
+enum TypedContent<'a> {
     Struct(StructContent<'a>),
     List(ListContent<'a>),
     Capability(u32),
@@ -1956,7 +1980,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         let list_ptr = ptr.try_list_ptr()?;
         let element_size = list_ptr.element_size();
         if element_size != PtrElementSize::Byte {
-            return Err(Error::fail_upgrade(element_size, PtrElementSize::Byte));
+            return Err(fail_upgrade(element_size, PtrElementSize::Byte));
         }
 
         let element_count = list_ptr.element_count();
@@ -2776,7 +2800,9 @@ impl<'a> ObjectBuilder<'a> {
             Some((word, self.clone()))
         } else {
             let (place, segment) = self.arena.alloc(size)?;
-            Some((place, ObjectBuilder { segment, arena: self.arena }))
+            let builder = ObjectBuilder { segment, arena: self.arena };
+            let rf = builder.at_offset(place);
+            Some((rf, builder))
         }
     }
 
@@ -2790,7 +2816,8 @@ impl<'a> ObjectBuilder<'a> {
     /// Attempt to allocate the given space in this segment.
     #[inline]
     pub fn alloc_in_segment(&self, size: AllocLen) -> Option<SegmentRef<'a>> {
-        self.segment.try_use_len(size)
+        let offset = self.segment.try_use_len(size)?;
+        Some(self.at_offset(offset))
     }
 
     #[inline]
@@ -2804,7 +2831,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn locate(self, ptr: SegmentRef<'a>) -> (Content<'a>, Self) {
+    fn locate(self, ptr: SegmentRef<'a>) -> (Content<'a>, Self) {
         self.locate_ptr(ptr, *ptr.as_wire_ptr())
     }
 
@@ -2813,7 +2840,7 @@ impl<'a> ObjectBuilder<'a> {
     /// This allows content to be relocated if the set pointer value in the place is different
     /// than the other value.
     #[inline]
-    pub fn locate_ptr(self, place: SegmentRef<'a>, ptr: WirePtr) -> (Content<'a>, Self) {
+    fn locate_ptr(self, place: SegmentRef<'a>, ptr: WirePtr) -> (Content<'a>, Self) {
         if let Some(far) = ptr.far_ptr() {
             let segment = far.segment();
             let double_far = far.double_far();
@@ -2876,7 +2903,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn set_ptr(&self, ptr: SegmentRef<'a>, value: impl Into<WirePtr>) {
+    fn set_ptr(&self, ptr: SegmentRef<'a>, value: impl Into<WirePtr>) {
         debug_assert!(
             self.contains(ptr.into()),
             "segment does not contain ptr: {:?}; segment: {:?}",
@@ -2946,8 +2973,10 @@ impl<'a> ObjectBuilder<'a> {
 
     #[inline]
     pub fn alloc_in_arena(&self, size: AllocLen) -> Option<(SegmentRef<'a>, Self)> {
-        self.arena.alloc(size)
-            .map(|(r, s)| (r, Self { segment: s, arena: self.arena }))
+        let (offset, segment) = self.arena.alloc(size)?;
+        let builder = ObjectBuilder { segment, arena: self.arena };
+        let rf = builder.at_offset(offset);
+        Some((rf, builder))
     }
 
     /// Allocates a struct in the message, then configures the given pointer to point to it.
@@ -3000,7 +3029,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn build_struct(&self, origin: SegmentRef<'a>) -> Result<(StructContent<'a>, Self)> {
+    fn build_struct(&self, origin: SegmentRef<'a>) -> Result<(StructContent<'a>, Self)> {
         let (Content { ptr, location }, builder) = self.clone().locate(origin);
         let struct_ptr = *ptr.try_struct_ptr()?;
 
@@ -3025,7 +3054,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn clear_struct_section(&self, content: StructContent<'a>) {
+    fn clear_struct_section(&self, content: StructContent<'a>) {
         self.clear_section(content.ptr, content.size.len());
     }
 
@@ -3180,7 +3209,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn build_list(&self, origin: SegmentRef<'a>) -> Result<(ListContent<'a>, Self)> {
+    fn build_list(&self, origin: SegmentRef<'a>) -> Result<(ListContent<'a>, Self)> {
         let (Content { ptr, location }, builder) = self.clone().locate(origin);
         let list_ptr = *ptr.try_list_ptr()?;
 
@@ -3224,7 +3253,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn clear_list_section(&self, content: ListContent<'a>) {
+    fn clear_list_section(&self, content: ListContent<'a>) {
         let Some(size) = AllocLen::new(content.element_size.object_words(content.element_count)) else {
             return
         };
@@ -5927,7 +5956,7 @@ mod core_tests {
 
     /// Test the assumption that a struct with the maximum size fits inside a u29
     #[test]
-    fn max_size_fits_in_object_len() {
+    fn struct_max_size_fits_in_object_len() {
         let size = StructSize {
             data: u16::MAX,
             ptrs: u16::MAX,

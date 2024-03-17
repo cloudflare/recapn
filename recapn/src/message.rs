@@ -1,7 +1,7 @@
 //! An arena of segments containing Cap'n Proto data.
 
 use crate::alloc::{
-    AllocLen, Segment, SegmentRef, Word, Space,
+    AllocLen, Segment, SegmentOffset, Space, Word
 };
 use crate::arena::{SegmentId, ArenaSegment, BuildArena, ReadArena};
 use crate::orphan::Orphanage;
@@ -37,7 +37,7 @@ impl SingleSegmentArena {
 }
 
 unsafe impl BuildArena for SingleSegmentArena {
-    fn alloc(&self, min_size: AllocLen) -> Option<(SegmentRef, &ArenaSegment)> {
+    fn alloc(&self, min_size: AllocLen) -> Option<(SegmentOffset, &ArenaSegment)> {
         let segment = self.segment();
         let place = segment.try_use_len(min_size)?;
         Some((place, segment))

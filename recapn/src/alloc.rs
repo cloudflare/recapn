@@ -136,16 +136,12 @@ pub type SignedSegmentOffset = i30;
 /// An unchecked pointer into a segment. This can't be derefed normally. It must be checked and
 /// turned into a `SegmentRef`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SegmentPtr<'a> {
+pub(crate) struct SegmentPtr<'a> {
     a: PhantomData<&'a Word>,
     ptr: *mut Word,
 }
 
 impl<'a> SegmentPtr<'a> {
-    pub const fn null() -> Self {
-        Self::new(core::ptr::null_mut())
-    }
-
     pub const fn new(ptr: *mut Word) -> Self {
         Self {
             a: PhantomData,
@@ -185,7 +181,7 @@ impl<'a> SegmentPtr<'a> {
 
 /// A checked reference to a location in a segment. This cannot be null.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SegmentRef<'a> {
+pub(crate) struct SegmentRef<'a> {
     a: PhantomData<&'a Word>,
     ptr: NonNull<Word>,
 }

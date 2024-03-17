@@ -8,7 +8,6 @@
 
 use core::fmt::{self, Display};
 use crate::alloc::AllocLen;
-use ptr::{PtrElementSize, WirePtr};
 
 #[doc(hidden)]
 extern crate self as recapn;
@@ -152,37 +151,6 @@ impl Display for Error {
             ErrorKind::AllocTooLarge => write!(f, "allocation too large"),
             ErrorKind::AllocFailed(size) => write!(f, "failed to allocate {size} words in message"),
             ErrorKind::OrphanFromDifferentMessage => write!(f, "orphan from different message"),
-        }
-    }
-}
-
-impl Error {
-    #[cold]
-    pub(crate) fn fail_read(expected: Option<ptr::ExpectedRead>, actual: WirePtr) -> Self {
-        Self {
-            kind: ErrorKind::UnexpectedRead(ptr::FailedRead {
-                expected,
-                actual: {
-                    if actual.is_null() {
-                        ptr::ActualRead::Null
-                    } else {
-                        use ptr::WireKind::*;
-                        match actual.kind() {
-                            Struct => ptr::ActualRead::Struct,
-                            Far => ptr::ActualRead::Far,
-                            Other => ptr::ActualRead::Other,
-                            List => ptr::ActualRead::List,
-                        }
-                    }
-                },
-            }),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn fail_upgrade(from: PtrElementSize, to: PtrElementSize) -> Self {
-        Self {
-            kind: ErrorKind::IncompatibleUpgrade(ptr::IncompatibleUpgrade { from, to }),
         }
     }
 }

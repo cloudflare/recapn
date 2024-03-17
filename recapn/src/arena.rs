@@ -149,7 +149,7 @@ impl ArenaSegment {
     /// Attempts to use the given `len` [`Word`]s in the segment, returning
     /// a [`SegmentRef`] to the start of the area if successful.
     #[inline]
-    pub(crate) fn try_use_len(&self, len: AllocLen) -> Option<SegmentRef> {
+    pub(crate) fn try_use_len(&self, len: AllocLen) -> Option<SegmentOffset> {
         let SegmentState::Used(old_used) = self.state.get() else { unreachable!() };
         let max = self.segment.len.get();
 
@@ -159,7 +159,7 @@ impl ArenaSegment {
         }
 
         self.state.set(SegmentState::Used(AllocLen::new(new_used).unwrap()));
-        Some(unsafe { self.start().offset(old_used.into()).as_ref_unchecked() })
+        Some(old_used.into())
     }
 
     #[inline]
@@ -179,7 +179,7 @@ impl ArenaSegment {
 }
 
 pub unsafe trait BuildArena {
-    fn alloc(&self, min_size: AllocLen) -> Option<(SegmentRef, &ArenaSegment)>;
+    fn alloc(&self, min_size: AllocLen) -> Option<(SegmentOffset, &ArenaSegment)>;
     fn segment(&self, id: SegmentId) -> Option<&ArenaSegment>;
 
     fn insert_external_segment(&self, segment: Segment) -> Option<SegmentId>;
@@ -367,7 +367,7 @@ pub(crate) mod growing {
     }
 
     unsafe impl<A: Alloc> BuildArena for Arena<A> {
-        fn alloc(&self, min_size: AllocLen) -> Option<(SegmentRef, &ArenaSegment)> {
+        fn alloc(&self, min_size: AllocLen) -> Option<(SegmentOffset, &ArenaSegment)> {
             let last_owned = self.segment(self.last_owned.get()).unwrap();
             if let Some(rf) = last_owned.try_use_len(min_size) {
                 return Some((rf, last_owned))
@@ -380,12 +380,11 @@ pub(crate) mod growing {
 
             let id = tail.len() as SegmentId + 1;
             let segment = self.alloc(min_size, id)?;
-            let rf = unsafe { SegmentRef::new_unchecked(segment.segment.data) };
             let ptr = box_to_nonnull(Box::new(segment));
             let segment = unsafe { ptr.as_ref() };
             tail.push(ptr);
             self.last_owned.set(id);
-            Some((rf, segment))
+            Some((0u16.into(), segment))
         }
         fn segment(&self, id: SegmentId) -> Option<&ArenaSegment> {
             self.segment(id)
