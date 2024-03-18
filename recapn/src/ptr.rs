@@ -859,52 +859,6 @@ impl From<ElementSize> for PtrElementSize {
 }
 
 impl PtrElementSize {
-    /// Returns the number of bits per element. This also returns the number of bits per pointer.
-    pub fn bits(self) -> u32 {
-        use PtrElementSize::*;
-        match self {
-            Void | InlineComposite => 0,
-            Bit => 1,
-            Byte => 8,
-            TwoBytes => 8 * 2,
-            FourBytes => 8 * 4,
-            EightBytes | Pointer => 8 * 8,
-        }
-    }
-
-    /// Returns the number of bits per data element.
-    /// Pointers don't count as data elements and inline composite elements don't have
-    /// a set number of bits, so they return 0.
-    pub fn data_bits(self) -> u32 {
-        use PtrElementSize::*;
-        match self {
-            Void | InlineComposite | Pointer => 0,
-            Bit => 1,
-            Byte => 8,
-            TwoBytes => 8 * 2,
-            FourBytes => 8 * 4,
-            EightBytes => 8 * 8,
-        }
-    }
-
-    pub fn data_bytes(self) -> u32 {
-        use PtrElementSize::*;
-        match self {
-            Void | InlineComposite | Pointer | Bit => 0,
-            Byte => 1,
-            TwoBytes => 2,
-            FourBytes => 4,
-            EightBytes => 8,
-        }
-    }
-
-    pub fn pointers(self) -> u16 {
-        match self {
-            PtrElementSize::Pointer => 1,
-            _ => 0,
-        }
-    }
-
     pub const fn size_of<T: ty::DynListValue>() -> Self {
         <T as ty::DynListValue>::PTR_ELEMENT_SIZE
     }
@@ -1545,8 +1499,8 @@ impl<'a> ObjectReader<'a> {
         list_ptr: ListPtr,
         expected_element_size: Option<PtrElementSize>,
     ) -> Result<ListContent<'a>> {
-        let element_size = list_ptr.element_size();
-        if element_size == PtrElementSize::InlineComposite {
+        let ptr_element = list_ptr.element_size();
+        if ptr_element == PtrElementSize::InlineComposite {
             let word_count = list_ptr.element_count().get();
             // add one for the tag pointer, because this could overflow the size of a segment,
             // we just assume on overflow the bounds check fails and is out of bounds.
@@ -1609,14 +1563,16 @@ impl<'a> ObjectReader<'a> {
                 element_count,
             })
         } else {
+            let element_size = ptr_element.to_element_size();
+
             if let Some(expected) = expected_element_size {
-                if element_size != expected {
-                     return Err(fail_upgrade(element_size, expected))
+                if element_size.upgradable_to(expected) {
+                     return Err(fail_upgrade(ptr_element, expected))
                 }
             }
 
             let element_count = list_ptr.element_count();
-            if element_size == PtrElementSize::Void {
+            if element_size == ElementSize::Void {
                 if self.try_amplified_read(element_count.get() as u64) {
                     return Err(ErrorKind::ReadLimitExceeded.into());
                 }
@@ -1634,7 +1590,7 @@ impl<'a> ObjectReader<'a> {
                 }
             }?;
 
-            Ok(ListContent { ptr, element_size: element_size.to_element_size(), element_count })
+            Ok(ListContent { ptr, element_size, element_count })
         }
     }
 
