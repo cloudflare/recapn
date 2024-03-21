@@ -5937,8 +5937,8 @@ mod tests {
         // making AlignedData hard, easier to just write the bytes as numbers
         // and swap the bytes with u64::to_be()
         let data = [
-            Word(0x_00_00_00_00_01_00_00_00_u64.to_be()),
-            Word(0x_01_23_45_67_89_ab_cd_ef_u64.to_be()),
+            Word([0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00]),
+            Word([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]),
         ];
 
         let ptr =

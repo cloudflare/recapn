@@ -150,7 +150,7 @@ impl<'b> Packer<'b> {
             }
 
             let tag = take_byte(&mut output_buf);
-            for byte in word.0.to_ne_bytes() {
+            for byte in word.0 {
                 if byte != 0 {
                     *tag |= 1;
                     write_byte(&mut output_buf, byte);
@@ -163,7 +163,7 @@ impl<'b> Packer<'b> {
                 // words, followed by the uncompressed words themselves.
 
                 let (uncompressed, remainder) = split_at_filter(self.input, |&w| {
-                    w.0.to_ne_bytes().into_iter().filter(|&b| b == 0).count() >= 2
+                    w.0.into_iter().filter(|&b| b == 0).count() >= 2
                 });
                 self.input = remainder;
 
@@ -320,7 +320,7 @@ impl PartialWord {
         if needed <= src.len() {
             let to_copy = take_at(src, needed);
             self.buf[buf_start..].copy_from_slice(to_copy);
-            *take_first_mut(dst) = Word(u64::from_ne_bytes(self.buf));
+            *take_first_mut(dst) = Word(self.buf);
             Ok(())
         } else {
             let to_copy = mem::take(src);
@@ -373,7 +373,7 @@ impl PartialTaggedWord {
         }
 
         if tag == 0 {
-            *take_first_mut(dst) = Word(u64::from_ne_bytes(buf));
+            *take_first_mut(dst) = Word(buf);
             Ok(())
         } else {
             Err(PartialTaggedWord {

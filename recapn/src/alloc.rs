@@ -16,12 +16,21 @@ use rustalloc::{
 
 /// An aligned 64-bit word type.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct Word(pub u64);
+#[repr(align(8))]
+pub struct Word(pub [u8; 8]);
+
+const _ASSERT: () = {
+    if core::mem::align_of::<Word>() != 8 {
+        panic!("Word is not 8-byte aligned!");
+    }
+    if core::mem::size_of::<Word>() != 8 {
+        panic!("Word is not 8 bytes!");
+    }
+};
 
 impl Word {
     /// A null value
-    pub const NULL: Self = Self(0);
+    pub const NULL: Self = Self([0; 8]);
 
     /// The number of bytes in a Word (8)
     pub const BYTES: usize = 8;
@@ -73,7 +82,7 @@ impl Word {
 
 impl Debug for Word {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#016X}", self.0)
+        write!(f, "{:#016X}", u64::from_ne_bytes(self.0))
     }
 }
 
