@@ -840,7 +840,7 @@ impl ElementSize {
 }
 
 /// A simplified element size that only indicates the variant of the element.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PtrElementSize {
     Void = 0,
     Bit = 1,
@@ -1095,7 +1095,7 @@ impl fmt::Display for FailedRead {
 #[cfg(feature = "std")]
 impl std::error::Error for FailedRead {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IncompatibleUpgrade {
     pub from: PtrElementSize,
     pub to: PtrElementSize,
