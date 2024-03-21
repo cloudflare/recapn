@@ -1524,7 +1524,15 @@ impl<'a> ObjectReader<'a> {
             let first = unsafe { tag_ptr.offset(1.into()).as_ref_unchecked() };
 
             let element_count = tag.inline_composite_element_count();
+
             let struct_size = tag.size();
+            let element_size = ElementSize::InlineComposite(struct_size);
+            if let Some(expected) = expected_element_size {
+                if !element_size.upgradable_to(expected) {
+                    return Err(fail_upgrade(ptr_element, expected))
+                }
+            }
+
             let words_per_element = struct_size.total();
 
             if element_count.get() as u64 * words_per_element as u64 > word_count.into() {
@@ -1540,23 +1548,6 @@ impl<'a> ObjectReader<'a> {
                 }
             }
 
-            // Check whether the size is compatible.
-            use PtrElementSize::*;
-            match expected_element_size {
-                None | Some(Void | InlineComposite) => {}
-                Some(Bit) => return Err(fail_upgrade(InlineComposite, Bit)),
-                Some(Pointer) => {
-                    if struct_size.ptrs == 0 {
-                        return Err(fail_upgrade(InlineComposite, Pointer));
-                    }
-                }
-                Some(expected @ (Byte | TwoBytes | FourBytes | EightBytes)) => {
-                    if struct_size.data == 0 {
-                        return Err(fail_upgrade(expected, Pointer));
-                    }
-                }
-            }
-
             Ok(ListContent {
                 ptr: first,
                 element_size: ElementSize::InlineComposite(struct_size),
@@ -1566,8 +1557,8 @@ impl<'a> ObjectReader<'a> {
             let element_size = ptr_element.to_element_size();
 
             if let Some(expected) = expected_element_size {
-                if element_size.upgradable_to(expected) {
-                     return Err(fail_upgrade(ptr_element, expected))
+                if !element_size.upgradable_to(expected) {
+                    return Err(fail_upgrade(ptr_element, expected))
                 }
             }
 
