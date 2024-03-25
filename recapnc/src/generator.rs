@@ -571,7 +571,7 @@ impl<'a> GeneratorContext<'a> {
                 }
             }
             TypeKind::Interface(_) => {
-                unimplemented!("cannot generate default values for Capability fields")
+                unimplemented!("cannot generate values for Capability fields")
             }
             TypeKind::AnyPointer(kind) => {
                 let ptr = value.and_then(|v| v.any_pointer().field())

@@ -1265,7 +1265,11 @@ pub mod call {
         type Reader<'a, T: _p::rpc::Table> = send_results_to::Reader<'a, T>;
         type Builder<'a, T: _p::rpc::Table> = send_results_to::Builder<'a, T>;
     }
-    impl _p::FieldGroup for SendResultsTo {}
+    impl _p::FieldGroup for SendResultsTo {
+        unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
+            std::unimplemented!()
+        }
+    }
     impl SendResultsTo {
         const CALLER: _p::VariantDescriptor<()> = _p::VariantDescriptor::<()> {
             variant: _p::VariantInfo {
@@ -2633,7 +2637,11 @@ pub mod disembargo {
         type Reader<'a, T: _p::rpc::Table> = context::Reader<'a, T>;
         type Builder<'a, T: _p::rpc::Table> = context::Builder<'a, T>;
     }
-    impl _p::FieldGroup for Context {}
+    impl _p::FieldGroup for Context {
+        unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
+            std::unimplemented!()
+        }
+    }
     impl Context {
         const SENDER_LOOPBACK: _p::VariantDescriptor<u32> = _p::VariantDescriptor::<
             u32,

@@ -106,7 +106,11 @@ pub mod prelude {
                     type Builder<'a, T: _p::rpc::Table> = $modname::Builder<'a, T>;
                 }
 
-                impl _p::FieldGroup for $name {}
+                impl _p::FieldGroup for $name {
+                    unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
+                        std::unimplemented!()
+                    }
+                }
 
                 impl $name {
                     $(def_field!(def : $fieldty, $descriptor $def);)*

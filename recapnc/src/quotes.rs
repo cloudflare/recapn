@@ -91,6 +91,11 @@ impl GeneratedStruct {
         let variants = self.which.as_ref().map(GeneratedWhich::mut_accessors).into_iter().flatten();
         fields.chain(variants)
     }
+    pub fn clear_all(&self) -> impl Iterator<Item = TokenStream> + '_ {
+        let fields = self.fields.iter().map(GeneratedField::call_clear);
+        let variant_clear = self.which.as_ref().map(GeneratedWhich::call_clear).into_iter().flatten();
+        fields.chain(variant_clear)
+    }
     pub fn which_accessors(&self) -> Option<(TokenStream, TokenStream)> {
         let _ = self.which.as_ref()?;
         let modname = &self.mod_ident;
@@ -189,8 +194,13 @@ to_tokens!(GeneratedStruct |self| {
             }
         }
     } else {
+        let clears = self.clear_all();
         quote! {
-            impl _p::FieldGroup for #name {}
+            impl _p::FieldGroup for #name {
+                unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+                    #(#clears)*
+                }
+            }
         }
     };
     quote! {
@@ -385,6 +395,18 @@ impl GeneratedField {
             }
         }
     }
+
+    pub fn call_clear(&self) -> TokenStream {
+        let Self {
+            field_type,
+            type_name,
+            descriptor_ident: descriptor,
+            ..
+        } = self;
+        quote! {
+            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor);
+        }
+    }
 }
 
 pub struct GeneratedWhich {
@@ -402,6 +424,20 @@ impl GeneratedWhich {
     }
     pub fn mut_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
         self.fields.iter().map(move |variant| variant.mut_accessor())
+    }
+    pub fn call_clear(&self) -> impl Iterator<Item = TokenStream> + '_ {
+        let tag_slot = self.tag_slot;
+        let clear_tag = quote! {
+            s.set_field_unchecked(#tag_slot, 0);
+        };
+
+        let clear_first = self.fields.iter()
+            .find(|variant| variant.case == 0)
+            .expect("no variant has case 0!")
+            .field
+            .call_clear();
+
+        [clear_tag, clear_first].into_iter()
     }
 }
 
