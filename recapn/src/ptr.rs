@@ -246,6 +246,8 @@ impl StructSize {
 
     /// Matches self against `EMPTY`, indicating if the struct has no data or pointer words.
     /// 
+    /// # Example
+    /// 
     /// ```
     /// use recapn::ptr::StructSize;
     /// 
@@ -263,21 +265,73 @@ impl StructSize {
         matches!(self, Self::EMPTY)
     }
 
-    /// Gets the total size of the struct in words as an `ObjectLen`.
-    #[inline]
-    pub const fn len(self) -> ObjectLen {
-        ObjectLen::new(self.total()).unwrap()
-    }
-
     /// Gets the total size of the struct in words
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::StructSize;
+    /// 
+    /// assert_eq!(StructSize::EMPTY.total(), 0);
+    /// 
+    /// let a = StructSize { data: 2, ptrs: 5 };
+    /// assert_eq!(a.total(), 7);
+    /// 
+    /// let max = StructSize { data: u16::MAX, ptrs: u16::MAX };
+    /// assert_eq!(max.total(), 131_070);
+    /// ```
     #[inline]
     pub const fn total(self) -> u32 {
         self.data as u32 + self.ptrs as u32
     }
 
+    /// Gets the total size of the struct in words as an [`ObjectLen`].
+    /// 
+    /// This is the same as [`total`] but it just wraps the result in [`ObjectLen`].
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::StructSize;
+    /// 
+    /// assert_eq!(StructSize::EMPTY.len().get(), 0);
+    /// 
+    /// let a = StructSize { data: 2, ptrs: 5 };
+    /// assert_eq!(a.len().get(), 7);
+    /// 
+    /// let max = StructSize { data: u16::MAX, ptrs: u16::MAX };
+    /// assert_eq!(max.len().get(), 131_070);
+    /// ```
+    #[inline]
+    pub const fn len(self) -> ObjectLen {
+        ObjectLen::new(self.total()).unwrap()
+    }
+
     /// Gets the max number of elements an struct list can contain of this struct.
     /// 
-    /// Struct lists have a limit on how many elements they can contain of a given struct
+    /// Struct lists have a limit on how many elements they can contain of a given struct.
+    /// Internally the list pointer to a struct list has the number of [`Word`]s in the list,
+    /// which can't be larger than a segment (max 4GB). Struct lists also have a "tag" that
+    /// declares the size of the struct itself, included with the list content. Thus, a list of
+    /// non-empty structs cannot have [`ElementCount::MAX`] struct elements in it, and the max
+    /// number of elements a struct list can have strinks as the struct grows larger.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{StructSize, ElementCount};
+    /// 
+    /// // An empty struct takes up no space and can have max elements.
+    /// assert_eq!(StructSize::EMPTY.max_elements(), ElementCount::MAX);
+    /// 
+    /// // A one word struct can have MAX - 1.
+    /// let one_word = StructSize { data: 1, ptrs: 0 };
+    /// assert_eq!(one_word.max_elements().get(), ElementCount::MAX_VALUE - 1);
+    /// 
+    /// // A max size struct list can only be 4,096 elements long
+    /// let max = StructSize { data: u16::MAX, ptrs: u16::MAX };
+    /// assert_eq!(max.max_elements().get(), 4096);
+    /// ```
     #[inline]
     pub const fn max_elements(self) -> ElementCount {
         if self.is_empty() {
@@ -306,7 +360,7 @@ impl StructSize {
     /// assert!(!a.fits_inside(b));
     /// ```
     #[inline]
-    pub fn fits_inside(self, outer: Self) -> bool {
+    pub const fn fits_inside(self, outer: Self) -> bool {
         self.data <= outer.data && self.ptrs <= outer.ptrs
     }
 
@@ -335,22 +389,28 @@ impl StructSize {
 
 /// The length of an object (pointer, struct, list) within a message in Words.
 pub type ObjectLen = u29;
-
+/// The number of elements in a Cap'n Proto list.
 pub type ElementCount = u29;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum WireKind {
+enum WireKind {
     Struct = 0,
     List = 1,
     Far = 2,
     Other = 3,
 }
 
+/// The type of data a pointer refers to.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PtrType {
+    /// The pointer is null (it doesn't refer to anything).
     Null,
+    /// The pointer refers to a struct.
     Struct,
+    /// The pointer refers to a list. This includes `Data` and `Text` which are represented as
+    /// lists of bytes on the wire.
     List,
+    /// The pointer refers to a capability.
     Capability,
 }
 
@@ -607,27 +667,63 @@ impl From<StructPtr> for WirePtr {
     }
 }
 
-/// A list element's size, with a struct size for inline composite values
+/// A list element's size, with a struct size for inline composite values.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ElementSize {
+    /// A void element. This takes up no space on the wire.
     Void,
+    /// A bit element. Used by bool lists. Bits are packed together to save space but can't be
+    /// upgraded to a struct later.
     Bit,
+    /// A byte element. `Data` and `Text` are lists of byte elements.
     Byte,
+    /// A two-byte element. Enums are represented by this size.
     TwoBytes,
+    /// A four-byte element.
     FourBytes,
+    /// A eight-byte element.
     EightBytes,
+    /// A pointer element. Lists of lists or capabilities use this element size.
     Pointer,
+    /// An inline composite element. Struct lists use this element size.
     InlineComposite(StructSize),
 }
 
 impl ElementSize {
     /// Returns whether this element size has no data or pointers.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// assert!(ElementSize::Void.is_empty());
+    /// assert!(ElementSize::InlineComposite(StructSize::EMPTY).is_empty());
+    /// 
+    /// assert!(!ElementSize::Bit.is_empty());
+    /// assert!(!ElementSize::EightBytes.is_empty());
+    /// assert!(!ElementSize::Pointer.is_empty());
+    /// assert!(!ElementSize::InlineComposite(StructSize { data: 1, ptrs: 0 }).is_empty());
+    /// ```
     #[inline]
     pub const fn is_empty(self) -> bool {
         matches!(self, Self::Void | Self::InlineComposite(StructSize::EMPTY))
     }
 
     /// Returns whether this element size consists entirely of pointers.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// assert!(ElementSize::Pointer.is_ptrs());
+    /// assert!(ElementSize::InlineComposite(StructSize { ptrs: 3, data: 0 }).is_ptrs());
+    /// 
+    /// assert!(!ElementSize::Void.is_ptrs());
+    /// assert!(!ElementSize::EightBytes.is_ptrs());
+    /// assert!(!ElementSize::InlineComposite(StructSize { ptrs: 3, data: 1 }).is_ptrs());
+    /// ```
     #[inline]
     pub const fn is_ptrs(self) -> bool {
         use ElementSize::*;
@@ -638,20 +734,80 @@ impl ElementSize {
         not_empty && has_ptrs
     }
 
+    /// Returns whether this element size is a composite of data *and* pointers.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// assert!(ElementSize::InlineComposite(StructSize { ptrs: 3, data: 5 }).is_composite());
+    /// 
+    /// assert!(!ElementSize::Void.is_composite());
+    /// assert!(!ElementSize::EightBytes.is_composite());
+    /// assert!(!ElementSize::Pointer.is_composite());
+    /// assert!(!ElementSize::InlineComposite(StructSize { ptrs: 3, data: 0 }).is_composite());
+    /// assert!(!ElementSize::InlineComposite(StructSize { ptrs: 0, data: 2 }).is_composite());
+    /// ```
+    #[inline]
+    pub const fn is_composite(self) -> bool {
+        use ElementSize::InlineComposite;
+        matches!(self, InlineComposite(StructSize { data, ptrs }) if data != 0 && ptrs != 0)
+    }
+
     /// Returns whether this element size consists entirely of data.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// assert!(ElementSize::Bit.is_data());
+    /// assert!(ElementSize::EightBytes.is_data());
+    /// assert!(ElementSize::InlineComposite(StructSize { ptrs: 0, data: 3 }).is_data());
+    /// 
+    /// assert!(!ElementSize::Void.is_data());
+    /// assert!(!ElementSize::Pointer.is_data());
+    /// assert!(!ElementSize::InlineComposite(StructSize { ptrs: 3, data: 1 }).is_data());
+    /// ```
     #[inline]
     pub const fn is_data(self) -> bool {
         let not_empty = !self.is_empty();
         let not_ptrs = !self.is_ptrs();
-        not_empty && not_ptrs
+        let not_composite = !self.is_composite();
+        not_empty && not_ptrs && not_composite
     }
 
+    /// Returns whether this is an inline composite element size.
+    /// 
+    /// Unlike with `is_composite` this does not consider the size of the elements themselves,
+    /// just whether it's an "inline composite".
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// let size = ElementSize::InlineComposite(StructSize::EMPTY);
+    /// assert!(size.is_inline_composite());
+    /// ```
     #[inline]
     pub const fn is_inline_composite(self) -> bool {
         matches!(self, ElementSize::InlineComposite(_))
     }
 
     /// Returns the number of bits per element. This also returns the number of bits per pointer.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::ElementSize;
+    /// 
+    /// assert_eq!(ElementSize::Void.bits(), 0);
+    /// assert_eq!(ElementSize::Bit.bits(), 1);
+    /// assert_eq!(ElementSize::TwoBytes.bits(), 16);
+    /// assert_eq!(ElementSize::Pointer.bits(), 64);
+    /// ```
     #[inline]
     pub const fn bits(self) -> u32 {
         use ElementSize::*;
@@ -667,6 +823,18 @@ impl ElementSize {
     }
 
     /// Return the number of bytes and pointers per element. Bit element return 0 bytes.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// assert_eq!(ElementSize::TwoBytes.bytes_and_ptrs(), (2, 0));
+    /// assert_eq!(ElementSize::Pointer.bytes_and_ptrs(), (0, 1));
+    /// 
+    /// let example = StructSize { data: 3, ptrs: 2 };
+    /// assert_eq!(ElementSize::InlineComposite(example).bytes_and_ptrs(), (3 * 8, 2));
+    /// ```
     #[inline]
     pub const fn bytes_and_ptrs(self) -> (u32, u16) {
         use ElementSize::*;
@@ -684,7 +852,7 @@ impl ElementSize {
 
     /// Return the struct size if upgrading this element size to a struct.
     /// 
-    /// Bit elements return an empty struct.
+    /// Bit elements cannot be upgraded and return an empty struct.
     #[inline]
     pub const fn struct_upgrade(self) -> StructSize {
         use ElementSize::*;
@@ -699,6 +867,17 @@ impl ElementSize {
     /// Get the maximum number of elements a list of this element size can contain. This only
     /// really matters for struct elements, since structs can overflow the max segment size
     /// if they're not zero sized.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, ElementCount, StructSize};
+    /// 
+    /// assert_eq!(ElementSize::FourBytes.max_elements(), ElementCount::MAX);
+    /// 
+    /// let one_data = ElementSize::InlineComposite(StructSize { data: 1, ptrs: 0 });
+    /// assert_eq!(one_data.max_elements().get(), ElementCount::MAX_VALUE - 1);
+    /// ```
     #[inline]
     pub const fn max_elements(self) -> ElementCount {
         match self {
@@ -708,7 +887,7 @@ impl ElementSize {
     }
 
     /// Get the total number of bytes required to hold all the data in a list of this element.
-    /// This does not include any other data including padding.
+    /// This is padded to the nearest byte for bit elements, but otherwise contains no other data.
     #[inline]
     pub const fn total_bytes(self, count: ElementCount) -> u32 {
         let count = count.get() as u64;
@@ -763,17 +942,48 @@ impl ElementSize {
 
     /// Creates a new element size based on a possible upgrade between the two sizes.
     ///
-    /// This works both ways, and will produce the same upgrade no matter the order
+    /// This is commutative, and will produce the same upgrade no matter the order
     /// of the args. For example, an upgrade from a Pointer element list to an
     /// InlineComposite list with a pointer element will yield the same result
     /// as "upgrading" an InlineComposite list to a Pointer element list. Either order
     /// will yield an InlineComposite element size.
+    /// 
+    /// ```
+    /// # use recapn::ptr::{ElementSize, StructSize};
+    /// let a = ElementSize::Pointer;
+    /// let b = ElementSize::InlineComposite(StructSize { ptrs: 2, data: 0 });
+    /// 
+    /// let c = a.upgrade_to(b).unwrap();
+    /// let d = b.upgrade_to(a).unwrap();
+    /// assert_eq!(c, d);
+    /// ```
     ///
     /// Attempting to upgrade the result of this function to itself or one of the original
     /// inputs will return the same result. Thus, this can be used to determine if a
     /// list builder has the correct upgraded size when performing a copy.
+    /// 
+    /// ```
+    /// # use recapn::ptr::{ElementSize, StructSize};
+    /// let a = ElementSize::Pointer;
+    /// let b = ElementSize::InlineComposite(StructSize { ptrs: 2, data: 0 });
+    /// 
+    /// let c = a.upgrade_to(b).unwrap();
+    /// let d = c.upgrade_to(a).unwrap();
+    /// assert_eq!(c, d);
+    /// 
+    /// let e = c.upgrade_to(b).unwrap();
+    /// assert_eq!(c, e);
+    /// ```
     ///
     /// If the upgrade is invalid, `None` will be returned.
+    /// 
+    /// ```
+    /// # use recapn::ptr::{ElementSize, StructSize};
+    /// // Bit lists cannot be upgraded
+    /// let a = ElementSize::Bit;
+    /// let b = ElementSize::InlineComposite(StructSize { data: 1, ptrs: 0 });
+    /// assert_eq!(a.upgrade_to(b), None);
+    /// ```
     #[inline]
     pub fn upgrade_to(self, other: ElementSize) -> Option<ElementSize> {
         use ElementSize::*;
@@ -807,6 +1017,15 @@ impl ElementSize {
     }
 
     /// Gets the ElementSize of the given static list value type.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::ElementSize;
+    /// 
+    /// let size = ElementSize::size_of::<u16>();
+    /// assert_eq!(size, ElementSize::TwoBytes);
+    /// ```
     #[inline]
     pub const fn size_of<T: ty::ListValue>() -> ElementSize {
         <T as ty::ListValue>::ELEMENT_SIZE
@@ -816,14 +1035,37 @@ impl ElementSize {
     /// 
     /// This is written to support empty default list readers, specifically empty lists
     /// of any struct, which need an element size for the inline composite elements.
+    /// 
     /// `AnyStruct` does not implement `ListValue` since it doesn't have a static
     /// list element size, so we use this and specify an empty inline composite element
     /// for empty lists.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::any::AnyStruct;
+    /// use recapn::ptr::{ElementSize, StructSize};
+    /// 
+    /// let size = ElementSize::empty_size_of::<u16>();
+    /// assert_eq!(size, ElementSize::TwoBytes);
+    /// 
+    /// let size = ElementSize::empty_size_of::<AnyStruct>();
+    /// assert_eq!(size, ElementSize::InlineComposite(StructSize::EMPTY));
+    /// ```
     #[inline]
     pub const fn empty_size_of<T: ty::DynListValue>() -> ElementSize {
         PtrElementSize::size_of::<T>().to_element_size()
     }
 
+    /// Convert this `ElementSize` into its `PtrElementSize` counterpart.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{ElementSize, PtrElementSize};
+    /// 
+    /// assert_eq!(ElementSize::TwoBytes.as_ptr_size(), PtrElementSize::TwoBytes);
+    /// ```
     #[inline]
     pub const fn as_ptr_size(self) -> PtrElementSize {
         match self {
@@ -842,13 +1084,21 @@ impl ElementSize {
 /// A simplified element size that only indicates the variant of the element.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PtrElementSize {
+    /// A void element.
     Void = 0,
+    /// A bit element.
     Bit = 1,
+    /// A byte element.
     Byte = 2,
+    /// A two-byte element.
     TwoBytes = 3,
+    /// A four-byte element.
     FourBytes = 4,
+    /// A eight-byte element.
     EightBytes = 5,
+    /// A pointer element.
     Pointer = 6,
+    /// An inline composite element.
     InlineComposite = 7,
 }
 
@@ -859,6 +1109,26 @@ impl From<ElementSize> for PtrElementSize {
 }
 
 impl PtrElementSize {
+    /// Gets the `PtrElementSize` of the given static list element type.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::PtrElementSize;
+    /// 
+    /// let size = PtrElementSize::size_of::<u16>();
+    /// assert_eq!(size, PtrElementSize::TwoBytes);
+    /// ```
+    /// 
+    /// This works with elements without a fixed `ElementSize`, like `AnyStruct`.
+    /// 
+    /// ```
+    /// # use recapn::ptr::PtrElementSize;
+    /// use recapn::any::AnyStruct;
+    /// 
+    /// let size = PtrElementSize::size_of::<AnyStruct>();
+    /// assert_eq!(size, PtrElementSize::InlineComposite);
+    /// ```
     pub const fn size_of<T: ty::DynListValue>() -> Self {
         <T as ty::DynListValue>::PTR_ELEMENT_SIZE
     }
@@ -868,6 +1138,27 @@ impl PtrElementSize {
     /// Because an inline composite element size isn't provided, it's assumed to be empty.
     /// This makes this method good for converting to `ElementSize` when you know it's not
     /// an inline composite as it was already handled separately.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use recapn::ptr::{PtrElementSize, ElementSize, StructSize};
+    /// 
+    /// assert_eq!(PtrElementSize::TwoBytes.to_element_size(), ElementSize::TwoBytes);
+    /// assert_eq!(
+    ///     PtrElementSize::InlineComposite.to_element_size(),
+    ///     ElementSize::InlineComposite(StructSize::EMPTY),
+    /// );
+    /// 
+    /// // This is useful if you've already handled the InlineComposite case separately
+    /// # let size = PtrElementSize::Byte;
+    /// let size = if size == PtrElementSize::InlineComposite {
+    ///     let struct_size = StructSize { data: 3, ptrs: 2 };
+    ///     ElementSize::InlineComposite(struct_size)
+    /// } else {
+    ///     size.to_element_size()
+    /// };
+    /// ```
     #[inline]
     pub const fn to_element_size(self) -> ElementSize {
         match self {
@@ -1036,18 +1327,16 @@ impl From<CapabilityPtr> for WirePtr {
     }
 }
 
-#[non_exhaustive]
 #[derive(Debug)]
-pub enum ExpectedRead {
+pub(crate) enum ExpectedRead {
     Struct,
     List,
     Far,
     Capability,
 }
 
-#[non_exhaustive]
 #[derive(Debug)]
-pub enum ActualRead {
+pub(crate) enum ActualRead {
     Null,
     Struct,
     List,
@@ -1056,7 +1345,7 @@ pub enum ActualRead {
 }
 
 #[derive(Debug)]
-pub struct FailedRead {
+pub(crate) struct FailedRead {
     /// The thing we expected to read from the pointer.
     pub expected: Option<ExpectedRead>,
     /// The actual pointer value.
@@ -1095,9 +1384,12 @@ impl fmt::Display for FailedRead {
 #[cfg(feature = "std")]
 impl std::error::Error for FailedRead {}
 
+/// An error returned when attempting to perform an incompatible upgrade to another list type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IncompatibleUpgrade {
+    /// The original element size we tried to upgrade from.
     pub from: PtrElementSize,
+    /// The new element size we tried to upgrade into.
     pub to: PtrElementSize,
 }
 
@@ -1132,7 +1424,9 @@ impl std::error::Error for IncompatibleUpgrade {}
 /// This is primarily used by code generators to figure out where a default value is located
 /// in the schema message that's embeded in the generated code.
 pub struct Address {
+    /// The segment the object is in.
     pub segment: SegmentId,
+    /// The offset into the segment the object is at.
     pub offset: SegmentOffset,
 }
 
@@ -1147,17 +1441,19 @@ impl Address {
 /// A number of things can go wrong when copying from one list or struct to another. You could
 /// exceed the nesting limit, the read limit, a pointer could be invalid, capability pointers
 /// might've been accidentally set when writing a canonical struct, etc. In these cases, a likely
-/// safe default is to not copy the value, and instead just write null at the destination.  This
+/// safe default is to not copy the value, and instead just write null at the destination. This
 /// struct signals that copying should continue, but should just write null to the destination
 /// instead of erroring out.
 #[derive(Default, Clone, Copy, Debug)]
 pub struct WriteNull;
 
 /// Describes an error handler type that can be used when setting copies of values.
-///
-/// Error handlers
 pub trait ErrorHandler {
+    /// The error returned. This can be any type, but most provided handlers will either return
+    /// [`crate::Error`] or [`core::convert::Infallible`].
     type Error;
+
+    /// Returns a [`ControlFlow`] to signal how to handle the error.
     fn handle_err(&mut self, err: Error) -> ControlFlow<Self::Error, WriteNull>;
 }
 
@@ -3218,18 +3514,10 @@ impl<'a> ObjectBuilder<'a> {
 
 /// Controls how a type is copied into a message.
 /// 
-/// In most implementations of Cap'n Proto, the set_* functions don't return instances of what
-/// was set in order to modify them. This implementation does! When you set a struct or list field to
-/// a copy of a value, you immediately get a builder for the field so it can be modified. This saves
-/// a step where you'd normally have to immediately call get_ again to get an instance of the value.
-/// 
-/// It also saves time in the case where you'd immediately need to perform a promotion after setting
-/// the value. If you set a field to a copy of a value that's smaller than the size a builder requests,
-/// you have to perform a promotion again which would make a hole in the message. This fixes that by
-/// handling promotion at the same time using CopySize::Minimum.
-/// 
-/// In the case where the copier doesn't care about the size of the value or wants to canonicalize
-/// a field, CopySize::FromValue and CopySize::Canonical is used.
+/// This allows you to control struct or list promotions when copying from an existing value.
+/// In other Cap'n Proto implementations, promotions must be done *after* a struct or list
+/// has been copied. In this crate, you can promote a struct or list during the initial copy,
+/// saving some time and message space.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CopySize<T> {
     /// Size is copied from the input value's size.
@@ -5896,24 +6184,6 @@ fn calculate_canonical_inline_composite_size(
         .unwrap_or(StructSize::EMPTY)
 }
 
-/// Core tests that don't require an allocator
-#[cfg(test)]
-mod core_tests {
-    use super::StructSize;
-
-    /// Test the assumption that a struct with the maximum size fits inside a u29
-    #[test]
-    fn struct_max_size_fits_in_object_len() {
-        let size = StructSize {
-            data: u16::MAX,
-            ptrs: u16::MAX,
-        };
-
-        assert_eq!(size.total(), (u16::MAX as u32 + u16::MAX as u32));
-        assert_eq!(size.total(), size.len().get());
-    }
-}
-
 #[cfg(test)]
 #[cfg(feature = "alloc")]
 mod tests {
@@ -5932,10 +6202,35 @@ mod tests {
 
     use rustalloc::vec::Vec;
 
+    /// Test all normal upgrades, specificly upgrades into structs
+    #[test]
+    fn valid_upgrades() {
+        use ElementSize::*;
+
+        let size5 = InlineComposite(StructSize { data: 3, ptrs: 2 });
+        for size in [Void, Bit, Byte, TwoBytes, FourBytes, EightBytes, size5] {
+            assert_eq!(size.upgrade_to(size), Some(size));
+        }
+
+        let empty = InlineComposite(StructSize::EMPTY);
+        assert_eq!(Void.upgrade_to(empty), Some(empty));
+        assert_eq!(Void.upgrade_to(size5), Some(size5));
+
+        let one_data = InlineComposite(StructSize { data: 1, ptrs: 0 });
+        for size in [Byte, TwoBytes, FourBytes, EightBytes] {
+            assert_eq!(size.upgrade_to(one_data), Some(one_data));
+            assert_eq!(size.upgrade_to(size5), Some(size5));
+        }
+
+        let one_ptr = InlineComposite(StructSize { data: 0, ptrs: 1 });
+        assert_eq!(Pointer.upgrade_to(one_ptr), Some(one_ptr));
+
+        assert_eq!(one_data.upgrade_to(size5), Some(size5));
+        assert_eq!(one_ptr.upgrade_to(size5), Some(size5));
+    }
+
     #[test]
     fn simple_struct() {
-        // making AlignedData hard, easier to just write the bytes as numbers
-        // and swap the bytes with u64::to_be()
         let data = [
             Word([0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00]),
             Word([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]),
