@@ -4,10 +4,9 @@
 //! 
 //! Request, Response, Pipeline, all in one allocation.
 
-use std::borrow::Borrow;
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
-use std::future::{Future, IntoFuture, poll_fn};
+use std::future::{Future, IntoFuture};
 use std::hash::Hash;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
@@ -28,6 +27,7 @@ use crate::sync::util::Marc;
 use crate::sync::sharedshot::{self, RecvWaiter, ShotState, TryRecvError};
 
 use super::mpsc::{SharedChannel, WeakChannel, self};
+use super::sharedshot::Waiter;
 use super::util::linked_list::{Pointers, Link};
 
 /// An abstract channel. This is associated data stored in a mpsc channel that
@@ -49,13 +49,30 @@ pub trait Chan: Sized {
     type Pipeline: PipelineResolver<Self>;
 }
 
+/// Allows for the creation of `ResponseReceivers` from within a `PipelineResolver`.
+/// 
+/// This can be useful for when a separate pipeline is configured with `set_pipeline` that still
+/// needs the original response. The factory can be used to create `ResponseReceiver` instances
+/// and process the response when it comes in.
+pub struct ResponseReceiverFactory<'a, C: Chan> {
+    shared: &'a Arc<SharedRequest<C>>,
+}
+
+impl<'a, C: Chan> Clone for ResponseReceiverFactory<'a, C> {
+    fn clone(&self) -> Self {
+        Self { shared: self.shared }
+    }
+}
+
+impl<'a, C: Chan> Copy for ResponseReceiverFactory<'a, C> {}
+
 pub trait PipelineResolver<C: Chan> {
     /// Resolves the pipeline channel with the given key.
-    fn resolve(&self, key: C::PipelineKey, channel: mpsc::Receiver<C>);
+    fn resolve(&self, recv: ResponseReceiverFactory<C>, key: C::PipelineKey, channel: mpsc::Receiver<C>);
 
     /// Returns the pipeline channel with the given key. If the key doesn't match,
     /// this may return an already broken channel.
-    fn pipeline(&self, key: C::PipelineKey) -> mpsc::Sender<C>;
+    fn pipeline(&self, recv: ResponseReceiverFactory<C>, key: C::PipelineKey) -> mpsc::Sender<C>;
 }
 
 /// Describes a conversion from a type into "results".
@@ -235,6 +252,14 @@ impl<C: Chan> SharedRequest<C> {
         self.waiters.wake_all();
     }
 
+    pub fn finished(self: &Arc<Self>) -> Finished<C> {
+        todo!()
+    }
+
+    pub fn is_finished(&self) -> bool {
+        !self.state.load(Relaxed).is_recv_closed()
+    }
+
     pub unsafe fn response(&self) -> &C::Results {
         (*self.response.get()).assume_init_ref()
     }
@@ -331,18 +356,20 @@ impl<C: Chan> SharedRequest<C> {
             }
         }
 
+        let factory = ResponseReceiverFactory { shared: self };
+
         let key = key.into();
 
         // Ah, a pipeline was set, so we can apply the ops and resolve directly into the
         // correct client.
         let pipeline = unsafe { (*self.pipeline_dest.get()).assume_init_ref() };
         match pipeline {
-            Some(p) => p.pipeline(key),
-            None => unsafe { self.response().pipeline(key) }
+            Some(p) => p.pipeline(factory, key),
+            None => unsafe { self.response().pipeline(factory, key) }
         }
     }
 
-    unsafe fn respond_and_resolve(&self, result: C::Results) {
+    unsafe fn respond_and_resolve(self: &Arc<Self>, result: C::Results) {
         // Write the response first
         (*self.response.get()).write(result);
 
@@ -368,15 +395,16 @@ impl<C: Chan> SharedRequest<C> {
         self.waiters.wake_all();
     }
 
-    unsafe fn set_pipeline(&self, dest: Option<C::Pipeline>) {
+    unsafe fn set_pipeline(self: &Arc<Self>, dest: Option<C::Pipeline>) {
         let dest = &*(*self.pipeline_dest.get()).write(dest);
+        let factory = ResponseReceiverFactory { shared: self };
 
         match dest {
             None => {
                 let r = self.response();
-                self.resolve_pipeline_map(|k, c| r.resolve(k, c));
+                self.resolve_pipeline_map(|k, c| r.resolve(factory, k, c));
             }
-            Some(dest) => self.resolve_pipeline_map(|k, c| dest.resolve(k, c)),
+            Some(dest) => self.resolve_pipeline_map(|k, c| dest.resolve(factory, k, c)),
         }
     }
 
@@ -456,7 +484,44 @@ pub fn request_pipeline<C: Chan>(msg: C::Parameters) -> (Request<C>, PipelineBui
     )
 }
 
+/// A future that signals when the request is "finished".
 /// 
+/// A request is finished when there are no more receivers waiting for responses. A receiver can be
+/// 
+///  * A response receiver that consumes the response directly.
+///  * A pending pipeline that hasn't been resolved.
+///  * Or a pipeline builder that can construct new pipelines.
+/// 
+/// When there are no more receivers for the response of a request, the request is considered
+/// "finished" and can be thrown away. If a request is actively in a channel, it will remove
+/// itself from the channel and drop itself. Servers can use this to cancel an operation by
+/// selecting either a "finished" future or a future processing the request. Multiple futures
+/// can exist simultaniously and wait on the same request.
+#[pin_project(PinnedDrop)]
+pub struct Finished<C: Chan> {
+    shared: Arc<SharedRequest<C>>,
+
+    #[pin]
+    waiter: Option<Waiter>,
+
+    state: Poll<()>,
+}
+
+impl<C: Chan> Future for Finished<C> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        todo!()
+    }
+}
+
+#[pinned_drop]
+impl<C: Chan> PinnedDrop for Finished<C> {
+    fn drop(self: Pin<&mut Self>) {
+        todo!()
+    }
+}
+
 pub struct Request<C: Chan> {
     shared: Marc<SharedRequest<C>>,
 }
@@ -486,8 +551,12 @@ impl<C: Chan> Request<C> {
         }
     }
 
-    pub fn is_closed(&self) -> bool {
-        !self.shared.get().state.load(Relaxed).is_recv_closed()
+    pub fn finished(&self) -> Finished<C> {
+        self.shared.inner().finished()
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.shared.get().is_finished()
     }
 
     pub(crate) fn take_inner(mut self) -> Arc<SharedRequest<C>> {
@@ -539,17 +608,12 @@ impl<C: Chan> Responder<C> {
         }
     }
 
-    pub async fn closed(&mut self) {
-        poll_fn(|cx| self.poll_closed(cx)).await
+    pub fn finished(&self) -> Finished<C> {
+        self.shared.inner().finished()
     }
 
-    pub fn is_closed(&self) -> bool {
-        self.shared.get().state.load(Acquire).is_recv_closed()
-    }
-
-    pub fn poll_closed(&mut self, cx: &mut task::Context<'_>) -> task::Poll<()> {
-        let shared = self.shared.get();
-        shared.closed_task.poll(&shared.state, cx)
+    pub fn is_finished(&self) -> bool {
+        self.shared.get().is_finished()
     }
 }
 
@@ -576,17 +640,12 @@ impl<C: Chan> ResultsSender<C> {
         }
     }
 
-    pub async fn closed(&mut self) {
-        poll_fn(|cx| self.poll_closed(cx)).await
+    pub fn finished(&self) -> Finished<C> {
+        self.shared.inner().finished()
     }
 
-    pub fn is_closed(&self) -> bool {
-        self.shared.get().state.load(Acquire).is_recv_closed()
-    }
-
-    pub fn poll_closed(&mut self, cx: &mut task::Context<'_>) -> task::Poll<()> {
-        let shared = self.shared.get();
-        shared.closed_task.poll(&shared.state, cx)
+    pub fn is_finished(&self) -> bool {
+        self.shared.get().is_finished()
     }
 }
 
@@ -751,7 +810,7 @@ mod test {
 
     use crate::{sync::{mpsc, request::RequestUsage}, Error};
 
-    use super::{request_response, Chan, PipelineResolver, IntoResults};
+    use super::{request_response, Chan, IntoResults, PipelineResolver, ResponseReceiverFactory};
 
     #[derive(Debug)]
     struct TestChannel;
@@ -781,7 +840,7 @@ mod test {
     }
 
     impl PipelineResolver<TestChannel> for IntsResponse {
-        fn resolve(&self, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
+        fn resolve(&self, _: ResponseReceiverFactory<TestChannel>, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
             let Some(results) = self.0.get(&key.0) else {
                 channel.close(Error::failed("unknown pipeline"));
                 return
@@ -793,7 +852,7 @@ mod test {
             }
         }
 
-        fn pipeline(&self, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
+        fn pipeline(&self, _: ResponseReceiverFactory<TestChannel>, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
             match self.0.get(&key.0) {
                 Some(c) => c.clone(),
                 None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
@@ -802,14 +861,14 @@ mod test {
     }
 
     impl PipelineResolver<TestChannel> for Result<IntsResponse, Error> {
-        fn resolve(&self, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
+        fn resolve(&self, recv: ResponseReceiverFactory<TestChannel>, key: IntPipelineKey, channel: mpsc::Receiver<TestChannel>) {
             match self {
-                Ok(r) => r.resolve(key, channel),
+                Ok(r) => r.resolve(recv, key, channel),
                 Err(err) => channel.close(err.clone()),
             }
         }
 
-        fn pipeline(&self, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
+        fn pipeline(&self, _: ResponseReceiverFactory<TestChannel>, key: IntPipelineKey) -> mpsc::Sender<TestChannel> {
             match self {
                 Ok(r) => match r.0.get(&key.0) {
                     Some(c) => c.clone(),
@@ -831,7 +890,7 @@ mod test {
         let (params, responder) = req.respond();
         assert_eq!(input, params);
 
-        assert!(!responder.is_closed());
+        assert!(!responder.is_finished());
         responder.respond(Ok(IntsResponse(HashMap::new())));
 
         let results = resp.try_recv().unwrap();

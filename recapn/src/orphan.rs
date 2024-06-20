@@ -182,8 +182,13 @@ impl<'a, T, Table: rpc::Table> Capable for Orphan<'a, T, Table> {
 
 impl<'a, T, Table: rpc::Table> Orphan<'a, T, Table> {
     #[inline]
-    fn new(builder: OrphanBuilder<'a, Table>) -> Self {
+    pub(crate) fn new(builder: OrphanBuilder<'a, Table>) -> Self {
         Self { t: PhantomData, builder }
+    }
+
+    #[inline]
+    pub(crate) fn into_inner(self) -> OrphanBuilder<'a, Table> {
+        self.builder
     }
 }
 

@@ -59,7 +59,7 @@ impl From<recapn::Error> for Error {
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PipelineOp {
     // We don't include PipelineOp::None because it's pointless and a waste of space.
     PtrField(u16),

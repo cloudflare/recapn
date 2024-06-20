@@ -13,12 +13,17 @@ pub mod prelude {
         };
         pub use recapn::list::{self, List};
         pub use recapn::ptr::{
-            StructBuilder, StructReader, StructSize
+            StructBuilder, StructReader, StructSize, ListReader, ElementSize,
         };
         pub use recapn::rpc::{self, Capable, Table};
         pub use recapn::text::{self, Text};
         pub use recapn::ty;
         pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
+
+        #[inline]
+        pub const fn eslpr() -> ListReader<'static> {
+            ListReader::empty(ElementSize::InlineComposite(StructSize::EMPTY))
+        }
 
         #[macro_export(local_inner_macros)]
         macro_rules! generate_file {
@@ -107,7 +112,7 @@ pub mod prelude {
                 }
 
                 impl _p::FieldGroup for $name {
-                    unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
+                    unsafe fn clear<'a, 'b, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
                         std::unimplemented!()
                     }
                 }
@@ -174,7 +179,7 @@ pub mod prelude {
                     unsafe fn get(repr: &'b _p::StructReader<'p, T>) -> Result<Self::View, _p::NotInSchema> {
                         let tag = repr.data_field::<u16>($tag_slot);
                         match tag {
-                            $($case => Ok($union_name::$variant(<$fieldty as _p::field::FieldType>::reader(repr, &super::$structty::$descriptor.field))),)*
+                            $($case => Ok($union_name::$variant(<$fieldty as _p::field::FieldType>::accessor(repr, &super::$structty::$descriptor.field))),)*
                             unknown => Err(_p::NotInSchema(unknown)),
                         }
                     }
@@ -186,7 +191,7 @@ pub mod prelude {
                     unsafe fn get(repr: &'b mut _p::StructBuilder<'p, T>) -> Result<Self::View, _p::NotInSchema> {
                         let tag = repr.data_field::<u16>($tag_slot);
                         match tag {
-                            $($case => Ok($union_name::$variant(<$fieldty as _p::field::FieldType>::builder(repr, &super::$structty::$descriptor.field))),)*
+                            $($case => Ok($union_name::$variant(<$fieldty as _p::field::FieldType>::accessor(repr, &super::$structty::$descriptor.field))),)*
                             unknown => Err(_p::NotInSchema(unknown)),
                         }
                     }
@@ -348,25 +353,25 @@ pub mod prelude {
             (read variant : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&self) -> _p::Variant<'_, 'p, T, $fieldty> {
-                    unsafe { _p::field::VariantField::new(&self.0, &$ty::$descriptor) }
+                    unsafe { <$fieldty as _p::field::FieldType>::variant(&self.0, &$ty::$descriptor) }
                 }
             };
             (write variant : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&mut self) -> _p::VariantMut<'_, 'p, T, $fieldty> {
-                    unsafe { _p::field::VariantField::new(&mut self.0, &$ty::$descriptor) }
+                    unsafe { <$fieldty as _p::field::FieldType>::variant(&mut self.0, &$ty::$descriptor) }
                 }
             };
             (read : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&self) -> _p::Accessor<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::reader(&self.0, &$ty::$descriptor) }
+                    unsafe { <$fieldty as _p::field::FieldType>::accessor(&self.0, &$ty::$descriptor) }
                 }
             };
             (write : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&mut self) -> _p::AccessorMut<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::builder(&mut self.0, &$ty::$descriptor) }
+                    unsafe { <$fieldty as _p::field::FieldType>::accessor(&mut self.0, &$ty::$descriptor) }
                 }
             };
         }

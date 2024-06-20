@@ -49,8 +49,8 @@ pub mod field;
 // Layer 3 : Extensions
 
 // pub mod schema;
+// pub mod dynamic;
 // pub mod compiler;
-    // pub mod dynamic;
 
 /// A type that is the reader of a struct type.
 pub type ReaderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Reader<'a, Table>;
@@ -59,20 +59,55 @@ pub type BuilderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Builder<'
 
 pub mod prelude {
     pub mod gen {
+        pub use recapn::alloc::Word;
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
-            self, Accessor, AccessorMut, Descriptor, Enum, FieldGroup, Group, Struct,
-            UnionViewer, Variant, VariantInfo, VariantDescriptor, VariantMut, ViewOf, Viewable,
+            self, Accessor, AccessorMut, AccessorOwned, Descriptor, Enum, FieldGroup, Group, Struct,
+            UnionViewer, VariantInfo, VariantDescriptor, Variant, VariantMut, VariantOwned,
+            ViewOf, Viewable,
         };
         pub use recapn::list::{self, List};
         pub use recapn::ptr::{
-            self, StructBuilder, StructReader, StructSize
+            self, StructBuilder, StructReader, StructSize, ListReader, ElementSize, PtrReader
         };
         pub use recapn::rpc::{self, Capable, Table};
         pub use recapn::text::{self, Text};
         pub use recapn::ty::{self, StructView};
         pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
+
+        #[macro_export]
+        macro_rules! default_value {
+            (struct) => { StructReader::empty() };
+            (struct $size:expr, $default:expr) => { unsafe { StructReader::slice_unchecked($default, $size) } };
+            (list $size:ident) => { };
+        }
+
+        #[macro_export]
+        macro_rules! descriptor_value {
+            (struct $ty:ty = $slot:literal $($tt:tt)*) => {
+                Descriptor::<Struct<$ty>> {
+                    slot: $slot,
+                    defaults: default_value!(struct $($tt)*),
+                };
+            };
+        }
+
+        #[macro_export]
+        macro_rules! descriptor {
+            ($name:ident struct $ty:ty = $($tt:tt)*) => {
+                const $name: Descriptor<Struct<$ty>> = descriptor_value!(struct $ty = $($tt)*);
+            };
+            ($name:ident variant { $slot:literal, $case:literal } struct $ty:ty = $($tt:tt)*) => {
+                const $name: VariantDescriptor<Struct<$ty>> = VariantDescriptor::<Struct<$ty>> {
+                    variant: VariantInfo {
+                        slot: $slot,
+                        case: $case,
+                    },
+                    field: descriptor_value!(struct $ty = $($tt)*),
+                }
+            };
+        }
     }
 }
 
@@ -161,6 +196,9 @@ impl From<ErrorKind> for Error {
         Error { kind }
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 

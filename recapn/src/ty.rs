@@ -8,6 +8,7 @@ use crate::internal::Sealed;
 use crate::list::{self, List, ElementSize};
 use crate::ptr::{self, StructSize, MessageSize};
 use crate::rpc::{Capable, Table};
+use crate::ReaderOf;
 use crate::{NotInSchema, IntoFamily, Result};
 
 /// An enum marker trait.
@@ -47,6 +48,13 @@ pub trait Struct: StructView {
 #[inline]
 pub const fn size_of<S: Struct>() -> StructSize {
     S::SIZE
+}
+
+/// Creates a reader for the default value of the given struct type.
+#[inline]
+pub fn struct_default<S: Struct>() -> ReaderOf<'static, S> {
+    let empty = ptr::StructReader::empty();
+    StructReader::from_ptr(empty)
 }
 
 /// A safely typed wrapper around a raw reader or builder.
@@ -125,11 +133,11 @@ pub trait AsReader {
 impl<'builder, 'borrow, Type, T> AsReader for &'borrow Type
 where
     Type: StructBuilder<Ptr = ptr::StructBuilder<'builder, T>> + IntoFamily + Capable<Table = T>,
-    Type::Family: StructView<Builder<'builder, T> = Type>,
+    Type::Family: StructView,
     T: Table + 'borrow,
     'builder: 'borrow,
 {
-    type Reader = crate::ReaderOf<'borrow, Type::Family, T>;
+    type Reader = ReaderOf<'borrow, Type::Family, T>;
 
     #[inline]
     fn as_reader(self) -> Self::Reader {
@@ -154,7 +162,7 @@ pub trait ReadPtr<T>: FromPtr<T> {
 }
 
 impl<'a, S: Struct, T: Table> FromPtr<any::StructReader<'a, T>> for field::Struct<S> {
-    type Output = S::Reader<'a, T>;
+    type Output = ReaderOf<'a, S, T>;
 
     fn get(ptr: any::StructReader<'a, T>) -> Self::Output {
         ptr.read_as::<S>()
@@ -162,7 +170,7 @@ impl<'a, S: Struct, T: Table> FromPtr<any::StructReader<'a, T>> for field::Struc
 }
 
 impl<'a, S: Struct, T: Table> FromPtr<any::PtrReader<'a, T>> for field::Struct<S> {
-    type Output = S::Reader<'a, T>;
+    type Output = ReaderOf<'a, S, T>;
 
     fn get(reader: any::PtrReader<'a, T>) -> Self::Output {
         match reader.as_ref().to_struct() {
@@ -256,7 +264,7 @@ impl_value!(Float32, FourBytes);
 impl_value!(Float64, EightBytes);
 
 impl<V: 'static> Value for List<V> {
-    type Default = list::Reader<'static, V>;
+    type Default = ptr::ListReader<'static>;
 }
 impl<V: 'static> ListValue for List<V> {
     const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;

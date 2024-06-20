@@ -91,6 +91,11 @@ impl GeneratedStruct {
         let variants = self.which.as_ref().map(GeneratedWhich::mut_accessors).into_iter().flatten();
         fields.chain(variants)
     }
+    pub fn own_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
+        let fields = self.fields.iter().map(GeneratedField::own_accessor);
+        let variants = self.which.as_ref().map(GeneratedWhich::own_accessors).into_iter().flatten();
+        fields.chain(variants)
+    }
     pub fn clear_all(&self) -> impl Iterator<Item = TokenStream> + '_ {
         let fields = self.fields.iter().map(GeneratedField::call_clear);
         let variant_clear = self.which.as_ref().map(GeneratedWhich::call_clear).into_iter().flatten();
@@ -130,7 +135,7 @@ impl GeneratedStruct {
                 field: GeneratedField { descriptor_ident, .. },
                 case,
             }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::reader(&repr.0, &super::#struct_name::#descriptor_ident.field))))
+                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&repr.0, &super::#struct_name::#descriptor_ident.field))))
             });
         let disciminant_mut_matches = fields.iter()
             .map(|GeneratedVariant {
@@ -139,7 +144,7 @@ impl GeneratedStruct {
                 field: GeneratedField { descriptor_ident, .. },
                 case,
             }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::builder(&mut repr.0, &super::#struct_name::#descriptor_ident.field))))
+                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&mut repr.0, &super::#struct_name::#descriptor_ident.field))))
             });
 
         Some(quote! {
@@ -179,6 +184,7 @@ to_tokens!(GeneratedStruct |self| {
     let descriptors = self.descriptors();
     let ref_accessors = self.ref_accessors();
     let mut_accessors = self.mut_accessors();
+    let own_accessors = self.own_accessors();
     let (which_ref_accessor, which_mut_accessor) = self.which_accessors().unzip();
     let which_type = self.which_type();
     let struct_view = quote! {
@@ -197,7 +203,7 @@ to_tokens!(GeneratedStruct |self| {
         let clears = self.clear_all();
         quote! {
             impl _p::FieldGroup for #name {
-                unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+                unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
                     #(#clears)*
                 }
             }
@@ -314,6 +320,7 @@ to_tokens!(GeneratedStruct |self| {
 
         impl<'p, T: _p::rpc::Table + 'p> #modname::Builder<'p, T> {
             #(#mut_accessors)*
+            #(#own_accessors)*
             #which_mut_accessor
         }
 
@@ -334,13 +341,18 @@ pub struct GeneratedField {
     pub type_name: syn::Ident,
     pub field_type: Box<syn::Type>,
     pub accessor_ident: syn::Ident,
+    /// The name for an accessor which consumes the builder, allowing a derived builder to be
+    /// returned without referencing a local builder. This is the default behavior of capnp-rust's
+    /// accessors. This field is an option to indicate if this field should have an own accessor
+    /// at all. In the case of simple data fields, this will be None.
+    pub own_accessor_ident: Option<syn::Ident>,
     pub descriptor_ident: syn::Ident,
     pub descriptor: Option<FieldDescriptor>,
 }
 
 pub struct FieldDescriptor {
     pub slot: u32,
-    pub default: Box<syn::Expr>,
+    pub default: TokenStream,
 }
 
 impl GeneratedField {
@@ -375,7 +387,7 @@ impl GeneratedField {
         quote! {
             #[inline]
             pub fn #name(&self) -> _p::Accessor<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::reader(&self.0, &#type_name::#descriptor) }
+                unsafe { <#field_type as _p::field::FieldType>::accessor(&self.0, &#type_name::#descriptor) }
             }
         }
     }
@@ -391,7 +403,23 @@ impl GeneratedField {
         quote! {
             #[inline]
             pub fn #name(&mut self) -> _p::AccessorMut<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::builder(&mut self.0, &#type_name::#descriptor) }
+                unsafe { <#field_type as _p::field::FieldType>::accessor(&mut self.0, &#type_name::#descriptor) }
+            }
+        }
+    }
+
+    pub fn own_accessor(&self) -> TokenStream {
+        let GeneratedField {
+            own_accessor_ident: Some(name),
+            field_type,
+            type_name,
+            descriptor_ident: descriptor,
+            ..
+        } = self else { return TokenStream::new() };
+        quote! {
+            #[inline]
+            pub fn #name(self) -> _p::AccessorOwned<'p, T, #field_type> {
+                unsafe { <#field_type as _p::field::FieldType>::accessor(self.0, &#type_name::#descriptor) }
             }
         }
     }
@@ -425,8 +453,11 @@ impl GeneratedWhich {
     pub fn mut_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
         self.fields.iter().map(move |variant| variant.mut_accessor())
     }
+    pub fn own_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
+        self.fields.iter().map(move |variant| variant.own_accessor())
+    }
     pub fn call_clear(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let tag_slot = self.tag_slot;
+        let tag_slot = self.tag_slot as usize;
         let clear_tag = quote! {
             s.set_field_unchecked(#tag_slot, 0);
         };
@@ -434,7 +465,6 @@ impl GeneratedWhich {
         let clear_first = self.fields.iter()
             .find(|variant| variant.case == 0)
             .expect("no variant has case 0!")
-            .field
             .call_clear();
 
         [clear_tag, clear_first].into_iter()
@@ -491,7 +521,7 @@ impl GeneratedVariant {
         quote! {
             #[inline]
             pub fn #name(&self) -> _p::Variant<'_, 'p, T, #field_type> {
-                unsafe { _p::field::VariantField::new(&self.0, &#type_name::#descriptor) }
+                unsafe { <#field_type as _p::field::FieldType>::variant(&self.0, &#type_name::#descriptor) }
             }
         }
     }
@@ -507,8 +537,36 @@ impl GeneratedVariant {
         quote! {
             #[inline]
             pub fn #name(&mut self) -> _p::VariantMut<'_, 'p, T, #field_type> {
-                unsafe { _p::field::VariantField::new(&mut self.0, &#type_name::#descriptor) }
+                unsafe { <#field_type as _p::field::FieldType>::variant(&mut self.0, &#type_name::#descriptor) }
             }
+        }
+    }
+
+    pub fn own_accessor(&self) -> TokenStream {
+        let GeneratedField {
+            own_accessor_ident: Some(name),
+            field_type,
+            type_name,
+            descriptor_ident: descriptor,
+            ..
+        } = &self.field else { return TokenStream::new() };
+        quote! {
+            #[inline]
+            pub fn #name(self) -> _p::VariantOwned<'p, T, #field_type> {
+                unsafe { <#field_type as _p::field::FieldType>::variant(self.0, &#type_name::#descriptor) }
+            }
+        }
+    }
+
+    pub fn call_clear(&self) -> TokenStream {
+        let GeneratedField {
+            field_type,
+            type_name,
+            descriptor_ident: descriptor,
+            ..
+        } = &self.field;
+        quote! {
+            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor.field);
         }
     }
 }
@@ -558,7 +616,7 @@ to_tokens!(GeneratedEnum |self| {
 pub struct GeneratedConst {
     pub ident: syn::Ident,
     pub const_type: Box<syn::Type>,
-    pub value: Box<syn::Expr>,
+    pub value: TokenStream,
 }
 
 to_tokens!(GeneratedConst |self| {

@@ -31,6 +31,18 @@ impl Table {
     pub fn builder(&mut self) -> TableBuilder<'_> {
         TableBuilder(&self.0)
     }
+
+    pub fn len(&self) -> usize {
+        unsafe { (*self.0.get()).len() }
+    }
+
+    pub fn inner_mut(&mut self) -> &mut Vec<Option<Client>> {
+        self.0.get_mut()
+    }
+
+    pub fn into_inner(self) -> Vec<Option<Client>> {
+        self.0.into_inner()
+    }
 }
 
 unsafe impl Send for Table {}

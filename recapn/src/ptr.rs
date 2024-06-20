@@ -4,6 +4,7 @@ use crate::alloc::{
     Segment, SegmentRef, SegmentPtr, SegmentOffset, SignedSegmentOffset, AllocLen, Word
 };
 use crate::arena::{SegmentId, SegmentWithId, ReadArena, BuildArena, ArenaSegment};
+use crate::internal::Sealed;
 use crate::message::ReadLimiter;
 use crate::num::u29;
 use crate::orphan::Orphanage;
@@ -23,140 +24,137 @@ use core::{cmp, fmt, slice};
 pub use crate::data::ptr::{Reader as DataReader, Builder as DataBuilder};
 pub use crate::text::ptr::{Reader as TextReader, Builder as TextBuilder};
 
-pub(crate) mod internal {
-    use super::*;
+/// A field type that can be found in the data section of a struct.
+pub trait Data: ty::Value<Default = Self> + ty::ListValue + Default + Copy + Sealed + 'static {
+    unsafe fn read(ptr: *const u8, len: u32, slot: usize, default: Self) -> Self;
+    unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self;
 
-    pub trait FieldData: ty::ListValue + Default + Copy + 'static {
-        unsafe fn read(ptr: *const u8, len: u32, slot: usize, default: Self) -> Self;
-        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self;
+    unsafe fn write(ptr: *mut u8, len: u32, slot: usize, value: Self, default: Self);
+    unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self);
+}
 
-        unsafe fn write(ptr: *mut u8, len: u32, slot: usize, value: Self, default: Self);
-        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self);
-    }
-
-    impl FieldData for bool {
-        #[inline]
-        unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
-            let byte_offset = slot / 8;
-            if byte_offset < (len_bytes as usize) {
-                Self::read_unchecked(ptr, slot, default)
-            } else {
-                default
-            }
-        }
-        #[inline]
-        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
-            let (byte_offset, bit_num) = (slot / 8, slot % 8);
-            let byte = core::ptr::read(ptr.add(byte_offset));
-            let value = ((byte) & (1 << (bit_num))) != 0;
-            value ^ default
-        }
-
-        #[inline]
-        unsafe fn write(ptr: *mut u8, len: u32, slot: usize, value: Self, default: Self) {
-            let byte_offset = slot / 8;
-            if byte_offset < (len as usize) {
-                Self::write_unchecked(ptr, slot, value, default)
-            }
-        }
-        #[inline]
-        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
-            let written_value = value ^ default;
-            let (byte_offset, bit_num) = (slot / 8, slot % 8);
-            let byte = ptr.add(byte_offset);
-            *byte = (*byte & !(1 << bit_num)) | ((written_value as u8) << bit_num);
+impl Data for bool {
+    #[inline]
+    unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+        let byte_offset = slot / 8;
+        if byte_offset < (len_bytes as usize) {
+            Self::read_unchecked(ptr, slot, default)
+        } else {
+            default
         }
     }
+    #[inline]
+    unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+        let (byte_offset, bit_num) = (slot / 8, slot % 8);
+        let byte = core::ptr::read(ptr.add(byte_offset));
+        let value = ((byte) & (1 << (bit_num))) != 0;
+        value ^ default
+    }
 
-    macro_rules! impl_int {
-        ($ty:ty) => {
-            impl FieldData for $ty {
-                #[inline]
-                unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
-                    let slot_byte_offset = slot * core::mem::size_of::<Self>();
-                    if slot_byte_offset < len_bytes as usize {
-                        Self::read_unchecked(ptr, slot, default)
-                    } else {
-                        default
-                    }
-                }
-                #[inline]
-                unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
-                    let data_ptr = ptr.cast::<WireValue<Self>>().add(slot);
-                    let value = core::ptr::read(data_ptr).get();
-                    value ^ default
-                }
+    #[inline]
+    unsafe fn write(ptr: *mut u8, len: u32, slot: usize, value: Self, default: Self) {
+        let byte_offset = slot / 8;
+        if byte_offset < (len as usize) {
+            Self::write_unchecked(ptr, slot, value, default)
+        }
+    }
+    #[inline]
+    unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+        let written_value = value ^ default;
+        let (byte_offset, bit_num) = (slot / 8, slot % 8);
+        let byte = ptr.add(byte_offset);
+        *byte = (*byte & !(1 << bit_num)) | ((written_value as u8) << bit_num);
+    }
+}
 
-                #[inline]
-                unsafe fn write(
-                    ptr: *mut u8,
-                    len_bytes: u32,
-                    slot: usize,
-                    value: Self,
-                    default: Self,
-                ) {
-                    let slot_byte_offset = slot * core::mem::size_of::<Self>();
-                    if slot_byte_offset < len_bytes as usize {
-                        Self::write_unchecked(ptr, slot, value, default)
-                    }
-                }
-                #[inline]
-                unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
-                    let data_ptr = ptr.cast::<WireValue<Self>>().add(slot);
-                    let write_value = value ^ default;
-                    (&mut *data_ptr).set(write_value)
+macro_rules! impl_int {
+    ($ty:ty) => {
+        impl Data for $ty {
+            #[inline]
+            unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+                let slot_byte_offset = slot * core::mem::size_of::<Self>();
+                if slot_byte_offset < len_bytes as usize {
+                    Self::read_unchecked(ptr, slot, default)
+                } else {
+                    default
                 }
             }
-        };
+            #[inline]
+            unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+                let data_ptr = ptr.cast::<WireValue<Self>>().add(slot);
+                let value = core::ptr::read(data_ptr).get();
+                value ^ default
+            }
+
+            #[inline]
+            unsafe fn write(
+                ptr: *mut u8,
+                len_bytes: u32,
+                slot: usize,
+                value: Self,
+                default: Self,
+            ) {
+                let slot_byte_offset = slot * core::mem::size_of::<Self>();
+                if slot_byte_offset < len_bytes as usize {
+                    Self::write_unchecked(ptr, slot, value, default)
+                }
+            }
+            #[inline]
+            unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+                let data_ptr = ptr.cast::<WireValue<Self>>().add(slot);
+                let write_value = value ^ default;
+                (&mut *data_ptr).set(write_value)
+            }
+        }
+    };
+}
+
+impl_int!(u8);
+impl_int!(i8);
+impl_int!(u16);
+impl_int!(i16);
+impl_int!(u32);
+impl_int!(i32);
+impl_int!(u64);
+impl_int!(i64);
+
+impl Data for f32 {
+    #[inline]
+    unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+        Self::from_bits(u32::read(ptr, len_bytes, slot, default.to_bits()))
+    }
+    #[inline]
+    unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+        Self::from_bits(u32::read_unchecked(ptr, slot, default.to_bits()))
     }
 
-    impl_int!(u8);
-    impl_int!(i8);
-    impl_int!(u16);
-    impl_int!(i16);
-    impl_int!(u32);
-    impl_int!(i32);
-    impl_int!(u64);
-    impl_int!(i64);
+    #[inline]
+    unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
+        u32::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
+    }
+    #[inline]
+    unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+        u32::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
+    }
+}
 
-    impl FieldData for f32 {
-        #[inline]
-        unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
-            Self::from_bits(u32::read(ptr, len_bytes, slot, default.to_bits()))
-        }
-        #[inline]
-        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
-            Self::from_bits(u32::read_unchecked(ptr, slot, default.to_bits()))
-        }
-
-        #[inline]
-        unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
-            u32::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
-        }
-        #[inline]
-        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
-            u32::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
-        }
+impl Data for f64 {
+    #[inline]
+    unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
+        Self::from_bits(u64::read(ptr, len_bytes, slot, default.to_bits()))
+    }
+    #[inline]
+    unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
+        Self::from_bits(u64::read_unchecked(ptr, slot, default.to_bits()))
     }
 
-    impl FieldData for f64 {
-        #[inline]
-        unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
-            Self::from_bits(u64::read(ptr, len_bytes, slot, default.to_bits()))
-        }
-        #[inline]
-        unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self {
-            Self::from_bits(u64::read_unchecked(ptr, slot, default.to_bits()))
-        }
-
-        #[inline]
-        unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
-            u64::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
-        }
-        #[inline]
-        unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
-            u64::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
-        }
+    #[inline]
+    unsafe fn write(ptr: *mut u8, len_bytes: u32, slot: usize, value: Self, default: Self) {
+        u64::write(ptr, len_bytes, slot, value.to_bits(), default.to_bits())
+    }
+    #[inline]
+    unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self) {
+        u64::write_unchecked(ptr, slot, value.to_bits(), default.to_bits())
     }
 }
 
@@ -2523,13 +2521,13 @@ impl<'a, T: Table> StructReader<'a, T> {
 
     /// Reads a field in the data section from the specified slot
     #[inline]
-    pub fn data_field<D: internal::FieldData>(&self, slot: usize) -> D {
+    pub fn data_field<D: Data>(&self, slot: usize) -> D {
         self.data_field_with_default(slot, D::default())
     }
 
     /// Reads a field in the data section with the specified slot and default value
     #[inline]
-    pub fn data_field_with_default<D: internal::FieldData>(&self, slot: usize, default: D) -> D {
+    pub fn data_field_with_default<D: Data>(&self, slot: usize, default: D) -> D {
         unsafe { D::read(self.data(), self.data_len, slot, default) }
     }
 
@@ -2752,7 +2750,7 @@ impl<'a, T: Table> ListReader<'a, T> {
     /// * If this is a inline composite list, the struct must have a data section with at least
     ///   one word
     #[inline]
-    pub unsafe fn data_unchecked<D: internal::FieldData>(&self, index: u32) -> D {
+    pub unsafe fn data_unchecked<D: Data>(&self, index: u32) -> D {
         use core::any::TypeId;
 
         debug_assert!(index < self.element_count.get(), "index out of bounds");
@@ -4134,7 +4132,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     /// Disown this pointer and create an orphan builder. An orphanage from this message is used
     /// to give the orphan a more flexible lifetime.
     #[inline]
-    pub fn disown_into<'b>(&mut self, orphanage: Orphanage<'b, T>) -> OrphanBuilder<'b, T> {
+    pub fn disown_into<'b>(&mut self, orphanage: &Orphanage<'b, T>) -> OrphanBuilder<'b, T> {
         let orphanage_builder = orphanage.builder();
         assert!(self.builder.is_same_message(orphanage_builder));
 
@@ -4563,27 +4561,27 @@ impl<'a, T: Table> StructBuilder<'a, T> {
 
     /// Reads a field in the data section from the specified slot
     #[inline]
-    pub fn data_field<D: internal::FieldData>(&self, slot: usize) -> D {
+    pub fn data_field<D: Data>(&self, slot: usize) -> D {
         self.data_field_with_default(slot, D::default())
     }
 
     /// Reads a field in the data section with the specified slot and default value
     #[inline]
-    pub fn data_field_with_default<D: internal::FieldData>(&self, slot: usize, default: D) -> D {
+    pub fn data_field_with_default<D: Data>(&self, slot: usize, default: D) -> D {
         unsafe { D::read(self.data_const(), self.data_len, slot, default) }
     }
 
     /// Reads a field in the data section from the specified slot. This assumes the slot is valid
     /// and does not perform any bounds checking.
     #[inline]
-    pub unsafe fn data_field_unchecked<D: internal::FieldData>(&self, slot: usize) -> D {
+    pub unsafe fn data_field_unchecked<D: Data>(&self, slot: usize) -> D {
         self.data_field_with_default_unchecked(slot, D::default())
     }
 
     /// Reads a field in the data section with the specified slot and default value. This assumes
     /// the slot is valid and does not perform any bounds checking.
     #[inline]
-    pub unsafe fn data_field_with_default_unchecked<D: internal::FieldData>(
+    pub unsafe fn data_field_with_default_unchecked<D: Data>(
         &self,
         slot: usize,
         default: D,
@@ -4594,19 +4592,19 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     /// Sets a field in the data section in the slot to the specified value. If the slot is outside
     /// the data section of this struct, this does nothing.
     #[inline]
-    pub fn set_field<D: internal::FieldData>(&mut self, slot: usize, value: D) {
+    pub fn set_field<D: Data>(&mut self, slot: usize, value: D) {
         unsafe { D::write(self.data_mut(), self.data_len, slot, value, D::default()) }
     }
 
     /// Sets a field in the data section in the slot to the specified value. This assumes the slot
     /// is valid and does not perform any bounds checking.
     #[inline]
-    pub unsafe fn set_field_unchecked<D: internal::FieldData>(&mut self, slot: usize, value: D) {
+    pub unsafe fn set_field_unchecked<D: Data>(&mut self, slot: usize, value: D) {
         self.set_field_with_default_unchecked(slot, value, D::default())
     }
 
     #[inline]
-    pub fn set_field_with_default<D: internal::FieldData>(
+    pub fn set_field_with_default<D: Data>(
         &mut self,
         slot: usize,
         value: D,
@@ -4616,7 +4614,7 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub unsafe fn set_field_with_default_unchecked<D: internal::FieldData>(
+    pub unsafe fn set_field_with_default_unchecked<D: Data>(
         &mut self,
         slot: usize,
         value: D,
@@ -4680,6 +4678,20 @@ impl<'a, T: Table> StructBuilder<'a, T> {
             ptr: self.ptrs_start.offset(slot.into()).as_ref_unchecked(),
             builder: self.builder.clone(),
             table: self.table.clone(),
+        }
+    }
+
+    #[inline]
+    pub fn into_ptr_field(self, slot: u16) -> Option<PtrBuilder<'a, T>> {
+        (slot < self.ptrs_len).then(move || unsafe { self.into_ptr_field_unchecked(slot) })
+    }
+
+    #[inline]
+    pub unsafe fn into_ptr_field_unchecked(self, slot: u16) -> PtrBuilder<'a, T> {
+        PtrBuilder {
+            ptr: self.ptrs_start.offset(slot.into()).as_ref_unchecked(),
+            builder: self.builder,
+            table: self.table,
         }
     }
 
@@ -4990,7 +5002,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
     /// * If this is a primitive list, D must have a size equal to or less than the element size
     ///   of the list
     #[inline]
-    pub unsafe fn data_unchecked<D: internal::FieldData>(&self, index: u32) -> D {
+    pub unsafe fn data_unchecked<D: Data>(&self, index: u32) -> D {
         use core::any::{TypeId, type_name};
 
         debug_assert!(index < self.element_count.get(), "index out of bounds");
@@ -5011,7 +5023,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
         }
     }
     #[inline]
-    pub unsafe fn set_data_unchecked<D: internal::FieldData>(&mut self, index: u32, value: D) {
+    pub unsafe fn set_data_unchecked<D: Data>(&mut self, index: u32, value: D) {
         use core::any::{TypeId, type_name};
 
         debug_assert!(index < self.element_count.get(), "index out of bounds");

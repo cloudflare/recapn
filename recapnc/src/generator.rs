@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use anyhow::{Result, Context, ensure};
-use quote::ToTokens;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
+use recapn::alloc::{self, AllocLen, SegmentOffset, Word};
 use recapn::ReaderOf;
 use recapn::any::{AnyList, AnyStruct};
-use recapn::ptr::StructSize;
+use recapn::ptr::{StructSize, UnwrapErrors};
 use syn::PathSegment;
 use syn::punctuated::Punctuated;
 
@@ -129,6 +131,38 @@ struct NodeContext<'a> {
     pub info: Option<NodeInfo>,
 }
 
+enum FieldKind {
+    Data,
+    Pointer,
+}
+
+impl FieldKind {
+    pub fn from_proto(r: &ReaderOf<Type>) -> Result<Self> {
+        use TypeKind as Kind;
+        Ok(match r.which()? {
+            Kind::Void(_) |
+            Kind::Bool(_) |
+            Kind::Uint8(_) |
+            Kind::Uint16(_) |
+            Kind::Uint32(_) |
+            Kind::Uint64(_) |
+            Kind::Int8(_) |
+            Kind::Int16(_) |
+            Kind::Int32(_) |
+            Kind::Int64(_) |
+            Kind::Float32(_) |
+            Kind::Float64(_) |
+            Kind::Enum(_) => Self::Data,
+            Kind::Text(_) |
+            Kind::Data(_) |
+            Kind::List(_) |
+            Kind::Struct(_) |
+            Kind::Interface(_) |
+            Kind::AnyPointer(_) => Self::Pointer,
+        })
+    }
+}
+
 #[derive(Debug)]
 enum NodeInfo {
     File(FileInfo),
@@ -192,11 +226,11 @@ impl<'a> GeneratorContext<'a> {
 
         // For some reason, groups are not considered nested nodes of structs. So we
         // have to iter over all fields and find all the groups contained
-        if let Some(struct_type) = node.r#struct().field() {
+        if let Some(struct_type) = node.r#struct().get() {
             let groups = struct_type
                 .fields()
                 .into_iter()
-                .filter_map(|f| f.group().field().map(|group| (f, group.type_id())));
+                .filter_map(|f| f.group().get().map(|group| (f, group.type_id())));
             for (field, group_id) in groups {
                 let name = field.name().as_str()?;
                 Self::validate_node(group_id, name, nodes, identifiers, scope)?;
@@ -305,8 +339,8 @@ impl<'a> GeneratorContext<'a> {
             (NodeKind::Const(c), Some(NodeInfo::Const(info))) => {
                 Ok(GeneratedItem::Const(self.generate_const(&c, info)?))
             }
-            (NodeKind::Interface(_), None) => unimplemented!(),
-            (NodeKind::Annotation(_), None) => unimplemented!(),
+            (NodeKind::Interface(_), None) => todo!(),
+            (NodeKind::Annotation(_), None) => todo!(),
             (NodeKind::File(()), None) => unimplemented!("found nested file node inside a file"),
             _ => anyhow::bail!("missing node info"),
         }
@@ -340,7 +374,7 @@ impl<'a> GeneratorContext<'a> {
                 let generated_field = self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents)?;
                 let variant = GeneratedVariant {
                     discriminant_ident,
-                    discriminant_field_type: self.field_type(&field, &struct_mod_scope)?,
+                    discriminant_field_type: self.field_type(&field, &struct_mod_scope)?.0,
                     case: field.discriminant_value(),
                     field: generated_field,
                 };
@@ -360,14 +394,14 @@ impl<'a> GeneratorContext<'a> {
             .into_iter()
             .map(|nested| self.generate_item(nested.id()));
         let nested_groups = node.r#struct()
-            .field()
+            .get()
             .into_iter()
             .flat_map(|node| node
                 .fields()
                 .into_iter()
                 .filter_map(|field| field
                     .group()
-                    .field()
+                    .get()
                     .map(|group| self.generate_item(group.type_id()))
                 )
             );
@@ -400,26 +434,29 @@ impl<'a> GeneratorContext<'a> {
         let name = field.name().as_str()?;
         let accessor_ident = accessor_idents.make_unique(AsSnakeCase(name))?;
         let descriptor_ident = descriptor_idents.make_unique(AsShoutySnakeCase(name))?;
-        let field_type = self.field_type(field, scope)?;
+        let (field_type, kind) = self.field_type(field, scope)?;
         let descriptor = self.descriptor(field, scope)?;
         let type_name = type_ident.clone();
+        let own_accessor_ident = match kind { 
+            FieldKind::Data => None,
+            FieldKind::Pointer => Some(accessor_idents.make_unique(AsSnakeCase(format!("into_{name}")))?),
+        };
 
-        Ok(GeneratedField { type_name, field_type, accessor_ident, descriptor_ident, descriptor })
+        Ok(GeneratedField { type_name, field_type, own_accessor_ident, accessor_ident, descriptor_ident, descriptor })
     }
 
-    fn field_type(&self, field: &ReaderOf<Field>, scope: &TypeScope) -> Result<Box<syn::Type>> {
+    fn field_type(&self, field: &ReaderOf<Field>, scope: &TypeScope) -> Result<(Box<syn::Type>, FieldKind)> {
         match field.which()? {
             schema::field::Which::Slot(slot) => {
                 let type_info = slot.r#type().get();
-                if type_info.void().is_set() {
-                    Ok(Box::new(syn::parse_quote!(())))
-                } else {
-                    self.resolve_type(scope, &type_info)
-                }
+                let syn_type = self.resolve_type(scope, &type_info)?;
+                let kind = FieldKind::from_proto(&type_info)?;
+                Ok((syn_type, kind))
             }
             schema::field::Which::Group(group) => {
-                let type_name = self.resolve_type_name(scope, group.type_id())?;
-                Ok(Box::new(syn::parse_quote!(_p::Group<#type_name>)))
+                let type_name = self.resolve_type_name(scope, group.type_id())?; 
+                let syn_type = Box::new(syn::parse_quote!(_p::Group<#type_name>));
+                Ok((syn_type, FieldKind::Pointer))
             }
         }
     }
@@ -480,7 +517,7 @@ impl<'a> GeneratorContext<'a> {
                 AnyPtrKind::Parameter(_) => {
                     todo!("resolve generic types")
                 },
-                AnyPtrKind::ImplicitMethodParameter(_) => unimplemented!(),
+                AnyPtrKind::ImplicitMethodParameter(_) => todo!(),
             }
         }))
     }
@@ -496,58 +533,89 @@ impl<'a> GeneratorContext<'a> {
         }
     }
 
-    fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>) -> Result<Box<syn::Expr>> {
-        fn quote_value_or_default<T, F>(value: Option<&ReaderOf<Value>>, f: F, default: T) -> Box<syn::Expr>
+    fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>) -> Result<TokenStream> {
+        fn quote_value_or_default<T, F>(value: Option<&ReaderOf<Value>>, f: F, default: T) -> TokenStream
         where
             T: ToTokens,
             F: FnOnce(&ReaderOf<Value>) -> Option<T>,
         {
             let value = value.and_then(f).unwrap_or(default);
-            syn::parse_quote!(#value)
+            quote!(#value)
         }
 
-        let expr: Box<syn::Expr> = match type_info.which()? {
-            TypeKind::Void(()) => syn::parse_quote!(()),
-            TypeKind::Bool(()) => quote_value_or_default(value, |v| v.bool().field(), false),
-            TypeKind::Int8(()) => quote_value_or_default(value, |v| v.int8().field(), 0),
-            TypeKind::Uint8(()) => quote_value_or_default(value, |v| v.uint8().field(), 0),
-            TypeKind::Int16(()) => quote_value_or_default(value, |v| v.int16().field(), 0),
-            TypeKind::Uint16(()) => quote_value_or_default(value, |v| v.uint16().field(), 0),
-            TypeKind::Int32(()) => quote_value_or_default(value, |v| v.int32().field(), 0),
-            TypeKind::Uint32(()) => quote_value_or_default(value, |v| v.uint32().field(), 0),
-            TypeKind::Int64(()) => quote_value_or_default(value, |v| v.int64().field(), 0),
-            TypeKind::Uint64(()) => quote_value_or_default(value, |v| v.uint64().field(), 0),
-            TypeKind::Float32(()) => quote_value_or_default(value, |v| v.float32().field(), 0.),
-            TypeKind::Float64(()) => quote_value_or_default(value, |v| v.float64().field(), 0.),
+        let expr = match type_info.which()? {
+            TypeKind::Void(()) => quote!(()),
+            TypeKind::Bool(()) => quote_value_or_default(value, |v| v.bool().get(), false),
+            TypeKind::Int8(()) => quote_value_or_default(value, |v| v.int8().get(), 0),
+            TypeKind::Uint8(()) => quote_value_or_default(value, |v| v.uint8().get(), 0),
+            TypeKind::Int16(()) => quote_value_or_default(value, |v| v.int16().get(), 0),
+            TypeKind::Uint16(()) => quote_value_or_default(value, |v| v.uint16().get(), 0),
+            TypeKind::Int32(()) => quote_value_or_default(value, |v| v.int32().get(), 0),
+            TypeKind::Uint32(()) => quote_value_or_default(value, |v| v.uint32().get(), 0),
+            TypeKind::Int64(()) => quote_value_or_default(value, |v| v.int64().get(), 0),
+            TypeKind::Uint64(()) => quote_value_or_default(value, |v| v.uint64().get(), 0),
+            TypeKind::Float32(()) => quote_value_or_default(value, |v| v.float32().get(), 0.),
+            TypeKind::Float64(()) => quote_value_or_default(value, |v| v.float64().get(), 0.),
             TypeKind::Text(()) => {
                 match value.and_then(|v| v.text().field()).map(|v| v.get()) {
                     Some(text) if !text.is_empty() => {
-                        todo!("implement text defaults")
+                        let bytes = syn::LitByteStr::new(
+                            text.as_bytes_with_nul(),
+                            proc_macro2::Span::call_site()
+                        );
+
+                        quote!(_p::text::Reader::from_slice(#bytes))
                     }
-                    _ => syn::parse_quote!(_p::text::Reader::empty()),
+                    _ => quote!(_p::text::Reader::empty()),
                 }
             }
             TypeKind::Data(()) => {
                 match value.and_then(|v| v.data().field()).map(|v| v.get()) {
                     Some(data) if !data.is_empty() => {
-                        todo!("implement data defaults")
+                        let bytes = syn::LitByteStr::new(
+                            data.as_slice(),
+                            proc_macro2::Span::call_site()
+                        );
+
+                        quote!(_p::data::Reader::from_slice(#bytes))
                     }
-                    _ => syn::parse_quote!(_p::data::Reader::empty()),
+                    _ => quote!(_p::data::Reader::empty()),
                 }
             }
             TypeKind::List(list) => {
                 let element_type = self.resolve_type(scope, &list.element_type().get())?;
                 let any = value.and_then(|v| v.list().field())
-                    .map(|v| v.read_as::<AnyList>());
+                    .map(|v| v.ptr().read_as::<AnyList>());
                 match any {
                     Some(list) if list.len() != 0 => {
-                        todo!("implement list defaults")
+                        let size = list.total_size().context("failed to calculate size of list default")?;
+                        assert_eq!(size.caps, 0, "default value contains caps!");
+                        assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
+
+                        let size = AllocLen::new(size.words as u32 + 1).unwrap();
+                        let mut space = alloc::DynSpace::new(size);
+                        let alloc = alloc::Scratch::with_dyn_space(&mut space, alloc::Never);
+
+                        let mut message = recapn::message::Message::new(alloc);
+                        let mut builder = message.builder();
+                        builder.by_ref().into_root().try_set_any_list(&list, UnwrapErrors).unwrap();
+    
+                        let result = builder.segments().first();
+                        assert_eq!(result.len(), size.get(), "written list value doesn't match size of original");
+
+                        // Remove the root pointer since we're going to create a direct pointer
+                        // to the data itself which must be allocated immediately after it.
+                        let words = result.as_words().split_first().unwrap().1;
+                        let len = list.as_ref().len();
+                        let element_size = list.as_ref().element_size();
+
+                        todo!()
                     }
-                    _ => syn::parse_quote!(_p::list::Reader::<#element_type>::empty()),
+                    _ => quote!(_p::ListReader::empty(_p::ElementSize::size_of::<#element_type>())),
                 }
             }
             TypeKind::Enum(info) => {
-                let value = value.and_then(|v| v.r#enum().field()).unwrap_or(0);
+                let value = value.and_then(|v| v.r#enum().get()).unwrap_or(0);
                 let NodeContext {
                     info: Some(NodeInfo::Enum(EnumInfo {
                         enumerants,
@@ -558,16 +626,37 @@ impl<'a> GeneratorContext<'a> {
                 let type_name = type_info.resolve_path(scope);
                 let enumerant = &enumerants[value as usize];
 
-                syn::parse_quote!(#type_name::#enumerant)
+                quote!(#type_name::#enumerant)
             }
             TypeKind::Struct(_) => {
                 let any = value.and_then(|v| v.r#struct().field())
-                    .and_then(|v| v.try_read_option_as::<AnyStruct>().ok().flatten());
+                    .and_then(|v| v.ptr().try_read_option_as::<AnyStruct>().ok().flatten());
                 match any {
-                    Some(_) => {
-                        todo!("implement struct defaults")
+                    Some(value) if !value.as_ref().size().is_empty() => {
+                        let size = value.total_size().context("failed to calculate size of struct default")?;
+                        assert_eq!(size.caps, 0, "default value contains caps!");
+                        assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
+
+                        let size = AllocLen::new(size.words as u32 + 1).unwrap();
+                        let mut space = alloc::DynSpace::new(size);
+                        let alloc = alloc::Scratch::with_dyn_space(&mut space, alloc::Never);
+
+                        let mut message = recapn::message::Message::new(alloc);
+                        let mut builder = message.builder();
+                        builder.by_ref().into_root().try_set_any_struct(&value, UnwrapErrors).unwrap();
+    
+                        let result = builder.segments().first();
+                        assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+
+                        // Remove the root pointer since we're going to create a direct pointer
+                        // to the data itself which must be allocated immediately after it.
+                        let words = words_lit(result.as_words().split_first().unwrap().1);
+                        let StructSize { data, ptrs } = value.as_ref().size();
+                        let size = quote!(_p::StructSize { data: #data, ptrs: #ptrs });
+
+                        quote!(_p::StructReader::slice_unchecked(#words, #size))
                     }
-                    _ => syn::parse_quote!(_p::StructReader::empty()),
+                    _ => quote!(_p::StructReader::empty()),
                 }
             }
             TypeKind::Interface(_) => {
@@ -579,15 +668,15 @@ impl<'a> GeneratorContext<'a> {
                 match kind.which()? {
                     AnyPtrKind::Unconstrained(unconstrained) => match (unconstrained.which()?, ptr) {
                         (ConstraintKind::AnyKind(_), None) => {
-                            syn::parse_quote!(_p::ptr::PtrReader::null())
+                            quote!(_p::ptr::PtrReader::null())
                         }
                         (ConstraintKind::Struct(_), None) => {
-                            syn::parse_quote!(_p::ptr::StructReader::empty())
+                            quote!(_p::ptr::StructReader::empty())
                         }
                         (ConstraintKind::List(_), None) => {
-                            syn::parse_quote!(_p::ptr::ListReader::empty())
+                            quote!(_p::ptr::ListReader::empty())
                         }
-                        (ConstraintKind::Capability(_), None) => syn::parse_quote!(()),
+                        (ConstraintKind::Capability(_), None) => quote!(()),
                         _ => todo!("generate default values for 'unconstrained' ptr types")
                     },
                     AnyPtrKind::Parameter(_) => todo!("generate default values for generic types"),
@@ -617,4 +706,12 @@ impl<'a> GeneratorContext<'a> {
             value: self.generate_value(&info.scope, &type_info, node.value().get_option().as_ref())?,
         })
     }
+}
+
+fn words_lit(words: &[Word]) -> TokenStream {
+    let words = words.iter().map(|Word([b0, b1, b2, b3, b4, b5, b6, b7])| {
+        quote!(Word([#b0, #b1, #b2, #b3, #b4, #b5, #b6, #b7]))
+    });
+
+    quote!(&[#(#words)*])
 }

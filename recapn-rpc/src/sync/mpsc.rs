@@ -62,7 +62,7 @@ impl<C: Chan> Clone for Sender<C> {
 
 impl<C: Chan> Sender<C> {
     pub fn send(&self, req: Request<C>) -> Result<(), Request<C>> {
-        if req.is_closed() {
+        if req.is_finished() {
             // Just drop the request nobody wants the result
             return Ok(())
         }

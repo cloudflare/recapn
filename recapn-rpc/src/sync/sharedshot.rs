@@ -25,7 +25,7 @@ use pin_project::{pin_project, pinned_drop};
 pub use super::TryRecvError;
 
 #[derive(Debug)]
-struct Waiter {
+pub(crate) struct Waiter {
     /// Intrusive linked-list pointers.
     pointers: Pointers<Waiter>,
 

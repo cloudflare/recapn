@@ -1,5 +1,5 @@
 use crate::sync::{request, mpsc};
-use crate::sync::request::PipelineResolver;
+use crate::sync::request::{PipelineResolver, ResponseReceiverFactory};
 use crate::table::{Table, CapTable};
 use crate::{connection, Result, Error, PipelineOp};
 use std::borrow::Cow;
@@ -10,7 +10,7 @@ use recapn::{ReaderOf, ty};
 use recapn::alloc::{Alloc, Global, Growing};
 use recapn::arena::ReadArena;
 use recapn::any::{AnyStruct, self};
-use recapn::message::Message;
+use recapn::message::{self, Message};
 use recapn::rpc::Capable;
 
 mod local;
@@ -19,11 +19,7 @@ mod queue;
 pub use local::{Dispatch, Dispatcher};
 
 pub type LocalMessage = Box<Message<'static, dyn Alloc + Send>>;
-pub type ExternalMessage = Box<dyn ReadArena + Send>;
-
-pub struct RpcMessage {
-    payload: MessagePayload,
-}
+pub type ExternalMessage = Box<dyn ReadArena + Send + Sync>;
 
 /// An RPC message which can refer to either a local message or an external message
 pub enum MessagePayload {
@@ -42,6 +38,10 @@ impl MessagePayload {
             MessagePayload::External(m) => m,
         }
     }
+
+    pub fn reader(&self, options: message::ReaderOptions) -> message::Reader {
+        message::Reader::new(self.segments(), options)
+    }
 }
 
 /// Indicates what kind of structure exists in the root pointer of the params message.
@@ -53,16 +53,16 @@ impl MessagePayload {
 /// If a local queue resolves into a remote capability, the parameters at the root will be
 /// disowned so a Call structure can be made there instead. The parameters will then be accessable
 /// from within the Payload located within the Call.
-enum ParamsRoot {
+pub(crate) enum ParamsRoot {
     /// The message root is the request parameters.
     Params,
 }
 
 pub struct Params {
-    root: ParamsRoot,
-    message: RpcMessage,
+    pub(crate) root: ParamsRoot,
+    pub(crate) message: MessagePayload,
     /// The capability table
-    table: Table,
+    pub(crate) table: Table,
 }
 
 impl Params {
@@ -83,46 +83,48 @@ enum ResultsRoot {
 
 pub struct RpcResponse {
     root: ResultsRoot,
-    message: RpcMessage,
+    message: MessagePayload,
     /// The capability table
     table: Table,
 }
 
 impl PipelineResolver<RpcClient> for RpcResponse {
-    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
         todo!()
     }
-    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
         todo!()
     }
 }
 
 impl PipelineResolver<RpcClient> for Result<RpcResponse, Error> {
-    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
         match self {
-            Ok(r) => r.resolve(key, channel),
+            Ok(r) => r.resolve(recv, key, channel),
             Err(err) => channel.close(err.clone()),
         }
     }
-    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
         match self {
-            Ok(r) => r.pipeline(key),
+            Ok(r) => r.pipeline(recv, key),
             Err(err) => mpsc::broken(RpcClient::Broken, err.clone()),
         }
     }
 }
 
 impl PipelineResolver<RpcClient> for RpcResults {
-    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
         match self {
-            Owned(r) => r.resolve(key, channel),
-            Shared(r) => r.resolve(key, channel),
+            Owned(r) => r.resolve(recv, key, channel),
+            OtherResponse(r) => r.resolve(recv, key, channel),
+            Shared(r) => r.resolve(recv, key, channel),
         }
     }
-    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
         match self {
-            Owned(r) => r.pipeline(key),
-            Shared(r) => r.pipeline(key),
+            Owned(r) => r.pipeline(recv, key),
+            OtherResponse(r) => r.pipeline(recv, key),
+            Shared(r) => r.pipeline(recv, key),
         }
     }
 }
@@ -133,16 +135,16 @@ pub(crate) enum SetPipeline {
 }
 
 impl PipelineResolver<RpcClient> for SetPipeline {
-    fn resolve(&self, key: Box<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
         match self {
-            Self::Response(r) => r.resolve(key, channel),
-            Self::RemotePipeline(r) => r.resolve(key, channel),
+            Self::Response(r) => r.resolve(recv, key, channel),
+            Self::RemotePipeline(r) => r.resolve(recv, key, channel),
         }
     }
-    fn pipeline(&self, key: Box<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
         match self {
-            Self::Response(r) => r.pipeline(key),
-            Self::RemotePipeline(r) => r.pipeline(key),
+            Self::Response(r) => r.pipeline(recv, key),
+            Self::RemotePipeline(r) => r.pipeline(recv, key),
         }
     }
 }
@@ -177,20 +179,23 @@ pub(crate) struct RpcCall {
 }
 
 pub(crate) enum RpcClient {
-    /// A client that always returns the same error when requests are made.
-    Broken,
-    /// A client from spawning a task to fulfill it later.
-    Spawned,
-    /// A client to handle bootstrap requests.
-    Bootstrap,
-    /// A client to handle pipelined requests to a remote party.
-    RemotePipeline,
     /// A client that sends requests to a local request handler.
     Local,
+    /// A client that always returns the same error when requests are made.
+    Broken,
     /// A client that sends requests to a local request handler, but will resolve
     /// in the future to another client. This causes the client to be advertised
     /// as a promise in the RPC protocol.
     LocalShortening,
+    /// A client from spawning a task to fulfill it later.
+    Spawned,
+    /// A client to handle bootstrap requests.
+    Bootstrap(connection::QuestionId),
+    /// A client to handle pipelined requests to a remote party.
+    RemotePipeline,
+    /// A client that was imported from another vat. When the client is dropped,
+    /// the import is released.
+    Import(connection::ImportClient),
 }
 
 pub(crate) enum RpcResults {
@@ -200,7 +205,10 @@ pub(crate) enum RpcResults {
     /// 
     /// This is useful if a call is sent to ourselves and another question needs to pull the
     /// response from it.
-    Shared(request::Response<RpcClient>),
+    OtherResponse(request::Response<RpcClient>),
+    /// A response put in an Arc. Connections use this to hold a copy of the response for future
+    /// possible pipeline calls.
+    Shared(Arc<Result<RpcResponse, Error>>),
 }
 
 use RpcResults::*;
@@ -208,7 +216,7 @@ use RpcResults::*;
 impl request::Chan for RpcClient {
     type Parameters = RpcCall;
 
-    type PipelineKey = Box<[PipelineOp]>;
+    type PipelineKey = Arc<[PipelineOp]>;
 
     type Error = Error;
 
@@ -287,9 +295,7 @@ impl Request {
                 method,
                 params: Params {
                     root: ParamsRoot::Params,
-                    message: RpcMessage {
-                        payload: MessagePayload::Local(Box::new(Message::global()))
-                    },
+                    message: MessagePayload::Local(Box::new(Message::global())),
                     table: Table::new(Vec::new()),
                 },
                 target: ResponseTarget::Local,

@@ -268,59 +268,113 @@ impl Message {
 impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
     #[inline]
     pub fn unimplemented(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Message>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::UNIMPLEMENTED) }
+        unsafe {
+            <_p::Struct<
+                Message,
+            > as _p::field::FieldType>::variant(&self.0, &Message::UNIMPLEMENTED)
+        }
     }
     #[inline]
     pub fn abort(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::ABORT) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&self.0, &Message::ABORT)
+        }
     }
     #[inline]
     pub fn call(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Call>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::CALL) }
+        unsafe {
+            <_p::Struct<Call> as _p::field::FieldType>::variant(&self.0, &Message::CALL)
+        }
     }
     #[inline]
     pub fn r#return(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Return>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::RETURN) }
+        unsafe {
+            <_p::Struct<
+                Return,
+            > as _p::field::FieldType>::variant(&self.0, &Message::RETURN)
+        }
     }
     #[inline]
     pub fn finish(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Finish>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::FINISH) }
+        unsafe {
+            <_p::Struct<
+                Finish,
+            > as _p::field::FieldType>::variant(&self.0, &Message::FINISH)
+        }
     }
     #[inline]
     pub fn resolve(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Resolve>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::RESOLVE) }
+        unsafe {
+            <_p::Struct<
+                Resolve,
+            > as _p::field::FieldType>::variant(&self.0, &Message::RESOLVE)
+        }
     }
     #[inline]
     pub fn release(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Release>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::RELEASE) }
+        unsafe {
+            <_p::Struct<
+                Release,
+            > as _p::field::FieldType>::variant(&self.0, &Message::RELEASE)
+        }
     }
     #[inline]
     pub fn obsolete_save(&self) -> _p::Variant<'_, 'p, T, _p::AnyPtr> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::OBSOLETE_SAVE) }
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &self.0,
+                &Message::OBSOLETE_SAVE,
+            )
+        }
     }
     #[inline]
     pub fn bootstrap(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Bootstrap>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::BOOTSTRAP) }
+        unsafe {
+            <_p::Struct<
+                Bootstrap,
+            > as _p::field::FieldType>::variant(&self.0, &Message::BOOTSTRAP)
+        }
     }
     #[inline]
     pub fn obsolete_delete(&self) -> _p::Variant<'_, 'p, T, _p::AnyPtr> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::OBSOLETE_DELETE) }
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &self.0,
+                &Message::OBSOLETE_DELETE,
+            )
+        }
     }
     #[inline]
     pub fn provide(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Provide>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::PROVIDE) }
+        unsafe {
+            <_p::Struct<
+                Provide,
+            > as _p::field::FieldType>::variant(&self.0, &Message::PROVIDE)
+        }
     }
     #[inline]
     pub fn accept(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Accept>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::ACCEPT) }
+        unsafe {
+            <_p::Struct<
+                Accept,
+            > as _p::field::FieldType>::variant(&self.0, &Message::ACCEPT)
+        }
     }
     #[inline]
     pub fn join(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Join>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::JOIN) }
+        unsafe {
+            <_p::Struct<Join> as _p::field::FieldType>::variant(&self.0, &Message::JOIN)
+        }
     }
     #[inline]
     pub fn disembargo(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Disembargo>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Message::DISEMBARGO) }
+        unsafe {
+            <_p::Struct<
+                Disembargo,
+            > as _p::field::FieldType>::variant(&self.0, &Message::DISEMBARGO)
+        }
     }
     #[inline]
     pub fn which(&self) -> Result<message::Which<&Self>, _p::NotInSchema> {
@@ -330,59 +384,227 @@ impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
 impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
     #[inline]
     pub fn unimplemented(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Message>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::UNIMPLEMENTED) }
+        unsafe {
+            <_p::Struct<
+                Message,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::UNIMPLEMENTED)
+        }
     }
     #[inline]
     pub fn abort(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::ABORT) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::ABORT)
+        }
     }
     #[inline]
     pub fn call(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Call>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::CALL) }
+        unsafe {
+            <_p::Struct<
+                Call,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::CALL)
+        }
     }
     #[inline]
     pub fn r#return(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Return>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::RETURN) }
+        unsafe {
+            <_p::Struct<
+                Return,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::RETURN)
+        }
     }
     #[inline]
     pub fn finish(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Finish>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::FINISH) }
+        unsafe {
+            <_p::Struct<
+                Finish,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::FINISH)
+        }
     }
     #[inline]
     pub fn resolve(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Resolve>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::RESOLVE) }
+        unsafe {
+            <_p::Struct<
+                Resolve,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::RESOLVE)
+        }
     }
     #[inline]
     pub fn release(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Release>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::RELEASE) }
+        unsafe {
+            <_p::Struct<
+                Release,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::RELEASE)
+        }
     }
     #[inline]
     pub fn obsolete_save(&mut self) -> _p::VariantMut<'_, 'p, T, _p::AnyPtr> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::OBSOLETE_SAVE) }
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Message::OBSOLETE_SAVE,
+            )
+        }
     }
     #[inline]
     pub fn bootstrap(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Bootstrap>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::BOOTSTRAP) }
+        unsafe {
+            <_p::Struct<
+                Bootstrap,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::BOOTSTRAP)
+        }
     }
     #[inline]
     pub fn obsolete_delete(&mut self) -> _p::VariantMut<'_, 'p, T, _p::AnyPtr> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::OBSOLETE_DELETE) }
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Message::OBSOLETE_DELETE,
+            )
+        }
     }
     #[inline]
     pub fn provide(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Provide>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::PROVIDE) }
+        unsafe {
+            <_p::Struct<
+                Provide,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::PROVIDE)
+        }
     }
     #[inline]
     pub fn accept(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Accept>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::ACCEPT) }
+        unsafe {
+            <_p::Struct<
+                Accept,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::ACCEPT)
+        }
     }
     #[inline]
     pub fn join(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Join>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::JOIN) }
+        unsafe {
+            <_p::Struct<
+                Join,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::JOIN)
+        }
     }
     #[inline]
     pub fn disembargo(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Disembargo>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Message::DISEMBARGO) }
+        unsafe {
+            <_p::Struct<
+                Disembargo,
+            > as _p::field::FieldType>::variant(&mut self.0, &Message::DISEMBARGO)
+        }
+    }
+    #[inline]
+    pub fn into_unimplemented(self) -> _p::VariantOwned<'p, T, _p::Struct<Message>> {
+        unsafe {
+            <_p::Struct<
+                Message,
+            > as _p::field::FieldType>::variant(self.0, &Message::UNIMPLEMENTED)
+        }
+    }
+    #[inline]
+    pub fn into_abort(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(self.0, &Message::ABORT)
+        }
+    }
+    #[inline]
+    pub fn into_call(self) -> _p::VariantOwned<'p, T, _p::Struct<Call>> {
+        unsafe {
+            <_p::Struct<Call> as _p::field::FieldType>::variant(self.0, &Message::CALL)
+        }
+    }
+    #[inline]
+    pub fn into_return(self) -> _p::VariantOwned<'p, T, _p::Struct<Return>> {
+        unsafe {
+            <_p::Struct<
+                Return,
+            > as _p::field::FieldType>::variant(self.0, &Message::RETURN)
+        }
+    }
+    #[inline]
+    pub fn into_finish(self) -> _p::VariantOwned<'p, T, _p::Struct<Finish>> {
+        unsafe {
+            <_p::Struct<
+                Finish,
+            > as _p::field::FieldType>::variant(self.0, &Message::FINISH)
+        }
+    }
+    #[inline]
+    pub fn into_resolve(self) -> _p::VariantOwned<'p, T, _p::Struct<Resolve>> {
+        unsafe {
+            <_p::Struct<
+                Resolve,
+            > as _p::field::FieldType>::variant(self.0, &Message::RESOLVE)
+        }
+    }
+    #[inline]
+    pub fn into_release(self) -> _p::VariantOwned<'p, T, _p::Struct<Release>> {
+        unsafe {
+            <_p::Struct<
+                Release,
+            > as _p::field::FieldType>::variant(self.0, &Message::RELEASE)
+        }
+    }
+    #[inline]
+    pub fn into_obsolete_save(self) -> _p::VariantOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                self.0,
+                &Message::OBSOLETE_SAVE,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_bootstrap(self) -> _p::VariantOwned<'p, T, _p::Struct<Bootstrap>> {
+        unsafe {
+            <_p::Struct<
+                Bootstrap,
+            > as _p::field::FieldType>::variant(self.0, &Message::BOOTSTRAP)
+        }
+    }
+    #[inline]
+    pub fn into_obsolete_delete(self) -> _p::VariantOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                self.0,
+                &Message::OBSOLETE_DELETE,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_provide(self) -> _p::VariantOwned<'p, T, _p::Struct<Provide>> {
+        unsafe {
+            <_p::Struct<
+                Provide,
+            > as _p::field::FieldType>::variant(self.0, &Message::PROVIDE)
+        }
+    }
+    #[inline]
+    pub fn into_accept(self) -> _p::VariantOwned<'p, T, _p::Struct<Accept>> {
+        unsafe {
+            <_p::Struct<
+                Accept,
+            > as _p::field::FieldType>::variant(self.0, &Message::ACCEPT)
+        }
+    }
+    #[inline]
+    pub fn into_join(self) -> _p::VariantOwned<'p, T, _p::Struct<Join>> {
+        unsafe {
+            <_p::Struct<Join> as _p::field::FieldType>::variant(self.0, &Message::JOIN)
+        }
+    }
+    #[inline]
+    pub fn into_disembargo(self) -> _p::VariantOwned<'p, T, _p::Struct<Disembargo>> {
+        unsafe {
+            <_p::Struct<
+                Disembargo,
+            > as _p::field::FieldType>::variant(self.0, &Message::DISEMBARGO)
+        }
     }
     #[inline]
     pub fn which(&mut self) -> Result<message::Which<&mut Self>, _p::NotInSchema> {
@@ -394,20 +616,20 @@ pub mod message {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Message<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Message<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Unimplemented(_p::ViewOf<T, _p::Struct<__file::Message>>),
-        Abort(_p::ViewOf<T, _p::Struct<__file::Exception>>),
-        Call(_p::ViewOf<T, _p::Struct<__file::Call>>),
-        Return(_p::ViewOf<T, _p::Struct<__file::Return>>),
-        Finish(_p::ViewOf<T, _p::Struct<__file::Finish>>),
-        Resolve(_p::ViewOf<T, _p::Struct<__file::Resolve>>),
-        Release(_p::ViewOf<T, _p::Struct<__file::Release>>),
+        Unimplemented(_p::ViewOf<T, _p::Struct<super::Message>>),
+        Abort(_p::ViewOf<T, _p::Struct<super::Exception>>),
+        Call(_p::ViewOf<T, _p::Struct<super::Call>>),
+        Return(_p::ViewOf<T, _p::Struct<super::Return>>),
+        Finish(_p::ViewOf<T, _p::Struct<super::Finish>>),
+        Resolve(_p::ViewOf<T, _p::Struct<super::Resolve>>),
+        Release(_p::ViewOf<T, _p::Struct<super::Release>>),
         ObsoleteSave(_p::ViewOf<T, _p::AnyPtr>),
-        Bootstrap(_p::ViewOf<T, _p::Struct<__file::Bootstrap>>),
+        Bootstrap(_p::ViewOf<T, _p::Struct<super::Bootstrap>>),
         ObsoleteDelete(_p::ViewOf<T, _p::AnyPtr>),
-        Provide(_p::ViewOf<T, _p::Struct<__file::Provide>>),
-        Accept(_p::ViewOf<T, _p::Struct<__file::Accept>>),
-        Join(_p::ViewOf<T, _p::Struct<__file::Join>>),
-        Disembargo(_p::ViewOf<T, _p::Struct<__file::Disembargo>>),
+        Provide(_p::ViewOf<T, _p::Struct<super::Provide>>),
+        Accept(_p::ViewOf<T, _p::Struct<super::Accept>>),
+        Join(_p::ViewOf<T, _p::Struct<super::Join>>),
+        Disembargo(_p::ViewOf<T, _p::Struct<super::Disembargo>>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -418,8 +640,8 @@ pub mod message {
                     Ok(
                         Which::Unimplemented(
                             <_p::Struct<
-                                __file::Message,
-                            > as _p::field::FieldType>::reader(
+                                super::Message,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
                             ),
@@ -430,8 +652,8 @@ pub mod message {
                     Ok(
                         Which::Abort(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::reader(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ABORT.field,
                             ),
@@ -442,8 +664,8 @@ pub mod message {
                     Ok(
                         Which::Call(
                             <_p::Struct<
-                                __file::Call,
-                            > as _p::field::FieldType>::reader(
+                                super::Call,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::CALL.field,
                             ),
@@ -454,8 +676,8 @@ pub mod message {
                     Ok(
                         Which::Return(
                             <_p::Struct<
-                                __file::Return,
-                            > as _p::field::FieldType>::reader(
+                                super::Return,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RETURN.field,
                             ),
@@ -466,8 +688,8 @@ pub mod message {
                     Ok(
                         Which::Finish(
                             <_p::Struct<
-                                __file::Finish,
-                            > as _p::field::FieldType>::reader(
+                                super::Finish,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::FINISH.field,
                             ),
@@ -478,8 +700,8 @@ pub mod message {
                     Ok(
                         Which::Resolve(
                             <_p::Struct<
-                                __file::Resolve,
-                            > as _p::field::FieldType>::reader(
+                                super::Resolve,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RESOLVE.field,
                             ),
@@ -490,8 +712,8 @@ pub mod message {
                     Ok(
                         Which::Release(
                             <_p::Struct<
-                                __file::Release,
-                            > as _p::field::FieldType>::reader(
+                                super::Release,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RELEASE.field,
                             ),
@@ -501,7 +723,7 @@ pub mod message {
                 7u16 => {
                     Ok(
                         Which::ObsoleteSave(
-                            <_p::AnyPtr as _p::field::FieldType>::reader(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::OBSOLETE_SAVE.field,
                             ),
@@ -512,8 +734,8 @@ pub mod message {
                     Ok(
                         Which::Bootstrap(
                             <_p::Struct<
-                                __file::Bootstrap,
-                            > as _p::field::FieldType>::reader(
+                                super::Bootstrap,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::BOOTSTRAP.field,
                             ),
@@ -523,7 +745,7 @@ pub mod message {
                 9u16 => {
                     Ok(
                         Which::ObsoleteDelete(
-                            <_p::AnyPtr as _p::field::FieldType>::reader(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::OBSOLETE_DELETE.field,
                             ),
@@ -534,8 +756,8 @@ pub mod message {
                     Ok(
                         Which::Provide(
                             <_p::Struct<
-                                __file::Provide,
-                            > as _p::field::FieldType>::reader(
+                                super::Provide,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::PROVIDE.field,
                             ),
@@ -546,8 +768,8 @@ pub mod message {
                     Ok(
                         Which::Accept(
                             <_p::Struct<
-                                __file::Accept,
-                            > as _p::field::FieldType>::reader(
+                                super::Accept,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ACCEPT.field,
                             ),
@@ -558,8 +780,8 @@ pub mod message {
                     Ok(
                         Which::Join(
                             <_p::Struct<
-                                __file::Join,
-                            > as _p::field::FieldType>::reader(
+                                super::Join,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::JOIN.field,
                             ),
@@ -570,8 +792,8 @@ pub mod message {
                     Ok(
                         Which::Disembargo(
                             <_p::Struct<
-                                __file::Disembargo,
-                            > as _p::field::FieldType>::reader(
+                                super::Disembargo,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::DISEMBARGO.field,
                             ),
@@ -594,8 +816,8 @@ pub mod message {
                     Ok(
                         Which::Unimplemented(
                             <_p::Struct<
-                                __file::Message,
-                            > as _p::field::FieldType>::builder(
+                                super::Message,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
                             ),
@@ -606,8 +828,8 @@ pub mod message {
                     Ok(
                         Which::Abort(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::builder(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ABORT.field,
                             ),
@@ -618,8 +840,8 @@ pub mod message {
                     Ok(
                         Which::Call(
                             <_p::Struct<
-                                __file::Call,
-                            > as _p::field::FieldType>::builder(
+                                super::Call,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::CALL.field,
                             ),
@@ -630,8 +852,8 @@ pub mod message {
                     Ok(
                         Which::Return(
                             <_p::Struct<
-                                __file::Return,
-                            > as _p::field::FieldType>::builder(
+                                super::Return,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RETURN.field,
                             ),
@@ -642,8 +864,8 @@ pub mod message {
                     Ok(
                         Which::Finish(
                             <_p::Struct<
-                                __file::Finish,
-                            > as _p::field::FieldType>::builder(
+                                super::Finish,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::FINISH.field,
                             ),
@@ -654,8 +876,8 @@ pub mod message {
                     Ok(
                         Which::Resolve(
                             <_p::Struct<
-                                __file::Resolve,
-                            > as _p::field::FieldType>::builder(
+                                super::Resolve,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RESOLVE.field,
                             ),
@@ -666,8 +888,8 @@ pub mod message {
                     Ok(
                         Which::Release(
                             <_p::Struct<
-                                __file::Release,
-                            > as _p::field::FieldType>::builder(
+                                super::Release,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RELEASE.field,
                             ),
@@ -677,7 +899,7 @@ pub mod message {
                 7u16 => {
                     Ok(
                         Which::ObsoleteSave(
-                            <_p::AnyPtr as _p::field::FieldType>::builder(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::OBSOLETE_SAVE.field,
                             ),
@@ -688,8 +910,8 @@ pub mod message {
                     Ok(
                         Which::Bootstrap(
                             <_p::Struct<
-                                __file::Bootstrap,
-                            > as _p::field::FieldType>::builder(
+                                super::Bootstrap,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::BOOTSTRAP.field,
                             ),
@@ -699,7 +921,7 @@ pub mod message {
                 9u16 => {
                     Ok(
                         Which::ObsoleteDelete(
-                            <_p::AnyPtr as _p::field::FieldType>::builder(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::OBSOLETE_DELETE.field,
                             ),
@@ -710,8 +932,8 @@ pub mod message {
                     Ok(
                         Which::Provide(
                             <_p::Struct<
-                                __file::Provide,
-                            > as _p::field::FieldType>::builder(
+                                super::Provide,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::PROVIDE.field,
                             ),
@@ -722,8 +944,8 @@ pub mod message {
                     Ok(
                         Which::Accept(
                             <_p::Struct<
-                                __file::Accept,
-                            > as _p::field::FieldType>::builder(
+                                super::Accept,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ACCEPT.field,
                             ),
@@ -734,8 +956,8 @@ pub mod message {
                     Ok(
                         Which::Join(
                             <_p::Struct<
-                                __file::Join,
-                            > as _p::field::FieldType>::builder(
+                                super::Join,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::JOIN.field,
                             ),
@@ -746,8 +968,8 @@ pub mod message {
                     Ok(
                         Which::Disembargo(
                             <_p::Struct<
-                                __file::Disembargo,
-                            > as _p::field::FieldType>::builder(
+                                super::Disembargo,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::DISEMBARGO.field,
                             ),
@@ -869,13 +1091,13 @@ impl<'p, T: _p::rpc::Table + 'p> bootstrap::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::reader(&self.0, &Bootstrap::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&self.0, &Bootstrap::QUESTION_ID)
         }
     }
     #[inline]
     pub fn deprecated_object_id(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::reader(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &self.0,
                 &Bootstrap::DEPRECATED_OBJECT_ID,
             )
@@ -886,14 +1108,23 @@ impl<'p, T: _p::rpc::Table + 'p> bootstrap::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Bootstrap::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Bootstrap::QUESTION_ID)
         }
     }
     #[inline]
     pub fn deprecated_object_id(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &mut self.0,
+                &Bootstrap::DEPRECATED_OBJECT_ID,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_deprecated_object_id(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
+                self.0,
                 &Bootstrap::DEPRECATED_OBJECT_ID,
             )
         }
@@ -1025,7 +1256,7 @@ impl Call {
         slot: 1u32,
         default: _p::StructReader::empty(),
     };
-    const SEND_RESULTS_TO: _p::Descriptor<_p::Group<__file::call::SendResultsTo>> = ();
+    const SEND_RESULTS_TO: _p::Descriptor<_p::Group<call::SendResultsTo>> = ();
     const ALLOW_THIRD_PARTY_TAIL_CALL: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 128u32,
         default: false,
@@ -1042,44 +1273,46 @@ impl Call {
 impl<'p, T: _p::rpc::Table + 'p> call::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Call::QUESTION_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Call::QUESTION_ID) }
     }
     #[inline]
     pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::reader(&self.0, &Call::TARGET)
+            > as _p::field::FieldType>::accessor(&self.0, &Call::TARGET)
         }
     }
     #[inline]
     pub fn interface_id(&self) -> _p::Accessor<'_, 'p, T, u64> {
-        unsafe { <u64 as _p::field::FieldType>::reader(&self.0, &Call::INTERFACE_ID) }
+        unsafe { <u64 as _p::field::FieldType>::accessor(&self.0, &Call::INTERFACE_ID) }
     }
     #[inline]
     pub fn method_id(&self) -> _p::Accessor<'_, 'p, T, u16> {
-        unsafe { <u16 as _p::field::FieldType>::reader(&self.0, &Call::METHOD_ID) }
+        unsafe { <u16 as _p::field::FieldType>::accessor(&self.0, &Call::METHOD_ID) }
     }
     #[inline]
     pub fn params(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<Payload>> {
         unsafe {
-            <_p::Struct<Payload> as _p::field::FieldType>::reader(&self.0, &Call::PARAMS)
+            <_p::Struct<
+                Payload,
+            > as _p::field::FieldType>::accessor(&self.0, &Call::PARAMS)
         }
     }
     #[inline]
     pub fn send_results_to(
         &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::Group<__file::call::SendResultsTo>> {
+    ) -> _p::Accessor<'_, 'p, T, _p::Group<call::SendResultsTo>> {
         unsafe {
             <_p::Group<
-                __file::call::SendResultsTo,
-            > as _p::field::FieldType>::reader(&self.0, &Call::SEND_RESULTS_TO)
+                call::SendResultsTo,
+            > as _p::field::FieldType>::accessor(&self.0, &Call::SEND_RESULTS_TO)
         }
     }
     #[inline]
     pub fn allow_third_party_tail_call(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(
+            <bool as _p::field::FieldType>::accessor(
                 &self.0,
                 &Call::ALLOW_THIRD_PARTY_TAIL_CALL,
             )
@@ -1088,13 +1321,19 @@ impl<'p, T: _p::rpc::Table + 'p> call::Reader<'p, T> {
     #[inline]
     pub fn no_promise_pipelining(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(&self.0, &Call::NO_PROMISE_PIPELINING)
+            <bool as _p::field::FieldType>::accessor(
+                &self.0,
+                &Call::NO_PROMISE_PIPELINING,
+            )
         }
     }
     #[inline]
     pub fn only_promise_pipeline(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(&self.0, &Call::ONLY_PROMISE_PIPELINE)
+            <bool as _p::field::FieldType>::accessor(
+                &self.0,
+                &Call::ONLY_PROMISE_PIPELINE,
+            )
         }
     }
 }
@@ -1102,7 +1341,7 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Call::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Call::QUESTION_ID)
         }
     }
     #[inline]
@@ -1110,41 +1349,41 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::builder(&mut self.0, &Call::TARGET)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Call::TARGET)
         }
     }
     #[inline]
     pub fn interface_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u64> {
         unsafe {
-            <u64 as _p::field::FieldType>::builder(&mut self.0, &Call::INTERFACE_ID)
+            <u64 as _p::field::FieldType>::accessor(&mut self.0, &Call::INTERFACE_ID)
         }
     }
     #[inline]
     pub fn method_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u16> {
-        unsafe { <u16 as _p::field::FieldType>::builder(&mut self.0, &Call::METHOD_ID) }
+        unsafe { <u16 as _p::field::FieldType>::accessor(&mut self.0, &Call::METHOD_ID) }
     }
     #[inline]
     pub fn params(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<Payload>> {
         unsafe {
             <_p::Struct<
                 Payload,
-            > as _p::field::FieldType>::builder(&mut self.0, &Call::PARAMS)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Call::PARAMS)
         }
     }
     #[inline]
     pub fn send_results_to(
         &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<__file::call::SendResultsTo>> {
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<call::SendResultsTo>> {
         unsafe {
             <_p::Group<
-                __file::call::SendResultsTo,
-            > as _p::field::FieldType>::builder(&mut self.0, &Call::SEND_RESULTS_TO)
+                call::SendResultsTo,
+            > as _p::field::FieldType>::accessor(&mut self.0, &Call::SEND_RESULTS_TO)
         }
     }
     #[inline]
     pub fn allow_third_party_tail_call(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Call::ALLOW_THIRD_PARTY_TAIL_CALL,
             )
@@ -1153,7 +1392,7 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
     #[inline]
     pub fn no_promise_pipelining(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Call::NO_PROMISE_PIPELINING,
             )
@@ -1162,10 +1401,36 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
     #[inline]
     pub fn only_promise_pipeline(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Call::ONLY_PROMISE_PIPELINE,
             )
+        }
+    }
+    #[inline]
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+        unsafe {
+            <_p::Struct<
+                MessageTarget,
+            > as _p::field::FieldType>::accessor(self.0, &Call::TARGET)
+        }
+    }
+    #[inline]
+    pub fn into_params(self) -> _p::AccessorOwned<'p, T, _p::Struct<Payload>> {
+        unsafe {
+            <_p::Struct<
+                Payload,
+            > as _p::field::FieldType>::accessor(self.0, &Call::PARAMS)
+        }
+    }
+    #[inline]
+    pub fn into_send_results_to(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::Group<call::SendResultsTo>> {
+        unsafe {
+            <_p::Group<
+                call::SendResultsTo,
+            > as _p::field::FieldType>::accessor(self.0, &Call::SEND_RESULTS_TO)
         }
     }
 }
@@ -1266,8 +1531,9 @@ pub mod call {
         type Builder<'a, T: _p::rpc::Table> = send_results_to::Builder<'a, T>;
     }
     impl _p::FieldGroup for SendResultsTo {
-        unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
-            std::unimplemented!()
+        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+            s.set_field_unchecked(3usize, 0);
+            <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
         }
     }
     impl SendResultsTo {
@@ -1301,15 +1567,24 @@ pub mod call {
     impl<'p, T: _p::rpc::Table + 'p> send_results_to::Reader<'p, T> {
         #[inline]
         pub fn caller(&self) -> _p::Variant<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&self.0, &SendResultsTo::CALLER) }
+            unsafe {
+                <() as _p::field::FieldType>::variant(&self.0, &SendResultsTo::CALLER)
+            }
         }
         #[inline]
         pub fn yourself(&self) -> _p::Variant<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&self.0, &SendResultsTo::YOURSELF) }
+            unsafe {
+                <() as _p::field::FieldType>::variant(&self.0, &SendResultsTo::YOURSELF)
+            }
         }
         #[inline]
         pub fn third_party(&self) -> _p::Variant<'_, 'p, T, _p::AnyPtr> {
-            unsafe { _p::field::VariantField::new(&self.0, &SendResultsTo::THIRD_PARTY) }
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::variant(
+                    &self.0,
+                    &SendResultsTo::THIRD_PARTY,
+                )
+            }
         }
         #[inline]
         pub fn which(&self) -> Result<send_results_to::Which<&Self>, _p::NotInSchema> {
@@ -1319,18 +1594,38 @@ pub mod call {
     impl<'p, T: _p::rpc::Table + 'p> send_results_to::Builder<'p, T> {
         #[inline]
         pub fn caller(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&mut self.0, &SendResultsTo::CALLER) }
+            unsafe {
+                <() as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &SendResultsTo::CALLER,
+                )
+            }
         }
         #[inline]
         pub fn yourself(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
             unsafe {
-                _p::field::VariantField::new(&mut self.0, &SendResultsTo::YOURSELF)
+                <() as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &SendResultsTo::YOURSELF,
+                )
             }
         }
         #[inline]
         pub fn third_party(&mut self) -> _p::VariantMut<'_, 'p, T, _p::AnyPtr> {
             unsafe {
-                _p::field::VariantField::new(&mut self.0, &SendResultsTo::THIRD_PARTY)
+                <_p::AnyPtr as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &SendResultsTo::THIRD_PARTY,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_third_party(self) -> _p::VariantOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::variant(
+                    self.0,
+                    &SendResultsTo::THIRD_PARTY,
+                )
             }
         }
         #[inline]
@@ -1364,7 +1659,7 @@ pub mod call {
                     0u16 => {
                         Ok(
                             Which::Caller(
-                                <() as _p::field::FieldType>::reader(
+                                <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::CALLER.field,
                                 ),
@@ -1374,7 +1669,7 @@ pub mod call {
                     1u16 => {
                         Ok(
                             Which::Yourself(
-                                <() as _p::field::FieldType>::reader(
+                                <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::YOURSELF.field,
                                 ),
@@ -1384,7 +1679,7 @@ pub mod call {
                     2u16 => {
                         Ok(
                             Which::ThirdParty(
-                                <_p::AnyPtr as _p::field::FieldType>::reader(
+                                <_p::AnyPtr as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::THIRD_PARTY.field,
                                 ),
@@ -1406,7 +1701,7 @@ pub mod call {
                     0u16 => {
                         Ok(
                             Which::Caller(
-                                <() as _p::field::FieldType>::builder(
+                                <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::CALLER.field,
                                 ),
@@ -1416,7 +1711,7 @@ pub mod call {
                     1u16 => {
                         Ok(
                             Which::Yourself(
-                                <() as _p::field::FieldType>::builder(
+                                <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::YOURSELF.field,
                                 ),
@@ -1426,7 +1721,7 @@ pub mod call {
                     2u16 => {
                         Ok(
                             Which::ThirdParty(
-                                <_p::AnyPtr as _p::field::FieldType>::builder(
+                                <_p::AnyPtr as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::THIRD_PARTY.field,
                                 ),
@@ -1614,46 +1909,68 @@ impl Return {
 impl<'p, T: _p::rpc::Table + 'p> r#return::Reader<'p, T> {
     #[inline]
     pub fn answer_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Return::ANSWER_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Return::ANSWER_ID) }
     }
     #[inline]
     pub fn release_param_caps(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(&self.0, &Return::RELEASE_PARAM_CAPS)
+            <bool as _p::field::FieldType>::accessor(
+                &self.0,
+                &Return::RELEASE_PARAM_CAPS,
+            )
         }
     }
     #[inline]
     pub fn no_finish_needed(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(&self.0, &Return::NO_FINISH_NEEDED)
+            <bool as _p::field::FieldType>::accessor(&self.0, &Return::NO_FINISH_NEEDED)
         }
     }
     #[inline]
     pub fn results(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Payload>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Return::RESULTS) }
+        unsafe {
+            <_p::Struct<
+                Payload,
+            > as _p::field::FieldType>::variant(&self.0, &Return::RESULTS)
+        }
     }
     #[inline]
     pub fn exception(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Return::EXCEPTION) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&self.0, &Return::EXCEPTION)
+        }
     }
     #[inline]
     pub fn canceled(&self) -> _p::Variant<'_, 'p, T, ()> {
-        unsafe { _p::field::VariantField::new(&self.0, &Return::CANCELED) }
+        unsafe { <() as _p::field::FieldType>::variant(&self.0, &Return::CANCELED) }
     }
     #[inline]
     pub fn results_sent_elsewhere(&self) -> _p::Variant<'_, 'p, T, ()> {
-        unsafe { _p::field::VariantField::new(&self.0, &Return::RESULTS_SENT_ELSEWHERE) }
+        unsafe {
+            <() as _p::field::FieldType>::variant(
+                &self.0,
+                &Return::RESULTS_SENT_ELSEWHERE,
+            )
+        }
     }
     #[inline]
     pub fn take_from_other_question(&self) -> _p::Variant<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&self.0, &Return::TAKE_FROM_OTHER_QUESTION)
+            <u32 as _p::field::FieldType>::variant(
+                &self.0,
+                &Return::TAKE_FROM_OTHER_QUESTION,
+            )
         }
     }
     #[inline]
     pub fn accept_from_third_party(&self) -> _p::Variant<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            _p::field::VariantField::new(&self.0, &Return::ACCEPT_FROM_THIRD_PARTY)
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &self.0,
+                &Return::ACCEPT_FROM_THIRD_PARTY,
+            )
         }
     }
     #[inline]
@@ -1665,13 +1982,13 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
     #[inline]
     pub fn answer_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Return::ANSWER_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Return::ANSWER_ID)
         }
     }
     #[inline]
     pub fn release_param_caps(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Return::RELEASE_PARAM_CAPS,
             )
@@ -1680,7 +1997,7 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
     #[inline]
     pub fn no_finish_needed(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Return::NO_FINISH_NEEDED,
             )
@@ -1688,32 +2005,74 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
     }
     #[inline]
     pub fn results(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Payload>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Return::RESULTS) }
+        unsafe {
+            <_p::Struct<
+                Payload,
+            > as _p::field::FieldType>::variant(&mut self.0, &Return::RESULTS)
+        }
     }
     #[inline]
     pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Return::EXCEPTION) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&mut self.0, &Return::EXCEPTION)
+        }
     }
     #[inline]
     pub fn canceled(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Return::CANCELED) }
+        unsafe { <() as _p::field::FieldType>::variant(&mut self.0, &Return::CANCELED) }
     }
     #[inline]
     pub fn results_sent_elsewhere(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &Return::RESULTS_SENT_ELSEWHERE)
+            <() as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Return::RESULTS_SENT_ELSEWHERE,
+            )
         }
     }
     #[inline]
     pub fn take_from_other_question(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &Return::TAKE_FROM_OTHER_QUESTION)
+            <u32 as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Return::TAKE_FROM_OTHER_QUESTION,
+            )
         }
     }
     #[inline]
     pub fn accept_from_third_party(&mut self) -> _p::VariantMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &Return::ACCEPT_FROM_THIRD_PARTY)
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Return::ACCEPT_FROM_THIRD_PARTY,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_results(self) -> _p::VariantOwned<'p, T, _p::Struct<Payload>> {
+        unsafe {
+            <_p::Struct<
+                Payload,
+            > as _p::field::FieldType>::variant(self.0, &Return::RESULTS)
+        }
+    }
+    #[inline]
+    pub fn into_exception(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(self.0, &Return::EXCEPTION)
+        }
+    }
+    #[inline]
+    pub fn into_accept_from_third_party(self) -> _p::VariantOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::variant(
+                self.0,
+                &Return::ACCEPT_FROM_THIRD_PARTY,
+            )
         }
     }
     #[inline]
@@ -1726,8 +2085,8 @@ pub mod r#return {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Return<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Return<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Results(_p::ViewOf<T, _p::Struct<__file::Payload>>),
-        Exception(_p::ViewOf<T, _p::Struct<__file::Exception>>),
+        Results(_p::ViewOf<T, _p::Struct<super::Payload>>),
+        Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
         Canceled(_p::ViewOf<T, ()>),
         ResultsSentElsewhere(_p::ViewOf<T, ()>),
         TakeFromOtherQuestion(_p::ViewOf<T, u32>),
@@ -1742,8 +2101,8 @@ pub mod r#return {
                     Ok(
                         Which::Results(
                             <_p::Struct<
-                                __file::Payload,
-                            > as _p::field::FieldType>::reader(
+                                super::Payload,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::RESULTS.field,
                             ),
@@ -1754,8 +2113,8 @@ pub mod r#return {
                     Ok(
                         Which::Exception(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::reader(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::EXCEPTION.field,
                             ),
@@ -1765,7 +2124,7 @@ pub mod r#return {
                 2u16 => {
                     Ok(
                         Which::Canceled(
-                            <() as _p::field::FieldType>::reader(
+                            <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::CANCELED.field,
                             ),
@@ -1775,7 +2134,7 @@ pub mod r#return {
                 3u16 => {
                     Ok(
                         Which::ResultsSentElsewhere(
-                            <() as _p::field::FieldType>::reader(
+                            <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::RESULTS_SENT_ELSEWHERE.field,
                             ),
@@ -1785,7 +2144,7 @@ pub mod r#return {
                 4u16 => {
                     Ok(
                         Which::TakeFromOtherQuestion(
-                            <u32 as _p::field::FieldType>::reader(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::TAKE_FROM_OTHER_QUESTION.field,
                             ),
@@ -1795,7 +2154,7 @@ pub mod r#return {
                 5u16 => {
                     Ok(
                         Which::AcceptFromThirdParty(
-                            <_p::AnyPtr as _p::field::FieldType>::reader(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::ACCEPT_FROM_THIRD_PARTY.field,
                             ),
@@ -1818,8 +2177,8 @@ pub mod r#return {
                     Ok(
                         Which::Results(
                             <_p::Struct<
-                                __file::Payload,
-                            > as _p::field::FieldType>::builder(
+                                super::Payload,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::RESULTS.field,
                             ),
@@ -1830,8 +2189,8 @@ pub mod r#return {
                     Ok(
                         Which::Exception(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::builder(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::EXCEPTION.field,
                             ),
@@ -1841,7 +2200,7 @@ pub mod r#return {
                 2u16 => {
                     Ok(
                         Which::Canceled(
-                            <() as _p::field::FieldType>::builder(
+                            <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::CANCELED.field,
                             ),
@@ -1851,7 +2210,7 @@ pub mod r#return {
                 3u16 => {
                     Ok(
                         Which::ResultsSentElsewhere(
-                            <() as _p::field::FieldType>::builder(
+                            <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::RESULTS_SENT_ELSEWHERE.field,
                             ),
@@ -1861,7 +2220,7 @@ pub mod r#return {
                 4u16 => {
                     Ok(
                         Which::TakeFromOtherQuestion(
-                            <u32 as _p::field::FieldType>::builder(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::TAKE_FROM_OTHER_QUESTION.field,
                             ),
@@ -1871,7 +2230,7 @@ pub mod r#return {
                 5u16 => {
                     Ok(
                         Which::AcceptFromThirdParty(
-                            <_p::AnyPtr as _p::field::FieldType>::builder(
+                            <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::ACCEPT_FROM_THIRD_PARTY.field,
                             ),
@@ -1990,12 +2349,15 @@ impl Finish {
 impl<'p, T: _p::rpc::Table + 'p> finish::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Finish::QUESTION_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Finish::QUESTION_ID) }
     }
     #[inline]
     pub fn release_result_caps(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(&self.0, &Finish::RELEASE_RESULT_CAPS)
+            <bool as _p::field::FieldType>::accessor(
+                &self.0,
+                &Finish::RELEASE_RESULT_CAPS,
+            )
         }
     }
 }
@@ -2003,13 +2365,13 @@ impl<'p, T: _p::rpc::Table + 'p> finish::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Finish::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Finish::QUESTION_ID)
         }
     }
     #[inline]
     pub fn release_result_caps(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Finish::RELEASE_RESULT_CAPS,
             )
@@ -2148,15 +2510,23 @@ impl Resolve {
 impl<'p, T: _p::rpc::Table + 'p> resolve::Reader<'p, T> {
     #[inline]
     pub fn promise_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Resolve::PROMISE_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Resolve::PROMISE_ID) }
     }
     #[inline]
     pub fn cap(&self) -> _p::Variant<'_, 'p, T, _p::Struct<CapDescriptor>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Resolve::CAP) }
+        unsafe {
+            <_p::Struct<
+                CapDescriptor,
+            > as _p::field::FieldType>::variant(&self.0, &Resolve::CAP)
+        }
     }
     #[inline]
     pub fn exception(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&self.0, &Resolve::EXCEPTION) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&self.0, &Resolve::EXCEPTION)
+        }
     }
     #[inline]
     pub fn which(&self) -> Result<resolve::Which<&Self>, _p::NotInSchema> {
@@ -2167,16 +2537,40 @@ impl<'p, T: _p::rpc::Table + 'p> resolve::Builder<'p, T> {
     #[inline]
     pub fn promise_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Resolve::PROMISE_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Resolve::PROMISE_ID)
         }
     }
     #[inline]
     pub fn cap(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<CapDescriptor>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Resolve::CAP) }
+        unsafe {
+            <_p::Struct<
+                CapDescriptor,
+            > as _p::field::FieldType>::variant(&mut self.0, &Resolve::CAP)
+        }
     }
     #[inline]
     pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &Resolve::EXCEPTION) }
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(&mut self.0, &Resolve::EXCEPTION)
+        }
+    }
+    #[inline]
+    pub fn into_cap(self) -> _p::VariantOwned<'p, T, _p::Struct<CapDescriptor>> {
+        unsafe {
+            <_p::Struct<
+                CapDescriptor,
+            > as _p::field::FieldType>::variant(self.0, &Resolve::CAP)
+        }
+    }
+    #[inline]
+    pub fn into_exception(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
+        unsafe {
+            <_p::Struct<
+                Exception,
+            > as _p::field::FieldType>::variant(self.0, &Resolve::EXCEPTION)
+        }
     }
     #[inline]
     pub fn which(&mut self) -> Result<resolve::Which<&mut Self>, _p::NotInSchema> {
@@ -2188,8 +2582,8 @@ pub mod resolve {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Cap(_p::ViewOf<T, _p::Struct<__file::CapDescriptor>>),
-        Exception(_p::ViewOf<T, _p::Struct<__file::Exception>>),
+        Cap(_p::ViewOf<T, _p::Struct<super::CapDescriptor>>),
+        Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -2200,8 +2594,8 @@ pub mod resolve {
                     Ok(
                         Which::Cap(
                             <_p::Struct<
-                                __file::CapDescriptor,
-                            > as _p::field::FieldType>::reader(
+                                super::CapDescriptor,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::CAP.field,
                             ),
@@ -2212,8 +2606,8 @@ pub mod resolve {
                     Ok(
                         Which::Exception(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::reader(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::EXCEPTION.field,
                             ),
@@ -2236,8 +2630,8 @@ pub mod resolve {
                     Ok(
                         Which::Cap(
                             <_p::Struct<
-                                __file::CapDescriptor,
-                            > as _p::field::FieldType>::builder(
+                                super::CapDescriptor,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::CAP.field,
                             ),
@@ -2248,8 +2642,8 @@ pub mod resolve {
                     Ok(
                         Which::Exception(
                             <_p::Struct<
-                                __file::Exception,
-                            > as _p::field::FieldType>::builder(
+                                super::Exception,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::EXCEPTION.field,
                             ),
@@ -2368,24 +2762,24 @@ impl Release {
 impl<'p, T: _p::rpc::Table + 'p> release::Reader<'p, T> {
     #[inline]
     pub fn id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Release::ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Release::ID) }
     }
     #[inline]
     pub fn reference_count(&self) -> _p::Accessor<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::reader(&self.0, &Release::REFERENCE_COUNT)
+            <u32 as _p::field::FieldType>::accessor(&self.0, &Release::REFERENCE_COUNT)
         }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> release::Builder<'p, T> {
     #[inline]
     pub fn id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::builder(&mut self.0, &Release::ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&mut self.0, &Release::ID) }
     }
     #[inline]
     pub fn reference_count(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(
+            <u32 as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Release::REFERENCE_COUNT,
             )
@@ -2498,7 +2892,7 @@ impl Disembargo {
         slot: 0u32,
         default: _p::StructReader::empty(),
     };
-    const CONTEXT: _p::Descriptor<_p::Group<__file::disembargo::Context>> = ();
+    const CONTEXT: _p::Descriptor<_p::Group<disembargo::Context>> = ();
 }
 impl<'p, T: _p::rpc::Table + 'p> disembargo::Reader<'p, T> {
     #[inline]
@@ -2506,17 +2900,15 @@ impl<'p, T: _p::rpc::Table + 'p> disembargo::Reader<'p, T> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::reader(&self.0, &Disembargo::TARGET)
+            > as _p::field::FieldType>::accessor(&self.0, &Disembargo::TARGET)
         }
     }
     #[inline]
-    pub fn context(
-        &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::Group<__file::disembargo::Context>> {
+    pub fn context(&self) -> _p::Accessor<'_, 'p, T, _p::Group<disembargo::Context>> {
         unsafe {
             <_p::Group<
-                __file::disembargo::Context,
-            > as _p::field::FieldType>::reader(&self.0, &Disembargo::CONTEXT)
+                disembargo::Context,
+            > as _p::field::FieldType>::accessor(&self.0, &Disembargo::CONTEXT)
         }
     }
 }
@@ -2526,17 +2918,35 @@ impl<'p, T: _p::rpc::Table + 'p> disembargo::Builder<'p, T> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::builder(&mut self.0, &Disembargo::TARGET)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Disembargo::TARGET)
         }
     }
     #[inline]
     pub fn context(
         &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<__file::disembargo::Context>> {
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<disembargo::Context>> {
         unsafe {
             <_p::Group<
-                __file::disembargo::Context,
-            > as _p::field::FieldType>::builder(&mut self.0, &Disembargo::CONTEXT)
+                disembargo::Context,
+            > as _p::field::FieldType>::accessor(&mut self.0, &Disembargo::CONTEXT)
+        }
+    }
+    #[inline]
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+        unsafe {
+            <_p::Struct<
+                MessageTarget,
+            > as _p::field::FieldType>::accessor(self.0, &Disembargo::TARGET)
+        }
+    }
+    #[inline]
+    pub fn into_context(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::Group<disembargo::Context>> {
+        unsafe {
+            <_p::Group<
+                disembargo::Context,
+            > as _p::field::FieldType>::accessor(self.0, &Disembargo::CONTEXT)
         }
     }
 }
@@ -2638,8 +3048,9 @@ pub mod disembargo {
         type Builder<'a, T: _p::rpc::Table> = context::Builder<'a, T>;
     }
     impl _p::FieldGroup for Context {
-        unsafe fn clear<'a, 'b: 'a, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
-            std::unimplemented!()
+        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+            s.set_field_unchecked(2usize, 0);
+            <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
         }
     }
     impl Context {
@@ -2688,19 +3099,29 @@ pub mod disembargo {
     impl<'p, T: _p::rpc::Table + 'p> context::Reader<'p, T> {
         #[inline]
         pub fn sender_loopback(&self) -> _p::Variant<'_, 'p, T, u32> {
-            unsafe { _p::field::VariantField::new(&self.0, &Context::SENDER_LOOPBACK) }
+            unsafe {
+                <u32 as _p::field::FieldType>::variant(
+                    &self.0,
+                    &Context::SENDER_LOOPBACK,
+                )
+            }
         }
         #[inline]
         pub fn receiver_loopback(&self) -> _p::Variant<'_, 'p, T, u32> {
-            unsafe { _p::field::VariantField::new(&self.0, &Context::RECEIVER_LOOPBACK) }
+            unsafe {
+                <u32 as _p::field::FieldType>::variant(
+                    &self.0,
+                    &Context::RECEIVER_LOOPBACK,
+                )
+            }
         }
         #[inline]
         pub fn accept(&self) -> _p::Variant<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&self.0, &Context::ACCEPT) }
+            unsafe { <() as _p::field::FieldType>::variant(&self.0, &Context::ACCEPT) }
         }
         #[inline]
         pub fn provide(&self) -> _p::Variant<'_, 'p, T, u32> {
-            unsafe { _p::field::VariantField::new(&self.0, &Context::PROVIDE) }
+            unsafe { <u32 as _p::field::FieldType>::variant(&self.0, &Context::PROVIDE) }
         }
         #[inline]
         pub fn which(&self) -> Result<context::Which<&Self>, _p::NotInSchema> {
@@ -2711,22 +3132,32 @@ pub mod disembargo {
         #[inline]
         pub fn sender_loopback(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
             unsafe {
-                _p::field::VariantField::new(&mut self.0, &Context::SENDER_LOOPBACK)
+                <u32 as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &Context::SENDER_LOOPBACK,
+                )
             }
         }
         #[inline]
         pub fn receiver_loopback(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
             unsafe {
-                _p::field::VariantField::new(&mut self.0, &Context::RECEIVER_LOOPBACK)
+                <u32 as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &Context::RECEIVER_LOOPBACK,
+                )
             }
         }
         #[inline]
         pub fn accept(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&mut self.0, &Context::ACCEPT) }
+            unsafe {
+                <() as _p::field::FieldType>::variant(&mut self.0, &Context::ACCEPT)
+            }
         }
         #[inline]
         pub fn provide(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
-            unsafe { _p::field::VariantField::new(&mut self.0, &Context::PROVIDE) }
+            unsafe {
+                <u32 as _p::field::FieldType>::variant(&mut self.0, &Context::PROVIDE)
+            }
         }
         #[inline]
         pub fn which(&mut self) -> Result<context::Which<&mut Self>, _p::NotInSchema> {
@@ -2758,7 +3189,7 @@ pub mod disembargo {
                     0u16 => {
                         Ok(
                             Which::SenderLoopback(
-                                <u32 as _p::field::FieldType>::reader(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::SENDER_LOOPBACK.field,
                                 ),
@@ -2768,7 +3199,7 @@ pub mod disembargo {
                     1u16 => {
                         Ok(
                             Which::ReceiverLoopback(
-                                <u32 as _p::field::FieldType>::reader(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::RECEIVER_LOOPBACK.field,
                                 ),
@@ -2778,7 +3209,7 @@ pub mod disembargo {
                     2u16 => {
                         Ok(
                             Which::Accept(
-                                <() as _p::field::FieldType>::reader(
+                                <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::ACCEPT.field,
                                 ),
@@ -2788,7 +3219,7 @@ pub mod disembargo {
                     3u16 => {
                         Ok(
                             Which::Provide(
-                                <u32 as _p::field::FieldType>::reader(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::PROVIDE.field,
                                 ),
@@ -2810,7 +3241,7 @@ pub mod disembargo {
                     0u16 => {
                         Ok(
                             Which::SenderLoopback(
-                                <u32 as _p::field::FieldType>::builder(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::SENDER_LOOPBACK.field,
                                 ),
@@ -2820,7 +3251,7 @@ pub mod disembargo {
                     1u16 => {
                         Ok(
                             Which::ReceiverLoopback(
-                                <u32 as _p::field::FieldType>::builder(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::RECEIVER_LOOPBACK.field,
                                 ),
@@ -2830,7 +3261,7 @@ pub mod disembargo {
                     2u16 => {
                         Ok(
                             Which::Accept(
-                                <() as _p::field::FieldType>::builder(
+                                <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::ACCEPT.field,
                                 ),
@@ -2840,7 +3271,7 @@ pub mod disembargo {
                     3u16 => {
                         Ok(
                             Which::Provide(
-                                <u32 as _p::field::FieldType>::builder(
+                                <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::PROVIDE.field,
                                 ),
@@ -2966,20 +3397,22 @@ impl Provide {
 impl<'p, T: _p::rpc::Table + 'p> provide::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Provide::QUESTION_ID) }
+        unsafe {
+            <u32 as _p::field::FieldType>::accessor(&self.0, &Provide::QUESTION_ID)
+        }
     }
     #[inline]
     pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::reader(&self.0, &Provide::TARGET)
+            > as _p::field::FieldType>::accessor(&self.0, &Provide::TARGET)
         }
     }
     #[inline]
     pub fn recipient(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::reader(&self.0, &Provide::RECIPIENT)
+            <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &Provide::RECIPIENT)
         }
     }
 }
@@ -2987,7 +3420,7 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Provide::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Provide::QUESTION_ID)
         }
     }
     #[inline]
@@ -2995,16 +3428,30 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Builder<'p, T> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::builder(&mut self.0, &Provide::TARGET)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Provide::TARGET)
         }
     }
     #[inline]
     pub fn recipient(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Provide::RECIPIENT,
             )
+        }
+    }
+    #[inline]
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+        unsafe {
+            <_p::Struct<
+                MessageTarget,
+            > as _p::field::FieldType>::accessor(self.0, &Provide::TARGET)
+        }
+    }
+    #[inline]
+    pub fn into_recipient(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &Provide::RECIPIENT)
         }
     }
 }
@@ -3124,30 +3571,30 @@ impl Accept {
 impl<'p, T: _p::rpc::Table + 'p> accept::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Accept::QUESTION_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Accept::QUESTION_ID) }
     }
     #[inline]
     pub fn provision(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::reader(&self.0, &Accept::PROVISION)
+            <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &Accept::PROVISION)
         }
     }
     #[inline]
     pub fn embargo(&self) -> _p::Accessor<'_, 'p, T, bool> {
-        unsafe { <bool as _p::field::FieldType>::reader(&self.0, &Accept::EMBARGO) }
+        unsafe { <bool as _p::field::FieldType>::accessor(&self.0, &Accept::EMBARGO) }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> accept::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Accept::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Accept::QUESTION_ID)
         }
     }
     #[inline]
     pub fn provision(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Accept::PROVISION,
             )
@@ -3155,7 +3602,15 @@ impl<'p, T: _p::rpc::Table + 'p> accept::Builder<'p, T> {
     }
     #[inline]
     pub fn embargo(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
-        unsafe { <bool as _p::field::FieldType>::builder(&mut self.0, &Accept::EMBARGO) }
+        unsafe {
+            <bool as _p::field::FieldType>::accessor(&mut self.0, &Accept::EMBARGO)
+        }
+    }
+    #[inline]
+    pub fn into_provision(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &Accept::PROVISION)
+        }
     }
 }
 pub mod accept {
@@ -3276,26 +3731,28 @@ impl Join {
 impl<'p, T: _p::rpc::Table + 'p> join::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe { <u32 as _p::field::FieldType>::reader(&self.0, &Join::QUESTION_ID) }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Join::QUESTION_ID) }
     }
     #[inline]
     pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::reader(&self.0, &Join::TARGET)
+            > as _p::field::FieldType>::accessor(&self.0, &Join::TARGET)
         }
     }
     #[inline]
     pub fn key_part(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
-        unsafe { <_p::AnyPtr as _p::field::FieldType>::reader(&self.0, &Join::KEY_PART) }
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &Join::KEY_PART)
+        }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> join::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(&mut self.0, &Join::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &Join::QUESTION_ID)
         }
     }
     #[inline]
@@ -3303,13 +3760,27 @@ impl<'p, T: _p::rpc::Table + 'p> join::Builder<'p, T> {
         unsafe {
             <_p::Struct<
                 MessageTarget,
-            > as _p::field::FieldType>::builder(&mut self.0, &Join::TARGET)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Join::TARGET)
         }
     }
     #[inline]
     pub fn key_part(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(&mut self.0, &Join::KEY_PART)
+            <_p::AnyPtr as _p::field::FieldType>::accessor(&mut self.0, &Join::KEY_PART)
+        }
+    }
+    #[inline]
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+        unsafe {
+            <_p::Struct<
+                MessageTarget,
+            > as _p::field::FieldType>::accessor(self.0, &Join::TARGET)
+        }
+    }
+    #[inline]
+    pub fn into_key_part(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &Join::KEY_PART)
         }
     }
 }
@@ -3439,11 +3910,17 @@ impl MessageTarget {
 impl<'p, T: _p::rpc::Table + 'p> message_target::Reader<'p, T> {
     #[inline]
     pub fn imported_cap(&self) -> _p::Variant<'_, 'p, T, u32> {
-        unsafe { _p::field::VariantField::new(&self.0, &MessageTarget::IMPORTED_CAP) }
+        unsafe {
+            <u32 as _p::field::FieldType>::variant(&self.0, &MessageTarget::IMPORTED_CAP)
+        }
     }
     #[inline]
     pub fn promised_answer(&self) -> _p::Variant<'_, 'p, T, _p::Struct<PromisedAnswer>> {
-        unsafe { _p::field::VariantField::new(&self.0, &MessageTarget::PROMISED_ANSWER) }
+        unsafe {
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(&self.0, &MessageTarget::PROMISED_ANSWER)
+        }
     }
     #[inline]
     pub fn which(&self) -> Result<message_target::Which<&Self>, _p::NotInSchema> {
@@ -3454,7 +3931,10 @@ impl<'p, T: _p::rpc::Table + 'p> message_target::Builder<'p, T> {
     #[inline]
     pub fn imported_cap(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &MessageTarget::IMPORTED_CAP)
+            <u32 as _p::field::FieldType>::variant(
+                &mut self.0,
+                &MessageTarget::IMPORTED_CAP,
+            )
         }
     }
     #[inline]
@@ -3462,7 +3942,22 @@ impl<'p, T: _p::rpc::Table + 'p> message_target::Builder<'p, T> {
         &mut self,
     ) -> _p::VariantMut<'_, 'p, T, _p::Struct<PromisedAnswer>> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &MessageTarget::PROMISED_ANSWER)
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(
+                &mut self.0,
+                &MessageTarget::PROMISED_ANSWER,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_promised_answer(
+        self,
+    ) -> _p::VariantOwned<'p, T, _p::Struct<PromisedAnswer>> {
+        unsafe {
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(self.0, &MessageTarget::PROMISED_ANSWER)
         }
     }
     #[inline]
@@ -3482,7 +3977,7 @@ pub mod message_target {
     >;
     pub enum Which<T: _p::Viewable = _p::Family> {
         ImportedCap(_p::ViewOf<T, u32>),
-        PromisedAnswer(_p::ViewOf<T, _p::Struct<__file::PromisedAnswer>>),
+        PromisedAnswer(_p::ViewOf<T, _p::Struct<super::PromisedAnswer>>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -3492,7 +3987,7 @@ pub mod message_target {
                 0u16 => {
                     Ok(
                         Which::ImportedCap(
-                            <u32 as _p::field::FieldType>::reader(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::MessageTarget::IMPORTED_CAP.field,
                             ),
@@ -3503,8 +3998,8 @@ pub mod message_target {
                     Ok(
                         Which::PromisedAnswer(
                             <_p::Struct<
-                                __file::PromisedAnswer,
-                            > as _p::field::FieldType>::reader(
+                                super::PromisedAnswer,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
                             ),
@@ -3526,7 +4021,7 @@ pub mod message_target {
                 0u16 => {
                     Ok(
                         Which::ImportedCap(
-                            <u32 as _p::field::FieldType>::builder(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::MessageTarget::IMPORTED_CAP.field,
                             ),
@@ -3537,8 +4032,8 @@ pub mod message_target {
                     Ok(
                         Which::PromisedAnswer(
                             <_p::Struct<
-                                __file::PromisedAnswer,
-                            > as _p::field::FieldType>::builder(
+                                super::PromisedAnswer,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
                             ),
@@ -3653,14 +4148,16 @@ impl Payload {
         _p::List<_p::Struct<CapDescriptor>>,
     > {
         slot: 1u32,
-        default: _p::list::Reader::<_p::Struct<CapDescriptor>>::empty(),
+        default: _p::ListReader::empty(
+            _p::ElementSize::size_of::<_p::Struct<CapDescriptor>>(),
+        ),
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> payload::Reader<'p, T> {
     #[inline]
     pub fn content(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::reader(&self.0, &Payload::CONTENT)
+            <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &Payload::CONTENT)
         }
     }
     #[inline]
@@ -3670,7 +4167,7 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Reader<'p, T> {
         unsafe {
             <_p::List<
                 _p::Struct<CapDescriptor>,
-            > as _p::field::FieldType>::reader(&self.0, &Payload::CAP_TABLE)
+            > as _p::field::FieldType>::accessor(&self.0, &Payload::CAP_TABLE)
         }
     }
 }
@@ -3678,7 +4175,10 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Builder<'p, T> {
     #[inline]
     pub fn content(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(&mut self.0, &Payload::CONTENT)
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Payload::CONTENT,
+            )
         }
     }
     #[inline]
@@ -3688,7 +4188,23 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Builder<'p, T> {
         unsafe {
             <_p::List<
                 _p::Struct<CapDescriptor>,
-            > as _p::field::FieldType>::builder(&mut self.0, &Payload::CAP_TABLE)
+            > as _p::field::FieldType>::accessor(&mut self.0, &Payload::CAP_TABLE)
+        }
+    }
+    #[inline]
+    pub fn into_content(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &Payload::CONTENT)
+        }
+    }
+    #[inline]
+    pub fn into_cap_table(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<CapDescriptor>>> {
+        unsafe {
+            <_p::List<
+                _p::Struct<CapDescriptor>,
+            > as _p::field::FieldType>::accessor(self.0, &Payload::CAP_TABLE)
         }
     }
 }
@@ -3862,35 +4378,59 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Reader<'p, T> {
     #[inline]
     pub fn attached_fd(&self) -> _p::Accessor<'_, 'p, T, u8> {
         unsafe {
-            <u8 as _p::field::FieldType>::reader(&self.0, &CapDescriptor::ATTACHED_FD)
+            <u8 as _p::field::FieldType>::accessor(&self.0, &CapDescriptor::ATTACHED_FD)
         }
     }
     #[inline]
     pub fn none(&self) -> _p::Variant<'_, 'p, T, ()> {
-        unsafe { _p::field::VariantField::new(&self.0, &CapDescriptor::NONE) }
+        unsafe { <() as _p::field::FieldType>::variant(&self.0, &CapDescriptor::NONE) }
     }
     #[inline]
     pub fn sender_hosted(&self) -> _p::Variant<'_, 'p, T, u32> {
-        unsafe { _p::field::VariantField::new(&self.0, &CapDescriptor::SENDER_HOSTED) }
+        unsafe {
+            <u32 as _p::field::FieldType>::variant(
+                &self.0,
+                &CapDescriptor::SENDER_HOSTED,
+            )
+        }
     }
     #[inline]
     pub fn sender_promise(&self) -> _p::Variant<'_, 'p, T, u32> {
-        unsafe { _p::field::VariantField::new(&self.0, &CapDescriptor::SENDER_PROMISE) }
+        unsafe {
+            <u32 as _p::field::FieldType>::variant(
+                &self.0,
+                &CapDescriptor::SENDER_PROMISE,
+            )
+        }
     }
     #[inline]
     pub fn receiver_hosted(&self) -> _p::Variant<'_, 'p, T, u32> {
-        unsafe { _p::field::VariantField::new(&self.0, &CapDescriptor::RECEIVER_HOSTED) }
+        unsafe {
+            <u32 as _p::field::FieldType>::variant(
+                &self.0,
+                &CapDescriptor::RECEIVER_HOSTED,
+            )
+        }
     }
     #[inline]
     pub fn receiver_answer(&self) -> _p::Variant<'_, 'p, T, _p::Struct<PromisedAnswer>> {
-        unsafe { _p::field::VariantField::new(&self.0, &CapDescriptor::RECEIVER_ANSWER) }
+        unsafe {
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(&self.0, &CapDescriptor::RECEIVER_ANSWER)
+        }
     }
     #[inline]
     pub fn third_party_hosted(
         &self,
     ) -> _p::Variant<'_, 'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
         unsafe {
-            _p::field::VariantField::new(&self.0, &CapDescriptor::THIRD_PARTY_HOSTED)
+            <_p::Struct<
+                ThirdPartyCapDescriptor,
+            > as _p::field::FieldType>::variant(
+                &self.0,
+                &CapDescriptor::THIRD_PARTY_HOSTED,
+            )
         }
     }
     #[inline]
@@ -3902,7 +4442,7 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
     #[inline]
     pub fn attached_fd(&mut self) -> _p::AccessorMut<'_, 'p, T, u8> {
         unsafe {
-            <u8 as _p::field::FieldType>::builder(
+            <u8 as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &CapDescriptor::ATTACHED_FD,
             )
@@ -3910,24 +4450,35 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
     }
     #[inline]
     pub fn none(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
-        unsafe { _p::field::VariantField::new(&mut self.0, &CapDescriptor::NONE) }
+        unsafe {
+            <() as _p::field::FieldType>::variant(&mut self.0, &CapDescriptor::NONE)
+        }
     }
     #[inline]
     pub fn sender_hosted(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &CapDescriptor::SENDER_HOSTED)
+            <u32 as _p::field::FieldType>::variant(
+                &mut self.0,
+                &CapDescriptor::SENDER_HOSTED,
+            )
         }
     }
     #[inline]
     pub fn sender_promise(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &CapDescriptor::SENDER_PROMISE)
+            <u32 as _p::field::FieldType>::variant(
+                &mut self.0,
+                &CapDescriptor::SENDER_PROMISE,
+            )
         }
     }
     #[inline]
     pub fn receiver_hosted(&mut self) -> _p::VariantMut<'_, 'p, T, u32> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &CapDescriptor::RECEIVER_HOSTED)
+            <u32 as _p::field::FieldType>::variant(
+                &mut self.0,
+                &CapDescriptor::RECEIVER_HOSTED,
+            )
         }
     }
     #[inline]
@@ -3935,7 +4486,12 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
         &mut self,
     ) -> _p::VariantMut<'_, 'p, T, _p::Struct<PromisedAnswer>> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &CapDescriptor::RECEIVER_ANSWER)
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(
+                &mut self.0,
+                &CapDescriptor::RECEIVER_ANSWER,
+            )
         }
     }
     #[inline]
@@ -3943,7 +4499,35 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
         &mut self,
     ) -> _p::VariantMut<'_, 'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
         unsafe {
-            _p::field::VariantField::new(&mut self.0, &CapDescriptor::THIRD_PARTY_HOSTED)
+            <_p::Struct<
+                ThirdPartyCapDescriptor,
+            > as _p::field::FieldType>::variant(
+                &mut self.0,
+                &CapDescriptor::THIRD_PARTY_HOSTED,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_receiver_answer(
+        self,
+    ) -> _p::VariantOwned<'p, T, _p::Struct<PromisedAnswer>> {
+        unsafe {
+            <_p::Struct<
+                PromisedAnswer,
+            > as _p::field::FieldType>::variant(self.0, &CapDescriptor::RECEIVER_ANSWER)
+        }
+    }
+    #[inline]
+    pub fn into_third_party_hosted(
+        self,
+    ) -> _p::VariantOwned<'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
+        unsafe {
+            <_p::Struct<
+                ThirdPartyCapDescriptor,
+            > as _p::field::FieldType>::variant(
+                self.0,
+                &CapDescriptor::THIRD_PARTY_HOSTED,
+            )
         }
     }
     #[inline]
@@ -3966,8 +4550,8 @@ pub mod cap_descriptor {
         SenderHosted(_p::ViewOf<T, u32>),
         SenderPromise(_p::ViewOf<T, u32>),
         ReceiverHosted(_p::ViewOf<T, u32>),
-        ReceiverAnswer(_p::ViewOf<T, _p::Struct<__file::PromisedAnswer>>),
-        ThirdPartyHosted(_p::ViewOf<T, _p::Struct<__file::ThirdPartyCapDescriptor>>),
+        ReceiverAnswer(_p::ViewOf<T, _p::Struct<super::PromisedAnswer>>),
+        ThirdPartyHosted(_p::ViewOf<T, _p::Struct<super::ThirdPartyCapDescriptor>>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -3977,7 +4561,7 @@ pub mod cap_descriptor {
                 0u16 => {
                     Ok(
                         Which::None(
-                            <() as _p::field::FieldType>::reader(
+                            <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::NONE.field,
                             ),
@@ -3987,7 +4571,7 @@ pub mod cap_descriptor {
                 1u16 => {
                     Ok(
                         Which::SenderHosted(
-                            <u32 as _p::field::FieldType>::reader(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::SENDER_HOSTED.field,
                             ),
@@ -3997,7 +4581,7 @@ pub mod cap_descriptor {
                 2u16 => {
                     Ok(
                         Which::SenderPromise(
-                            <u32 as _p::field::FieldType>::reader(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::SENDER_PROMISE.field,
                             ),
@@ -4007,7 +4591,7 @@ pub mod cap_descriptor {
                 3u16 => {
                     Ok(
                         Which::ReceiverHosted(
-                            <u32 as _p::field::FieldType>::reader(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::RECEIVER_HOSTED.field,
                             ),
@@ -4018,8 +4602,8 @@ pub mod cap_descriptor {
                     Ok(
                         Which::ReceiverAnswer(
                             <_p::Struct<
-                                __file::PromisedAnswer,
-                            > as _p::field::FieldType>::reader(
+                                super::PromisedAnswer,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
                             ),
@@ -4030,8 +4614,8 @@ pub mod cap_descriptor {
                     Ok(
                         Which::ThirdPartyHosted(
                             <_p::Struct<
-                                __file::ThirdPartyCapDescriptor,
-                            > as _p::field::FieldType>::reader(
+                                super::ThirdPartyCapDescriptor,
+                            > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
                             ),
@@ -4053,7 +4637,7 @@ pub mod cap_descriptor {
                 0u16 => {
                     Ok(
                         Which::None(
-                            <() as _p::field::FieldType>::builder(
+                            <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::NONE.field,
                             ),
@@ -4063,7 +4647,7 @@ pub mod cap_descriptor {
                 1u16 => {
                     Ok(
                         Which::SenderHosted(
-                            <u32 as _p::field::FieldType>::builder(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::SENDER_HOSTED.field,
                             ),
@@ -4073,7 +4657,7 @@ pub mod cap_descriptor {
                 2u16 => {
                     Ok(
                         Which::SenderPromise(
-                            <u32 as _p::field::FieldType>::builder(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::SENDER_PROMISE.field,
                             ),
@@ -4083,7 +4667,7 @@ pub mod cap_descriptor {
                 3u16 => {
                     Ok(
                         Which::ReceiverHosted(
-                            <u32 as _p::field::FieldType>::builder(
+                            <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::RECEIVER_HOSTED.field,
                             ),
@@ -4094,8 +4678,8 @@ pub mod cap_descriptor {
                     Ok(
                         Which::ReceiverAnswer(
                             <_p::Struct<
-                                __file::PromisedAnswer,
-                            > as _p::field::FieldType>::builder(
+                                super::PromisedAnswer,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
                             ),
@@ -4106,8 +4690,8 @@ pub mod cap_descriptor {
                     Ok(
                         Which::ThirdPartyHosted(
                             <_p::Struct<
-                                __file::ThirdPartyCapDescriptor,
-                            > as _p::field::FieldType>::builder(
+                                super::ThirdPartyCapDescriptor,
+                            > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
                             ),
@@ -4218,28 +4802,33 @@ impl PromisedAnswer {
         slot: 0u32,
         default: 0u32,
     };
-    const TRANSFORM: _p::Descriptor<_p::List<_p::Struct<__file::promised_answer::Op>>> = _p::Descriptor::<
-        _p::List<_p::Struct<__file::promised_answer::Op>>,
+    const TRANSFORM: _p::Descriptor<_p::List<_p::Struct<promised_answer::Op>>> = _p::Descriptor::<
+        _p::List<_p::Struct<promised_answer::Op>>,
     > {
         slot: 0u32,
-        default: _p::list::Reader::<_p::Struct<__file::promised_answer::Op>>::empty(),
+        default: _p::ListReader::empty(
+            _p::ElementSize::size_of::<_p::Struct<promised_answer::Op>>(),
+        ),
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> promised_answer::Reader<'p, T> {
     #[inline]
     pub fn question_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::reader(&self.0, &PromisedAnswer::QUESTION_ID)
+            <u32 as _p::field::FieldType>::accessor(
+                &self.0,
+                &PromisedAnswer::QUESTION_ID,
+            )
         }
     }
     #[inline]
     pub fn transform(
         &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<__file::promised_answer::Op>>> {
+    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
         unsafe {
             <_p::List<
-                _p::Struct<__file::promised_answer::Op>,
-            > as _p::field::FieldType>::reader(&self.0, &PromisedAnswer::TRANSFORM)
+                _p::Struct<promised_answer::Op>,
+            > as _p::field::FieldType>::accessor(&self.0, &PromisedAnswer::TRANSFORM)
         }
     }
 }
@@ -4247,7 +4836,7 @@ impl<'p, T: _p::rpc::Table + 'p> promised_answer::Builder<'p, T> {
     #[inline]
     pub fn question_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(
+            <u32 as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &PromisedAnswer::QUESTION_ID,
             )
@@ -4256,11 +4845,21 @@ impl<'p, T: _p::rpc::Table + 'p> promised_answer::Builder<'p, T> {
     #[inline]
     pub fn transform(
         &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Struct<__file::promised_answer::Op>>> {
+    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
         unsafe {
             <_p::List<
-                _p::Struct<__file::promised_answer::Op>,
-            > as _p::field::FieldType>::builder(&mut self.0, &PromisedAnswer::TRANSFORM)
+                _p::Struct<promised_answer::Op>,
+            > as _p::field::FieldType>::accessor(&mut self.0, &PromisedAnswer::TRANSFORM)
+        }
+    }
+    #[inline]
+    pub fn into_transform(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
+        unsafe {
+            <_p::List<
+                _p::Struct<promised_answer::Op>,
+            > as _p::field::FieldType>::accessor(self.0, &PromisedAnswer::TRANSFORM)
         }
     }
 }
@@ -4393,11 +4992,13 @@ pub mod promised_answer {
     impl<'p, T: _p::rpc::Table + 'p> op::Reader<'p, T> {
         #[inline]
         pub fn noop(&self) -> _p::Variant<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&self.0, &Op::NOOP) }
+            unsafe { <() as _p::field::FieldType>::variant(&self.0, &Op::NOOP) }
         }
         #[inline]
         pub fn get_pointer_field(&self) -> _p::Variant<'_, 'p, T, u16> {
-            unsafe { _p::field::VariantField::new(&self.0, &Op::GET_POINTER_FIELD) }
+            unsafe {
+                <u16 as _p::field::FieldType>::variant(&self.0, &Op::GET_POINTER_FIELD)
+            }
         }
         #[inline]
         pub fn which(&self) -> Result<op::Which<&Self>, _p::NotInSchema> {
@@ -4407,11 +5008,16 @@ pub mod promised_answer {
     impl<'p, T: _p::rpc::Table + 'p> op::Builder<'p, T> {
         #[inline]
         pub fn noop(&mut self) -> _p::VariantMut<'_, 'p, T, ()> {
-            unsafe { _p::field::VariantField::new(&mut self.0, &Op::NOOP) }
+            unsafe { <() as _p::field::FieldType>::variant(&mut self.0, &Op::NOOP) }
         }
         #[inline]
         pub fn get_pointer_field(&mut self) -> _p::VariantMut<'_, 'p, T, u16> {
-            unsafe { _p::field::VariantField::new(&mut self.0, &Op::GET_POINTER_FIELD) }
+            unsafe {
+                <u16 as _p::field::FieldType>::variant(
+                    &mut self.0,
+                    &Op::GET_POINTER_FIELD,
+                )
+            }
         }
         #[inline]
         pub fn which(&mut self) -> Result<op::Which<&mut Self>, _p::NotInSchema> {
@@ -4437,7 +5043,7 @@ pub mod promised_answer {
                     0u16 => {
                         Ok(
                             Which::Noop(
-                                <() as _p::field::FieldType>::reader(
+                                <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Op::NOOP.field,
                                 ),
@@ -4447,7 +5053,7 @@ pub mod promised_answer {
                     1u16 => {
                         Ok(
                             Which::GetPointerField(
-                                <u16 as _p::field::FieldType>::reader(
+                                <u16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Op::GET_POINTER_FIELD.field,
                                 ),
@@ -4469,7 +5075,7 @@ pub mod promised_answer {
                     0u16 => {
                         Ok(
                             Which::Noop(
-                                <() as _p::field::FieldType>::builder(
+                                <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Op::NOOP.field,
                                 ),
@@ -4479,7 +5085,7 @@ pub mod promised_answer {
                     1u16 => {
                         Ok(
                             Which::GetPointerField(
-                                <u16 as _p::field::FieldType>::builder(
+                                <u16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Op::GET_POINTER_FIELD.field,
                                 ),
@@ -4610,7 +5216,7 @@ impl<'p, T: _p::rpc::Table + 'p> third_party_cap_descriptor::Reader<'p, T> {
     #[inline]
     pub fn id(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::reader(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &self.0,
                 &ThirdPartyCapDescriptor::ID,
             )
@@ -4619,7 +5225,7 @@ impl<'p, T: _p::rpc::Table + 'p> third_party_cap_descriptor::Reader<'p, T> {
     #[inline]
     pub fn vine_id(&self) -> _p::Accessor<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::reader(
+            <u32 as _p::field::FieldType>::accessor(
                 &self.0,
                 &ThirdPartyCapDescriptor::VINE_ID,
             )
@@ -4630,7 +5236,7 @@ impl<'p, T: _p::rpc::Table + 'p> third_party_cap_descriptor::Builder<'p, T> {
     #[inline]
     pub fn id(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::builder(
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &ThirdPartyCapDescriptor::ID,
             )
@@ -4639,9 +5245,18 @@ impl<'p, T: _p::rpc::Table + 'p> third_party_cap_descriptor::Builder<'p, T> {
     #[inline]
     pub fn vine_id(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::builder(
+            <u32 as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &ThirdPartyCapDescriptor::VINE_ID,
+            )
+        }
+    }
+    #[inline]
+    pub fn into_id(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        unsafe {
+            <_p::AnyPtr as _p::field::FieldType>::accessor(
+                self.0,
+                &ThirdPartyCapDescriptor::ID,
             )
         }
     }
@@ -4752,7 +5367,7 @@ impl _p::ty::Struct for Exception {
 impl Exception {
     const REASON: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
-        default: _p::text::ptr::Reader::empty(),
+        default: _p::text::Reader::empty(),
     };
     const OBSOLETE_IS_CALLERS_FAULT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 0u32,
@@ -4762,28 +5377,28 @@ impl Exception {
         slot: 1u32,
         default: 0u16,
     };
-    const TYPE: _p::Descriptor<_p::Enum<__file::exception::Type>> = _p::Descriptor::<
-        _p::Enum<__file::exception::Type>,
+    const TYPE: _p::Descriptor<_p::Enum<exception::Type>> = _p::Descriptor::<
+        _p::Enum<exception::Type>,
     > {
         slot: 2u32,
-        default: __file::exception::Type::Failed,
+        default: exception::Type::Failed,
     };
     const TRACE: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 1u32,
-        default: _p::text::ptr::Reader::empty(),
+        default: _p::text::Reader::empty(),
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {
     #[inline]
     pub fn reason(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
         unsafe {
-            <_p::Text as _p::field::FieldType>::reader(&self.0, &Exception::REASON)
+            <_p::Text as _p::field::FieldType>::accessor(&self.0, &Exception::REASON)
         }
     }
     #[inline]
     pub fn obsolete_is_callers_fault(&self) -> _p::Accessor<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::reader(
+            <bool as _p::field::FieldType>::accessor(
                 &self.0,
                 &Exception::OBSOLETE_IS_CALLERS_FAULT,
             )
@@ -4792,36 +5407,38 @@ impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {
     #[inline]
     pub fn obsolete_durability(&self) -> _p::Accessor<'_, 'p, T, u16> {
         unsafe {
-            <u16 as _p::field::FieldType>::reader(
+            <u16 as _p::field::FieldType>::accessor(
                 &self.0,
                 &Exception::OBSOLETE_DURABILITY,
             )
         }
     }
     #[inline]
-    pub fn r#type(&self) -> _p::Accessor<'_, 'p, T, _p::Enum<__file::exception::Type>> {
+    pub fn r#type(&self) -> _p::Accessor<'_, 'p, T, _p::Enum<exception::Type>> {
         unsafe {
             <_p::Enum<
-                __file::exception::Type,
-            > as _p::field::FieldType>::reader(&self.0, &Exception::TYPE)
+                exception::Type,
+            > as _p::field::FieldType>::accessor(&self.0, &Exception::TYPE)
         }
     }
     #[inline]
     pub fn trace(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
-        unsafe { <_p::Text as _p::field::FieldType>::reader(&self.0, &Exception::TRACE) }
+        unsafe {
+            <_p::Text as _p::field::FieldType>::accessor(&self.0, &Exception::TRACE)
+        }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> exception::Builder<'p, T> {
     #[inline]
     pub fn reason(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
         unsafe {
-            <_p::Text as _p::field::FieldType>::builder(&mut self.0, &Exception::REASON)
+            <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &Exception::REASON)
         }
     }
     #[inline]
     pub fn obsolete_is_callers_fault(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
         unsafe {
-            <bool as _p::field::FieldType>::builder(
+            <bool as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Exception::OBSOLETE_IS_CALLERS_FAULT,
             )
@@ -4830,26 +5447,36 @@ impl<'p, T: _p::rpc::Table + 'p> exception::Builder<'p, T> {
     #[inline]
     pub fn obsolete_durability(&mut self) -> _p::AccessorMut<'_, 'p, T, u16> {
         unsafe {
-            <u16 as _p::field::FieldType>::builder(
+            <u16 as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &Exception::OBSOLETE_DURABILITY,
             )
         }
     }
     #[inline]
-    pub fn r#type(
-        &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Enum<__file::exception::Type>> {
+    pub fn r#type(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Enum<exception::Type>> {
         unsafe {
             <_p::Enum<
-                __file::exception::Type,
-            > as _p::field::FieldType>::builder(&mut self.0, &Exception::TYPE)
+                exception::Type,
+            > as _p::field::FieldType>::accessor(&mut self.0, &Exception::TYPE)
         }
     }
     #[inline]
     pub fn trace(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
         unsafe {
-            <_p::Text as _p::field::FieldType>::builder(&mut self.0, &Exception::TRACE)
+            <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &Exception::TRACE)
+        }
+    }
+    #[inline]
+    pub fn into_reason(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+        unsafe {
+            <_p::Text as _p::field::FieldType>::accessor(self.0, &Exception::REASON)
+        }
+    }
+    #[inline]
+    pub fn into_trace(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+        unsafe {
+            <_p::Text as _p::field::FieldType>::accessor(self.0, &Exception::TRACE)
         }
     }
 }

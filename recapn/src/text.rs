@@ -39,7 +39,7 @@ pub type Builder<'a> = Text<ptr::Builder<'a>>;
 
 impl Sealed for Text {}
 impl ty::Value for Text {
-    type Default = ptr::Reader<'static>;
+    type Default = Reader<'static>;
 }
 impl ty::ListValue for Text {
     const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;

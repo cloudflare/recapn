@@ -30,6 +30,7 @@
 use crate::field::Struct;
 use crate::internal::Sealed;
 use crate::list::{self, List, ElementSize};
+use crate::orphan::{Orphan, Orphanage};
 use crate::ptr::{ElementCount, CopySize, ErrorHandler, IgnoreErrors, MessageSize, PtrElementSize, StructSize};
 use crate::rpc::{self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, PipelineBuilder, Pipelined, Table};
 use crate::ty::{self, FromPtr, StructReader as _};
@@ -500,6 +501,16 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         T2: InsertableInto<T>,
     {
         self.try_set(reader, canonical, IgnoreErrors).unwrap()
+    }
+
+    #[inline]
+    pub fn disown_into<'b>(&mut self, orphanage: &Orphanage<'b, T>) -> Orphan<'b, AnyPtr, T> {
+        Orphan::new(self.0.disown_into(orphanage))
+    }
+
+    #[inline]
+    pub fn adopt(&mut self, orphan: Orphan<'_, AnyPtr, T>) {
+        self.0.adopt(orphan.into_inner());
     }
 
     // TODO orphan APIs

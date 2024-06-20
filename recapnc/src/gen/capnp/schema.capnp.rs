@@ -10,18 +10,18 @@ _p::generate_file! {
         size: { data: 5, ptrs: 6 },
         fields: {
             ID, id, id_mut, u64 = { slot: 0, default: 0 },
-            DISPLAY_NAME, display_name, display_name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+            DISPLAY_NAME, display_name, display_name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
             DISPLAY_NAME_PREFIX_LENGTH, display_name_prefix_length, display_name_prefix_length_mut, u32 = { slot: 2, default: 0 },
             SCOPE_ID, scope_id, scope_id_mut, u64 = { slot: 2, default: 0 },
             PARAMETERS, parameters, parameters_mut, _p::List<_p::Struct<node::Parameter>> = {
-                slot: 5, default: _p::list::Reader::empty()
+                slot: 5, default: _p::eslpr()
             },
             IS_GENERIC, is_generic, is_generic_mut, bool = { slot: 288, default: false },
             NESTED_NODES, nested_nodes, nested_nodes_mut, _p::List<_p::Struct<node::NestedNode>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
-                slot: 2, default: _p::list::Reader::empty()
+                slot: 2, default: _p::eslpr()
             },
         },
         union {
@@ -48,7 +48,7 @@ _p::generate_file! {
                     DISCRIMINANT_COUNT, discriminant_count, discriminant_count_mut, u16 = { slot: 15, default: 0 },
                     DISCRIMINANT_OFFSET, discriminant_offset, discriminant_offset_mut, u32 = { slot: 8, default: 0 },
                     FIELDS, fields, fields_mut, _p::List<_p::Struct<__file::Field>> = {
-                        slot: 3, default: _p::list::Reader::empty()
+                        slot: 3, default: _p::eslpr()
                     },
                 },
             },
@@ -56,7 +56,7 @@ _p::generate_file! {
                 mod: r#enum,
                 fields: {
                     ENUMERANTS, enumerants, enumerants_mut, _p::List<_p::Struct<__file::Enumerant>> = {
-                        slot: 3, default: _p::list::Reader::empty()
+                        slot: 3, default: _p::eslpr()
                     },
                 },
             },
@@ -64,10 +64,10 @@ _p::generate_file! {
                 mod: interface,
                 fields: {
                     METHODS, methods, methods_mut, _p::List<_p::Struct<__file::Method>> = {
-                        slot: 3, default: _p::list::Reader::empty()
+                        slot: 3, default: _p::eslpr()
                     },
                     SUPERCLASSES, superclasses, superclasses_mut, _p::List<_p::Struct<__file::Superclass>> = {
-                        slot: 4, default: _p::list::Reader::empty()
+                        slot: 4, default: _p::eslpr()
                     },
                 },
             },
@@ -100,14 +100,14 @@ _p::generate_file! {
                 mod: parameter,
                 size: { data: 0, ptrs: 1 },
                 fields: {
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                 },
             },
             struct NestedNode {
                 mod: nested_node,
                 size: { data: 0, ptrs: 1 },
                 fields: {
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
                 },
             },
@@ -116,9 +116,9 @@ _p::generate_file! {
                 size: { data: 0, ptrs: 1 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                    DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                     MEMBERS, members, members_mut, _p::List<_p::Struct<source_info::Member>> = {
-                        slot: 1, default: _p::list::Reader::empty()
+                        slot: 1, default: _p::eslpr()
                     },
                 },
                 nested: {
@@ -126,7 +126,7 @@ _p::generate_file! {
                         mod: member,
                         size: { data: 0, ptrs: 1 },
                         fields: {
-                            DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                            DOC_COMMENT, doc_comment, doc_comment_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                         },
                     }
                 },
@@ -137,10 +137,10 @@ _p::generate_file! {
         mod: field,
         size: { data: 3, ptrs: 4 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             },
             DISCRIMINANT_VALUE, discriminant_value, discriminant_value_mut, u16 = { slot: 1, default: 65535 },
             ORDINAL, ordinal, ordinal_mut, _p::Group<field::Ordinal> = (),
@@ -185,10 +185,10 @@ _p::generate_file! {
         mod: enumerant,
         size: { data: 1, ptrs: 2 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             },
         },
     },
@@ -198,7 +198,7 @@ _p::generate_file! {
         fields: {
             ID, id, id_mut, u64 = { slot: 0, default: 0 },
             BRAND, brand, brand_mut, _p::List<_p::Struct<Brand>> = {
-                slot: 0, default: _p::list::Reader::empty()
+                slot: 0, default: _p::eslpr()
             }
         },
     },
@@ -206,17 +206,17 @@ _p::generate_file! {
         mod: method,
         size: { data: 3, ptrs: 5 },
         fields: {
-            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
             CODE_ORDER, code_order, code_order_mut, u16 = { slot: 0, default: 0 },
             IMPLICIT_PARAMETERS, implicit_parameters, implicit_parameters_mut, _p::List<_p::Struct<node::Parameter>> = {
-                slot: 4, default: _p::list::Reader::empty()
+                slot: 4, default: _p::eslpr()
             },
             PARAM_STRUCT_TYPE, param_struct_type, param_struct_type_mut, u64 = { slot: 1, default: 0 },
             PARAM_BRAND, param_brand, param_brand_mut, _p::Struct<Brand> = { slot: 2, default: _p::StructReader::empty() },
             RESULT_STRUCT_TYPE, result_struct_type, result_struct_type_mut, u64 = { slot: 2, default: 0 },
             RESULT_BRAND, result_brand, result_brand_mut, _p::Struct<Brand> = { slot: 3, default: _p::StructReader::empty() },
             ANNOTATIONS, annotations, annotations_mut, _p::List<_p::Struct<Annotation>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             },
         },
     },
@@ -323,7 +323,7 @@ _p::generate_file! {
         size: { data: 0, ptrs: 1 },
         fields: {
             SCOPES, scopes, scopes_mut, _p::List<_p::Struct<__file::brand::Scope>> = {
-                slot: 0, default: _p::list::Reader::empty()
+                slot: 0, default: _p::eslpr()
             }
         },
         nested: {
@@ -337,7 +337,7 @@ _p::generate_file! {
                     tag_slot: 4,
                     fields: {
                         BIND, Bind, bind, bind_mut, _p::List<_p::Struct<__file::brand::Binding>> = {
-                            case: 0, slot: 0, default: _p::list::Reader::empty()
+                            case: 0, slot: 0, default: _p::eslpr()
                         },
                         INHERIT, Inherit, inherit, inherit_mut, () = { case: 1 },
                     },
@@ -376,8 +376,8 @@ _p::generate_file! {
                 UINT64, Uint64, uint64, uint64_mut, u64 = { case: 9, slot: 1, default: 0 },
                 FLOAT32, Float32, float32, float32_mut, f32 = { case: 10, slot: 1, default: 0. },
                 FLOAT64, Float64, float64, float64_mut, f64 = { case: 11, slot: 1, default: 0. },
-                TEXT, Text, text, text_mut, _p::Text = { case: 12, slot: 0, default: _p::text::ptr::Reader::empty() },
-                DATA, Data, data, data_mut, _p::Data = { case: 13, slot: 0, default: _p::data::ptr::Reader::empty() },
+                TEXT, Text, text, text_mut, _p::Text = { case: 12, slot: 0, default: _p::text::Reader::empty() },
+                DATA, Data, data, data_mut, _p::Data = { case: 13, slot: 0, default: _p::data::Reader::empty() },
                 LIST, List, list, list_mut, _p::AnyPtr = { case: 14, slot: 0, default: _p::any::ptr::PtrReader::null() },
                 ENUM, Enum, r#enum, enum_mut, u16 = { case: 15, slot: 1, default: 0 },
                 STRUCT, Struct, r#struct, struct_mut, _p::AnyPtr = { case: 16, slot: 0, default: _p::any::ptr::PtrReader::null() },
@@ -392,7 +392,7 @@ _p::generate_file! {
         fields: {
             ID, id, id_mut, u64 = { slot: 0, default: 0 },
             BRAND, brand, brand_mut, _p::List<_p::Struct<Brand>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             },
             VALUE, value, value_mut, _p::Struct<__file::Value> = { slot: 0, default: _p::StructReader::empty() },
         },
@@ -412,13 +412,13 @@ _p::generate_file! {
         fields: {
             CAPNP_VERSION, capnp_version, capnp_version_mut, _p::Struct<CapnpVersion> = { slot: 2, default: _p::StructReader::empty() },
             NODES, nodes, nodes_mut, _p::List<_p::Struct<Node>> = {
-                slot: 0, default: _p::list::Reader::empty()
+                slot: 0, default: _p::eslpr()
             },
             SOURCE_INFO, source_info, source_info_mut, _p::List<_p::Struct<node::SourceInfo>> = {
-                slot: 3, default: _p::list::Reader::empty()
+                slot: 3, default: _p::eslpr()
             },
             REQUESTED_FILES, requested_files, requested_files_mut, _p::List<_p::Struct<code_generator_request::RequestedFile>> = {
-                slot: 1, default: _p::list::Reader::empty()
+                slot: 1, default: _p::eslpr()
             }
         },
         nested: {
@@ -427,9 +427,9 @@ _p::generate_file! {
                 size: { data: 1, ptrs: 2 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    FILENAME, filename, filename_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                    FILENAME, filename, filename_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                     IMPORTS, imports, imports_mut, _p::List<_p::Struct<Import>> = {
-                        slot: 1, default: _p::list::Reader::empty()
+                        slot: 1, default: _p::eslpr()
                     },
                 },
             },
@@ -438,7 +438,7 @@ _p::generate_file! {
                 size: { data: 1, ptrs: 1 },
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::ptr::Reader::empty() },
+                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
                 },
             },
         },

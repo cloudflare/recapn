@@ -16,7 +16,7 @@ use crate::ptr::{CopySize, ErrorHandler, IgnoreErrors};
 use crate::text::{self, Text};
 use crate::field::{Enum, Struct, Capability};
 use crate::internal::Sealed;
-use crate::ptr::{internal::FieldData, PtrElementSize, StructSize};
+use crate::ptr::{Data as FieldData, PtrElementSize, StructSize};
 use crate::rpc::{self, Capable, InsertableInto, Table};
 use crate::ty::{self, EnumResult};
 use crate::{Error, Family, IntoFamily, Result, ErrorKind};
@@ -34,6 +34,8 @@ pub mod ptr {
         PtrElementSize as ElementSize,
     };
 }
+
+pub struct TooManyElementsError(pub(crate) ());
 
 pub type Reader<'a, V, T = rpc::Empty> = List<V, ptr::Reader<'a, T>>;
 pub type Builder<'a, V, T = rpc::Empty> = List<V, ptr::Builder<'a, T>>;

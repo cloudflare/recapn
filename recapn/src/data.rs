@@ -23,7 +23,7 @@ impl<T> IntoFamily for Data<T> {
     type Family = Data;
 }
 impl ty::Value for Data {
-    type Default = ptr::Reader<'static>;
+    type Default = Reader<'static>;
 }
 impl ty::ListValue for Data {
     const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
