@@ -534,28 +534,26 @@ impl<'a> GeneratorContext<'a> {
     }
 
     fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>) -> Result<TokenStream> {
-        fn quote_value_or_default<T, F>(value: Option<&ReaderOf<Value>>, f: F, default: T) -> TokenStream
-        where
-            T: ToTokens,
-            F: FnOnce(&ReaderOf<Value>) -> Option<T>,
-        {
-            let value = value.and_then(f).unwrap_or(default);
-            quote!(#value)
+        macro_rules! value_or_default {
+            ($field:ident) => {{
+                let value = value.and_then(|v| v.$field().get()).unwrap_or_default();
+                quote!(#value)
+            }};
         }
 
         let expr = match type_info.which()? {
             TypeKind::Void(()) => quote!(()),
-            TypeKind::Bool(()) => quote_value_or_default(value, |v| v.bool().get(), false),
-            TypeKind::Int8(()) => quote_value_or_default(value, |v| v.int8().get(), 0),
-            TypeKind::Uint8(()) => quote_value_or_default(value, |v| v.uint8().get(), 0),
-            TypeKind::Int16(()) => quote_value_or_default(value, |v| v.int16().get(), 0),
-            TypeKind::Uint16(()) => quote_value_or_default(value, |v| v.uint16().get(), 0),
-            TypeKind::Int32(()) => quote_value_or_default(value, |v| v.int32().get(), 0),
-            TypeKind::Uint32(()) => quote_value_or_default(value, |v| v.uint32().get(), 0),
-            TypeKind::Int64(()) => quote_value_or_default(value, |v| v.int64().get(), 0),
-            TypeKind::Uint64(()) => quote_value_or_default(value, |v| v.uint64().get(), 0),
-            TypeKind::Float32(()) => quote_value_or_default(value, |v| v.float32().get(), 0.),
-            TypeKind::Float64(()) => quote_value_or_default(value, |v| v.float64().get(), 0.),
+            TypeKind::Bool(()) => value_or_default!(bool),
+            TypeKind::Int8(()) => value_or_default!(int8),
+            TypeKind::Uint8(()) => value_or_default!(uint8),
+            TypeKind::Int16(()) => value_or_default!(int16),
+            TypeKind::Uint16(()) => value_or_default!(uint16),
+            TypeKind::Int32(()) => value_or_default!(int32),
+            TypeKind::Uint32(()) => value_or_default!(uint32),
+            TypeKind::Int64(()) => value_or_default!(int64),
+            TypeKind::Uint64(()) => value_or_default!(uint64),
+            TypeKind::Float32(()) => value_or_default!(float32),
+            TypeKind::Float64(()) => value_or_default!(float64),
             TypeKind::Text(()) => {
                 match value.and_then(|v| v.text().field()).map(|v| v.get()) {
                     Some(text) if !text.is_empty() => {
