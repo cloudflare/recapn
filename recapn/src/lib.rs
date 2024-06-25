@@ -2,8 +2,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(const_option)]
-#![feature(slice_from_ptr_range)]
-#![feature(ptr_sub_ptr)]
 #![cfg_attr(feature = "std", feature(write_all_vectored))]
 
 use core::fmt::{self, Display};
