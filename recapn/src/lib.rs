@@ -75,39 +75,6 @@ pub mod prelude {
         pub use recapn::text::{self, Text};
         pub use recapn::ty::{self, StructView};
         pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
-
-        #[macro_export]
-        macro_rules! default_value {
-            (struct) => { StructReader::empty() };
-            (struct $size:expr, $default:expr) => { unsafe { StructReader::slice_unchecked($default, $size) } };
-            (list $size:ident) => { };
-        }
-
-        #[macro_export]
-        macro_rules! descriptor_value {
-            (struct $ty:ty = $slot:literal $($tt:tt)*) => {
-                Descriptor::<Struct<$ty>> {
-                    slot: $slot,
-                    defaults: default_value!(struct $($tt)*),
-                };
-            };
-        }
-
-        #[macro_export]
-        macro_rules! descriptor {
-            ($name:ident struct $ty:ty = $($tt:tt)*) => {
-                const $name: Descriptor<Struct<$ty>> = descriptor_value!(struct $ty = $($tt)*);
-            };
-            ($name:ident variant { $slot:literal, $case:literal } struct $ty:ty = $($tt:tt)*) => {
-                const $name: VariantDescriptor<Struct<$ty>> = VariantDescriptor::<Struct<$ty>> {
-                    variant: VariantInfo {
-                        slot: $slot,
-                        case: $case,
-                    },
-                    field: descriptor_value!(struct $ty = $($tt)*),
-                }
-            };
-        }
     }
 }
 
