@@ -178,14 +178,14 @@ impl<'a> Builder<'a> {
     }
 
     #[inline]
-    pub const fn as_slice(&self) -> &'a [u8] {
+    pub const fn as_slice(&self) -> &[u8] {
         let data = self.0.data().as_ptr().cast_const();
         let len = self.len() as usize;
         unsafe { core::slice::from_raw_parts(data, len) }
     }
 
     #[inline]
-    pub fn as_slice_mut(&mut self) -> &'a mut [u8] {
+    pub fn as_slice_mut(&mut self) -> &mut [u8] {
         let data = self.0.data().as_ptr();
         let len = self.len() as usize;
         unsafe { core::slice::from_raw_parts_mut(data, len) }
