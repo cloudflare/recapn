@@ -440,7 +440,7 @@ impl<'b, 'p, T: Table, U> VoidVariant<U, StructBuilder<'b, 'p, T>> {
     }
 }
 
-impl<'b, 'p, T: Table, U> VoidVariant<U, StructBuilder<'b, 'p, T>> {
+impl<'b, 'p, T: Table> VoidVariant<(), StructBuilder<'b, 'p, T>> {
     #[inline]
     pub fn set(&mut self) {
         self.set_variant();
@@ -458,8 +458,17 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p
     }
 
     #[inline]
-    pub unsafe fn get_unchecked(self) -> G::Builder<'p, T> {
-        ty::StructBuilder::from_ptr(self.repr.clone())
+    pub unsafe fn get_unchecked(self) -> G::Builder<'b, T> {
+        ty::StructBuilder::from_ptr(self.repr.by_ref())
+    }
+
+    #[inline]
+    pub fn set(mut self) -> G::Builder<'b, T> {
+        self.set_variant();
+        unsafe {
+            G::clear(self.repr);
+            ty::StructBuilder::from_ptr(self.repr.by_ref())
+        }
     }
 }
 
