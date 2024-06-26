@@ -512,8 +512,6 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     pub fn adopt(&mut self, orphan: Orphan<'_, AnyPtr, T>) {
         self.0.adopt(orphan.into_inner());
     }
-
-    // TODO orphan APIs
 }
 
 impl<'a, T: Table, T2: Table> PartialEq<PtrReader<'a, T2>> for PtrBuilder<'a, T> {
