@@ -270,20 +270,33 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     {
         V::get(self, index)
     }
-}
 
-/// A checked index view into a List.
-pub struct Element<T> {
-    list: T,
-    idx: u32,
-}
+    #[inline]
+    pub fn try_into_element(self, index: u32) -> Result<ElementOwner<'a, V, T>, Self>
+    where
+        V: ListAccessable<Self>,
+    {
+        if index < self.len().get() {
+            Ok(unsafe { self.into_element_unchecked(index) })
+        } else {
+            Err(self)
+        }
+    }
 
-type ReaderElement<'a, 'b, V, T = rpc::Empty> = Element<&'b Reader<'a, V, T>>;
-type BuilderElement<'a, 'b, V, T = rpc::Empty> = Element<&'b mut Builder<'a, V, T>>;
+    #[inline]
+    pub fn into_element(self, index: u32) -> ElementOwner<'a, V, T>
+    where
+        V: ListAccessable<Self>,
+    {
+        self.try_into_element(index).ok().expect("index out of bounds")
+    }
 
-impl<T> Element<T> {
-    fn new(list: T, idx: u32) -> Self {
-        Self { list, idx }
+    #[inline]
+    pub unsafe fn into_element_unchecked(self, index: u32) -> ElementOwner<'a, V, T>
+    where
+        V: ListAccessable<Self>,
+    {
+        V::get(self, index)
     }
 }
 
@@ -293,6 +306,25 @@ pub type ElementReader<'a, 'b, V, T = rpc::Empty> =
 /// An element in a list builder with a mutable borrow
 pub type ElementBuilder<'a, 'b, V, T = rpc::Empty> =
     <V as ListAccessable<&'b mut Builder<'a, V, T>>>::View;
+pub type ElementOwner<'a, V, T = rpc::Empty> =
+    <V as ListAccessable<Builder<'a, V, T>>>::View;
+
+/// A checked index view into a List.
+pub struct DataElement<T> {
+    list: T,
+    idx: u32,
+}
+
+pub type DataElementBuilder<'a, 'b, V, T = rpc::Empty> = DataElement<&'b mut Builder<'a, V, T>>;
+
+pub struct PtrElement<T> {
+    list: T,
+    idx: u32,
+}
+
+pub type PtrElementReader<'a, 'b, V, T = rpc::Empty> = PtrElement<&'b Reader<'a, V, T>>;
+pub type PtrElementBuilder<'a, 'b, V, T = rpc::Empty> = PtrElement<&'b mut Builder<'a, V, T>>;
+pub type PtrElementOwner<'a, V, T = rpc::Empty> = PtrElement<Builder<'a, V, T>>;
 
 /// A helper used to provide element views into a list. Depending on the value type, this may simply
 /// return the value itself, or an element view which can be used to access one of the other getters
@@ -310,35 +342,6 @@ pub trait ListAccessable<T> {
     type View;
 
     unsafe fn get(list: T, index: u32) -> Self::View;
-}
-
-impl<'a, 'b, V, T> BuilderElement<'a, 'b, V, T>
-where
-    T: Table,
-{
-    /// Borrows an element, rather than consuming it.
-    ///
-    /// Allows calling multiple builder methods without consuming the element.
-    ///
-    /// # Example
-    ///
-    /// Basic usage:
-    /// ```
-    /// let mut element = list.at(0).unwrap();
-    /// let mut sublist = element.by_ref().get_mut_or_init(2);
-    ///
-    /// // do some processing on the list. in this case, we don't actually know if the list is
-    /// // large enough for our needs. so we use by_ref to keep the original element around and
-    /// // resize if it's not big enough
-    ///
-    /// let mut sublist = element.by_ref().get_mut_or_init(4);
-    #[inline]
-    pub fn by_ref(&mut self) -> BuilderElement<'a, '_, V, T> {
-        Element {
-            list: &mut *self.list,
-            idx: self.idx,
-        }
-    }
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
@@ -365,15 +368,15 @@ impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for
 }
 
 impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b mut Builder<'a, Self, T>> for V {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = DataElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element { list, idx }
+        DataElement { list, idx }
     }
 }
 
-impl<'a, 'b, V: FieldData, T: Table> BuilderElement<'a, 'b, V, T> {
+impl<'a, 'b, V: FieldData, T: Table> DataElementBuilder<'a, 'b, V, T> {
     /// A generic accessor for getting "field data", that is, primitive numeric and boolean types.
     #[inline]
     pub fn get(&self) -> V {
@@ -386,7 +389,7 @@ impl<'a, 'b, V: FieldData, T: Table> BuilderElement<'a, 'b, V, T> {
     }
 }
 
-impl<'a, 'b, T: Table> BuilderElement<'a, 'b, f32, T> {
+impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f32, T> {
     #[inline]
     /// Canonicalizes NaN values by blowing away the NaN payload.
     pub fn set_canonical(&mut self, value: f32) {
@@ -400,7 +403,7 @@ impl<'a, 'b, T: Table> BuilderElement<'a, 'b, f32, T> {
     }
 }
 
-impl<'a, 'b, T: Table> BuilderElement<'a, 'b, f64, T> {
+impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f64, T> {
     /// Canonicalizes NaN values by blowing away the NaN payload.
     #[inline]
     pub fn set_canonical(&mut self, value: f64) {
@@ -425,15 +428,15 @@ impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b Reader<'a, Self, T>> for 
 }
 
 impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b mut Builder<'a, Self, T>> for Enum<E> {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = DataElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        DataElement { list, idx }
     }
 }
 
-impl<'a, 'b, E: ty::Enum, T: Table> BuilderElement<'a, 'b, Enum<E>, T>
+impl<'a, 'b, E: ty::Enum, T: Table> DataElementBuilder<'a, 'b, Enum<E>, T>
 where
     T: Table,
     E: ty::Enum,
@@ -450,6 +453,14 @@ where
     }
 }
 
+pub struct StructElement<T> {
+    list: T,
+    idx: u32,
+}
+
+pub type StructElementBuilder<'a, 'b, V, T = rpc::Empty> = StructElement<&'b mut Builder<'a, V, T>>;
+pub type StructElementOwner<'a, V, T = rpc::Empty> = StructElement<Builder<'a, V, T>>;
+
 impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b Reader<'a, Self, T>> for Struct<S> {
     type View = S::Reader<'a, T>;
 
@@ -460,15 +471,24 @@ impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b Reader<'a, Self, T>> fo
 }
 
 impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b mut Builder<'a, Self, T>> for Struct<S> {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = StructElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        StructElement { list, idx }
     }
 }
 
-impl<'a, 'b, S, T> BuilderElement<'a, 'b, Struct<S>, T>
+impl<'a, T: Table, S: ty::Struct> ListAccessable<Builder<'a, Self, T>> for Struct<S> {
+    type View = StructElementOwner<'a, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: Builder<'a, Self, T>, idx: u32) -> Self::View {
+        StructElement { list, idx }
+    }
+}
+
+impl<'a, 'b, S, T> StructElementBuilder<'a, 'b, Struct<S>, T>
 where
     S: ty::Struct,
     T: Table,
@@ -518,15 +538,24 @@ impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyStruct {
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyStruct {
-    type View = BuilderElement<'a, 'b, AnyStruct, T>;
+    type View = StructElementBuilder<'a, 'b, AnyStruct, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        StructElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> BuilderElement<'a, 'b, AnyStruct, T>
+impl<'a, T: Table> ListAccessable<Builder<'a, Self, T>> for AnyStruct {
+    type View = StructElementOwner<'a, Self, T>;
+
+    #[inline]
+    unsafe fn get(list: Builder<'a, Self, T>, idx: u32) -> Self::View {
+        StructElement { list, idx }
+    }
+}
+
+impl<'a, 'b, T> StructElementBuilder<'a, 'b, AnyStruct, T>
 where
     T: Table,
 {
@@ -566,15 +595,15 @@ where
 }
 
 impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b Reader<'a, Self, T>> for List<V> {
-    type View = ReaderElement<'a, 'b, Self, T>;
+    type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, V, T> ReaderElement<'a, 'b, List<V>, T>
+impl<'a, 'b, V, T> PtrElementReader<'a, 'b, List<V>, T>
 where
     T: Table,
     V: ty::DynListValue,
@@ -639,15 +668,15 @@ where
 }
 
 impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b mut Builder<'a, Self, T>> for List<V> {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T, V> BuilderElement<'a, 'b, List<V>, T>
+impl<'a, 'b, T, V> PtrElementBuilder<'a, 'b, List<V>, T>
 where
     T: Table,
     V: ty::ListValue,
@@ -747,7 +776,7 @@ where
     }
 }
 
-impl<'a, 'b, T> BuilderElement<'a, 'b, List<AnyStruct>, T>
+impl<'a, 'b, T> PtrElementBuilder<'a, 'b, List<AnyStruct>, T>
 where
     T: Table,
 {
@@ -863,15 +892,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyList {
-    type View = ReaderElement<'a, 'b, Self, T>;
+    type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> ReaderElement<'a, 'b, AnyList, T>
+impl<'a, 'b, T> PtrElementReader<'a, 'b, AnyList, T>
 where
     T: Table,
 {
@@ -935,15 +964,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyList {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> BuilderElement<'a, 'b, AnyList, T>
+impl<'a, 'b, T> PtrElementBuilder<'a, 'b, AnyList, T>
 where
     T: Table,
 {
@@ -1026,15 +1055,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Data {
-    type View = ReaderElement<'a, 'b, Self, T>;
+    type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> ReaderElement<'a, 'b, Data, T>
+impl<'a, 'b, T> PtrElementReader<'a, 'b, Data, T>
 where
     T: Table,
 {
@@ -1093,15 +1122,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Data {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> BuilderElement<'a, 'b, Data, T>
+impl<'a, 'b, T> PtrElementBuilder<'a, 'b, Data, T>
 where
     T: Table,
 {
@@ -1149,15 +1178,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Text {
-    type View = ReaderElement<'a, 'b, Self, T>;
+    type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> ReaderElement<'a, 'b, Text, T>
+impl<'a, 'b, T> PtrElementReader<'a, 'b, Text, T>
 where
     T: Table,
 {
@@ -1218,15 +1247,15 @@ where
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Text {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, T> BuilderElement<'a, 'b, Text, T>
+impl<'a, 'b, T> PtrElementBuilder<'a, 'b, Text, T>
 where
     T: Table,
 {
@@ -1323,15 +1352,15 @@ impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyPtr {
 }
 
 impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Capability<C> {
-    type View = ReaderElement<'a, 'b, Self, T>;
+    type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, C, T, Client> ReaderElement<'a, 'b, Capability<C>, T>
+impl<'a, 'b, C, T, Client> PtrElementReader<'a, 'b, Capability<C>, T>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client>,
@@ -1356,7 +1385,7 @@ where
     }
 }
 
-impl<'a, 'b, C, T, Client> ReaderElement<'a, 'b, Capability<C>, T>
+impl<'a, 'b, C, T, Client> PtrElementReader<'a, 'b, Capability<C>, T>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
@@ -1389,15 +1418,15 @@ where
 }
 
 impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Capability<C> {
-    type View = BuilderElement<'a, 'b, Self, T>;
+    type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
     unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        Element::new(list, idx)
+        PtrElement { list, idx }
     }
 }
 
-impl<'a, 'b, C, T, Client> BuilderElement<'a, 'b, Capability<C>, T>
+impl<'a, 'b, C, T, Client> PtrElementBuilder<'a, 'b, Capability<C>, T>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client>,
@@ -1432,7 +1461,7 @@ where
     }
 }
 
-impl<'a, 'b, C, T, Client> BuilderElement<'a, 'b, Capability<C>, T>
+impl<'a, 'b, C, T, Client> PtrElementBuilder<'a, 'b, Capability<C>, T>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
@@ -1538,47 +1567,47 @@ pub struct InfalliblePtrs;
 
 infallible_strategies!(InfalliblePtrs);
 
-impl<'a, 'b, T, V> IterStrategy<List<V>, ReaderElement<'a, 'b, List<V>, T>> for InfalliblePtrs
+impl<'a, 'b, T, V> IterStrategy<List<V>, PtrElementReader<'a, 'b, List<V>, T>> for InfalliblePtrs
 where
     T: Table,
     V: ty::DynListValue,
 {
     type Item = Reader<'a, V, T>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, List<V>, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, List<V>, T>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<AnyList, ReaderElement<'a, 'b, AnyList, T>> for InfalliblePtrs
+impl<'a, 'b, T> IterStrategy<AnyList, PtrElementReader<'a, 'b, AnyList, T>> for InfalliblePtrs
 where
     T: Table,
 {
     type Item = any::ListReader<'a, T>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, AnyList, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, AnyList, T>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Data, ReaderElement<'a, 'b, Data, T>> for InfalliblePtrs
+impl<'a, 'b, T> IterStrategy<Data, PtrElementReader<'a, 'b, Data, T>> for InfalliblePtrs
 where
     T: Table,
 {
     type Item = data::Reader<'a>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, Data, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, Data, T>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Text, ReaderElement<'a, 'b, Text, T>> for InfalliblePtrs
+impl<'a, 'b, T> IterStrategy<Text, PtrElementReader<'a, 'b, Text, T>> for InfalliblePtrs
 where
     T: Table,
 {
     type Item = text::Reader<'a>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, Text, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, Text, T>) -> Self::Item {
         element.get()
     }
 }
@@ -1589,47 +1618,47 @@ pub struct Fallible;
 
 infallible_strategies!(Fallible);
 
-impl<'a, 'b, T, V> IterStrategy<List<V>, ReaderElement<'a, 'b, List<V>, T>> for Fallible
+impl<'a, 'b, T, V> IterStrategy<List<V>, PtrElementReader<'a, 'b, List<V>, T>> for Fallible
 where
     T: Table,
     V: ty::DynListValue,
 {
     type Item = Result<Reader<'a, V, T>>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, List<V>, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, List<V>, T>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<AnyList, ReaderElement<'a, 'b, AnyList, T>> for Fallible
+impl<'a, 'b, T> IterStrategy<AnyList, PtrElementReader<'a, 'b, AnyList, T>> for Fallible
 where
     T: Table,
 {
     type Item = Result<any::ListReader<'a, T>>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, AnyList, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, AnyList, T>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Data, ReaderElement<'a, 'b, Data, T>> for Fallible
+impl<'a, 'b, T> IterStrategy<Data, PtrElementReader<'a, 'b, Data, T>> for Fallible
 where
     T: Table,
 {
     type Item = Result<data::Reader<'a>>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, Data, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, Data, T>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Text, ReaderElement<'a, 'b, Text, T>> for Fallible
+impl<'a, 'b, T> IterStrategy<Text, PtrElementReader<'a, 'b, Text, T>> for Fallible
 where
     T: Table,
 {
     type Item = Result<text::Reader<'a>>;
 
-    fn get(&mut self, element: ReaderElement<'a, 'b, Text, T>) -> Self::Item {
+    fn get(&mut self, element: PtrElementReader<'a, 'b, Text, T>) -> Self::Item {
         element.try_get()
     }
 }
