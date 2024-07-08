@@ -123,3 +123,47 @@ pub mod map {
 * I'm also not sure how this will look until schemas are implemented in recapn, which will likely happen after RPC.
 
 # recapn-rpc
+
+* [ ] Finish sync types
+  * This library implements it's own synchronization primitives optimized for Cap'n Proto RPC. There are three modules:
+    * `sharedshot`: a shared `oneshot` that doesn't require a separate allocation for the value
+      * [ ] Just needs testing, the API is done.
+    * `request`: a request value, a response `sharedshot`, and a pipeline map all wrapped up in a single allocation!
+      * This only needs two more features implemented:
+        * [ ] `Finished`: this type tracks when the request has no more response receivers listening to it.
+        * [ ] Automatic removal from channel when finished. If a request is in an associated channel type, it will automatically
+          remove itself from the channel, causing itself to get automatically canceled.
+      * [ ] Also testing. Extensive testing.
+    * `mpsc`: a specialized channel for handling `request` instances. Supports operations commonly used in Cap'n Proto RPC
+      including channel forwarding where all items are forwarded to another channel as an O(1) operation. Future items get automatically
+      forwarded when they're sent. Channels can also be closed with an error, causing all requests to be responded to with that
+      same error.
+      * [ ] `Sender::resolution` is an async function that awaits channel resolution.
+  * These modules are designed to be generic for testing purposes. Outside of these modules, we only use one channel type.
+* [ ] Client design
+  * We need to implement the actual client types to make these sync types usable. This is mostly implementing wrappers that
+    implement something similar to the C++ interface.
+  * [x] You can make clients from futures of clients
+  * [x] You can make clients from errors
+  * [ ] You can await client resolution
+  * [ ] You can make new requests, build parameters, then send them
+  * [ ] You can await and read responses
+  * [ ] You can make pipelined clients
+* [ ] Server design
+  * We need to design a flexible system for capnp `interface`s that can work with multiple different types of dispatchers.
+    On one hand, many users would prefer to opt their servers into work-stealing multi-threading. But also, users might want
+    to be more flexible and do async operations while reading parameters or writing responses. However, readers and builders
+    have interior mutability, so they can't be used with work-stealing multi-threading. We don't know what kind of interface
+    users want, so why not support both? Somehow... with generics!
+  * [ ] Work-stealing interface
+    * For work-stealing we need to parse the parameters into some other type. Perform checks, do validation (sync), return
+      data. This is then passed to another user provided function which does the work required. This can return a future
+      which is then awaited. The result of this is then passed to another function which can do things like, make tail calls,
+      write results, etc.
+  * [ ] Single-threaded interface
+    * Work-stealing can't do everything Cap'n Proto has to offer. For the rest, we need an interface with a different set of
+      trade-offs. In this one, request handling is done through a local set on a single thread. Of course, users can choose
+      to spawn work on the work-stealing pool through tokio::spawn, but request handling must be done locally.
+* [ ] Connections and RPC systems
+  * I don't even know where to start with this, most of it isn't finished. Because it's so big and complicated I'm extremely
+    tempted to break it up into smaller pieces that handle imports / exports and questions / answers.
