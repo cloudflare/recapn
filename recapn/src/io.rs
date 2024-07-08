@@ -387,6 +387,7 @@ pub fn read_from_stream<R: io::Read>(r: &mut R, options: StreamOptions) -> Resul
 /// 
 /// This allows for easily reading words from a packed input stream.
 #[cfg(feature = "std")]
+#[derive(Debug)]
 pub struct PackedStream<R> {
     unpacker: Unpacker,
     stream: R,
@@ -437,6 +438,27 @@ impl<R: io::BufRead> PackedStream<R> {
             Err(io::Error::from(io::ErrorKind::UnexpectedEof))
         } else {
             Ok(())
+        }
+    }
+
+    /// Finishes the stream, flushing the unpacker state. If more data needs to be unpacked, this
+    /// returns an error.
+    pub fn finish(&mut self) -> Result<(), io::Error> {
+        loop {
+            let buf = self.stream.fill_buf()?;
+            if buf.is_empty() {
+                return self.unpacker.finish()
+                    .map_err(|e| io::Error::new(io::ErrorKind::UnexpectedEof, e))
+            }
+
+            let result = self.unpacker.unpack(buf, &mut []);
+            self.stream.consume(result.bytes_read);
+
+            match result.reason {
+                StopReason::NeedInput => continue,
+                StopReason::NeedOutput => return self.unpacker.finish()
+                    .map_err(|e| io::Error::new(io::ErrorKind::WriteZero, e)),
+            }
         }
     }
 

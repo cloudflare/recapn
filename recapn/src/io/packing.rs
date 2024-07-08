@@ -82,7 +82,7 @@ fn split_at_filter(input: &[Word], func: impl FnMut(&Word) -> bool) -> (&[Word],
     let zero_words = input[..to_read]
         .iter()
         .position(func)
-        .unwrap_or(255);
+        .unwrap_or(to_read);
     input.split_at(zero_words)
 }
 
@@ -103,20 +103,18 @@ impl<'b> Packer<'b> {
     /// At least 10 bytes are needed to write a word to the output buffer. If a buffer
     /// smaller than that is provided, no bytes will be written.
     pub fn pack(&mut self, mut output_buf: &mut [u8]) -> PackResult {
-        let output_len = output_buf.len();
-        let mut bytes_written = 0;
+        let in_output_len = output_buf.len();
 
         // Check if we have a copy to resume
         if let Some(active_copy) = &mut self.active_copy {
             match copy_and_advance_slices(active_copy, output_buf) {
                 Ok(new_buf) => {
                     output_buf = new_buf;
-                    bytes_written += active_copy.len();
                     self.active_copy = None;
                 },
                 Err(remainder) => {
                     *active_copy = remainder;
-                    return PackResult { completed: false, bytes_written: output_len }
+                    return PackResult { completed: false, bytes_written: in_output_len }
                 }
             }
         }
@@ -127,14 +125,15 @@ impl<'b> Packer<'b> {
         // 1 byte uncompressed word count
         const MIN_BUF: usize = 10;
 
-        if output_buf.len() < MIN_BUF {
-            return PackResult { completed: false, bytes_written }
-        }
-
         let completed = loop {
             let Some((&word, remainder)) = self.input.split_first() else {
                 break true
             };
+
+            if output_buf.len() < MIN_BUF {
+                break false
+            }
+
             self.input = remainder;
 
             if word == Word::NULL {
@@ -150,13 +149,26 @@ impl<'b> Packer<'b> {
             }
 
             let tag = take_byte(&mut output_buf);
-            for byte in word.0 {
-                if byte != 0 {
-                    *tag |= 1;
-                    write_byte(&mut output_buf, byte);
-                }
-                *tag <<= 1;
+            *tag = 0;
+            macro_rules! handle_byte {
+                ($idx:literal) => {
+                    let b = word.0[$idx];
+                    let bit = (b != 0) as u8;
+                    *tag |= (bit << $idx);
+                    if b != 0 {
+                        write_byte(&mut output_buf, b);
+                    }
+                };
             }
+
+            handle_byte!(0);
+            handle_byte!(1);
+            handle_byte!(2);
+            handle_byte!(3);
+            handle_byte!(4);
+            handle_byte!(5);
+            handle_byte!(6);
+            handle_byte!(7);
 
             if *tag == 0xff {
                 // An all-nonzero word is followed by a count of consecutive uncompressed
@@ -179,18 +191,16 @@ impl<'b> Packer<'b> {
                     },
                     Err(remainder) => {
                         self.active_copy = Some(remainder);
-                        return PackResult { completed: false, bytes_written: output_len }
+                        return PackResult {
+                            completed: false,
+                            bytes_written: in_output_len,
+                        }
                     }
                 }
             }
-
-            if output_buf.len() < MIN_BUF {
-                bytes_written += output_len - output_buf.len();
-                break false
-            }
         };
 
-        PackResult { completed, bytes_written }
+        PackResult { completed, bytes_written: in_output_len - output_buf.len() }
     }
 }
 
@@ -325,8 +335,9 @@ impl PartialWord {
         } else {
             let to_copy = mem::take(src);
             let copy_len = to_copy.len();
-            self.buf[buf_start..copy_len].copy_from_slice(to_copy);
-            self.written_bytes = WrittenBytes::from_bytes(buf_start + copy_len);
+            let buf_end = buf_start + copy_len;
+            self.buf[buf_start..buf_end].copy_from_slice(to_copy);
+            self.written_bytes = WrittenBytes::from_bytes(buf_end);
             Err(self)
         }
     }
@@ -348,7 +359,7 @@ impl PartialTaggedWord {
         let mut buf = [0u8; 8];
         let mut dst_idx = 0;
         while tag != 0 {
-            if (tag | 1) != 0 {
+            if (tag & 1) != 0 {
                 let Some(&byte) = try_take_first(&mut src) else { break };
                 buf[dst_idx] = byte;
             }
@@ -363,7 +374,7 @@ impl PartialTaggedWord {
         let Self { mut buf, mut tag, written_bytes } = self;
         let mut dst_idx = written_bytes.bytes();
         while tag != 0 {
-            if (tag | 1) != 0 {
+            if (tag & 1) != 0 {
                 let Some(&byte) = try_take_first(src) else { break };
                 buf[dst_idx] = byte;
             }
@@ -397,14 +408,15 @@ enum IncompleteState {
     /// The unpacker is expecting one byte for an uncompressed word count
     NeedUncompressedCount,
     /// The unpacker is writing null words to the output
-    WritingNulls(u8),
+    WritingNulls(usize),
     /// The unpacker is writing uncompressed words to the output
     WritingUncompressed {
-        remaining: u8,
+        remaining: usize,
         partial: Option<PartialWord>,
     },
 }
 
+#[derive(Debug)]
 pub struct Unpacker {
     state: Option<IncompleteState>,
 }
@@ -416,8 +428,7 @@ impl Unpacker {
     }
 
     /// Unpack words from the input into the specified buffer. The output buffer should
-    /// be made up entirely of Word::NULL. If the output buffer is empty this immediately
-    /// returns.
+    /// be made up entirely of Word::NULL.
     #[inline]
     pub fn unpack(&mut self, mut src: &[u8], mut dst: &mut [Word]) -> UnpackResult {
         let original_src_len = src.len();
@@ -435,13 +446,12 @@ impl Unpacker {
     /// Progress the output by count. This doesn't actually write anything since we assume the input
     /// consists entirely of NULL already.
     #[inline]
-    fn write_nulls(&mut self, dst: &mut &mut [Word], count: u8) -> Result<(), StopReason> {
-        let count_usize = count as usize;
-        if dst.len() >= count_usize {
-            *dst = &mut mem::take(dst)[count_usize..];
+    fn write_nulls(&mut self, dst: &mut &mut [Word], count: usize) -> Result<(), StopReason> {
+        if dst.len() >= count {
+            *dst = &mut mem::take(dst)[count..];
             Ok(())
         } else {
-            let remaining = (count_usize - dst.len()) as u8;
+            let remaining = count - dst.len();
             *dst = &mut [];
             self.state = Some(IncompleteState::WritingNulls(remaining));
             Err(StopReason::NeedOutput)
@@ -449,21 +459,15 @@ impl Unpacker {
     }
 
     #[inline]
-    fn write_uncompressed(&mut self, src: &mut &[u8], dst: &mut &mut [Word], count: u8) -> Result<(), StopReason> {
-        if count == 0 {
-            return Ok(())
-        }
-
-        let count_usize = count as usize;
-
+    fn write_uncompressed(&mut self, src: &mut &[u8], dst: &mut &mut [Word], count: usize) -> Result<(), StopReason> {
         let (full_words, partial_bytes) = (src.len() / 8, src.len() % 8);
-        let enough_input = full_words >= count_usize;
-        let words_to_read = if enough_input { count_usize } else { full_words };
-        let enough_output = words_to_read < dst.len();
+        let enough_input = full_words >= count;
+        let words_to_read = if enough_input { count } else { full_words };
+        let enough_output = words_to_read <= dst.len();
 
         if !enough_output {
             let out = mem::take(dst);
-            let remaining = (count_usize - out.len()) as u8;
+            let remaining = count - out.len();
 
             let out_bytes = Word::slice_to_bytes_mut(out);
             let in_bytes = take_at(src, out_bytes.len());
@@ -480,7 +484,7 @@ impl Unpacker {
         if !enough_input {
             let has_partial = partial_bytes != 0;
             let consumed_words = full_words + (has_partial as usize);
-            let remaining = (count_usize - consumed_words) as u8;
+            let remaining = count - consumed_words;
             let full_word_bytes = take_at(src, full_words * 8);
             out_bytes.copy_from_slice(full_word_bytes);
 
@@ -497,10 +501,6 @@ impl Unpacker {
     }
 
     fn unpack_inner<'a>(&mut self, src: &mut &[u8], dst: &mut &mut [Word]) -> StopReason {
-        if dst.is_empty() {
-            return StopReason::NeedOutput
-        }
-
         if src.is_empty() {
             return StopReason::NeedInput
         }
@@ -509,32 +509,34 @@ impl Unpacker {
         match self.state.take() {
             Some(IncompleteState::PartialWord(partial)) => {
                 if let Err(partial) = partial.finish(src, dst) {
-                    self.state = Some(IncompleteState::PartialWord(partial))
+                    self.state = Some(IncompleteState::PartialWord(partial));
+                    return StopReason::NeedInput
                 }
             }
             Some(IncompleteState::PartialUncompressed(partial)) => {
                 if let Err(partial) = partial.finish(src, dst) {
-                    self.state = Some(IncompleteState::PartialUncompressed(partial))
+                    self.state = Some(IncompleteState::PartialUncompressed(partial));
+                    return StopReason::NeedInput
                 }
-                
+
                 if src.is_empty() {
                     self.state = Some(IncompleteState::NeedUncompressedCount);
                     return StopReason::NeedInput
                 }
 
-                let count = *take_first(src);
+                let count = *take_first(src) as usize;
                 if let Err(stop) = self.write_uncompressed(src, dst, count) {
                     return stop
                 }
             }
             Some(IncompleteState::NeedNullCount) => {
-                let count = *take_first(src);
+                let count = *take_first(src) as usize;
                 if let Err(stop) = self.write_nulls(dst, count) {
                     return stop
                 }
             }
             Some(IncompleteState::NeedUncompressedCount) => {
-                let count = *take_first(src);
+                let count = *take_first(src) as usize;
                 if let Err(stop) = self.write_uncompressed(src, dst, count) {
                     return stop
                 }
@@ -550,7 +552,8 @@ impl Unpacker {
                         self.state = Some(IncompleteState::WritingUncompressed {
                             remaining,
                             partial: Some(partial),
-                        })
+                        });
+                        return StopReason::NeedInput
                     }
                 }
 
@@ -585,9 +588,11 @@ impl Unpacker {
                         break StopReason::NeedInput
                     }
     
-                    let count = *take_first(src);
-                    if let Err(stop) = self.write_nulls(dst, count) {
-                        break stop
+                    let count = *take_first(src) as usize;
+                    if count != 0 {
+                        if let Err(stop) = self.write_nulls(dst, count) {
+                            break stop
+                        }
                     }
                 }
                 0xff => {
@@ -608,9 +613,11 @@ impl Unpacker {
                         break StopReason::NeedInput
                     }
 
-                    let count = *take_first(src);
-                    if let Err(stop) = self.write_uncompressed(src, dst, count) {
-                        break stop
+                    let count = *take_first(src) as usize;
+                    if count != 0 {
+                        if let Err(stop) = self.write_uncompressed(src, dst, count) {
+                            break stop
+                        }
                     }
                 }
                 mut tag => {
@@ -625,11 +632,10 @@ impl Unpacker {
                     let word = take_first_mut(dst);
                     let word_bytes = Word::slice_to_bytes_mut(slice::from_mut(word));
 
-                    let mut input_pos = 0;
+                    let mut i = input_to_read.into_iter();
                     for word_byte in word_bytes.iter_mut() {
-                        if (tag | 1) != 0 {
-                            *word_byte = input_to_read[input_pos];
-                            input_pos += 1;
+                        if (tag & 1) != 0 {
+                            *word_byte = *i.next().unwrap();
                         }
 
                         tag >>= 1;
@@ -667,5 +673,120 @@ impl Unpacker {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufReader;
 
+    use crate::alloc::Word;
+    use crate::io::PackedStream;
+    use super::Packer;
+
+    fn expect_packs_to(unpacked: &[Word], packed: &[u8]) {
+        // Use a buffer of 0xDE to make sure we're properly writting 0x00 bytes.
+        let mut buf = [0xde; 512];
+        let mut packer = Packer::new(unpacked);
+        let mut out = Vec::new();
+
+        loop {
+            let r = packer.pack(&mut buf);
+            out.extend_from_slice(&buf[0..r.bytes_written]);
+            if r.completed {
+                break
+            }
+        }
+
+        assert_eq!(packed, out.as_slice(), "expected != result");
+
+        {
+            let mut words = vec![Word::NULL; unpacked.len()].into_boxed_slice();
+            let mut stream = PackedStream::new(packed);
+            stream.read_exact(&mut *words).expect("expected to read packed data");
+            stream.finish().expect("expected end of stream");
+    
+            assert_eq!(unpacked, &*words);
+        }
+
+        // Test some silly buffers
+        for size in [1, 2, 3, 5, 7, 10] {
+            let mut words = vec![Word::NULL; unpacked.len()].into_boxed_slice();
+            let reader = BufReader::with_capacity(size, packed);
+            let mut stream = PackedStream::new(reader);
+            stream.read_exact(&mut *words).expect("expected to read packed data");
+            stream.finish().expect("expected end of stream");
+    
+            assert_eq!(unpacked, &*words);
+        }
+    }
+
+    #[test]
+    fn simple_packing() {
+        expect_packs_to(&[], &[]);
+        expect_packs_to(&[Word([0, 0, 0, 0, 0, 0, 0, 0])], &[0, 0]);
+        expect_packs_to(&[
+            Word([0, 0, 12, 0, 0, 34, 0, 0]),
+        ], &[
+            0b00100100, 12, 34,
+        ]);
+        expect_packs_to(&[
+            Word([1, 3, 2, 4, 5, 7, 6, 8]),
+        ], &[
+            0b11111111, 1, 3, 2, 4, 5, 7, 6, 8, 0,
+        ]);
+        expect_packs_to(&[
+            Word([0, 0, 0, 0, 0, 0, 0, 0]),
+            Word([1, 3, 2, 4, 5, 7, 6, 8]),
+        ], &[
+            0, 0,
+            0b11111111, 1, 3, 2, 4, 5, 7, 6, 8, 0,
+        ]);
+        expect_packs_to(&[
+            Word([0, 0, 12, 0, 0, 34, 0, 0]),
+            Word([1, 3, 2, 4, 5, 7, 6, 8]),
+        ], &[
+            0b00100100, 12, 34,
+            0b11111111, 1, 3, 2, 4, 5, 7, 6, 8, 0,
+        ]);
+        expect_packs_to(&[
+            Word([1, 3, 2, 4, 5, 7, 6, 8]),
+            Word([8, 6, 7, 5, 4, 2, 3, 1]),
+        ], &[
+            0b11111111, 1, 3, 2, 4, 5, 7, 6, 8, 1,
+            8, 6, 7, 5, 4, 2, 3, 1,
+        ]);
+        expect_packs_to(&[
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([0, 2, 4, 0, 9, 0, 5, 1]),
+        ], &[
+            0b11111111, 1, 2, 3, 4, 5, 6, 7, 8, 3,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            0b11010110, 2, 4, 9, 5, 1,
+        ]);
+        expect_packs_to(&[
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([6, 2, 4, 3, 9, 0, 5, 1]),
+            Word([1, 2, 3, 4, 5, 6, 7, 8]),
+            Word([0, 2, 4, 0, 9, 0, 5, 1]),
+        ], &[
+            0b11111111, 1, 2, 3, 4, 5, 6, 7, 8, 3,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            6, 2, 4, 3, 9, 0, 5, 1,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            0b11010110, 2, 4, 9, 5, 1,
+        ]);
+        expect_packs_to(&[
+            Word([8, 0, 100, 6, 0, 1, 1, 2]),
+            Word([0, 0, 0, 0, 0, 0, 0, 0]),
+            Word([0, 0, 0, 0, 0, 0, 0, 0]),
+            Word([0, 0, 0, 0, 0, 0, 0, 0]),
+            Word([0, 0, 1, 0, 2, 0, 3, 1]),
+        ], &[
+            0b11101101, 8, 100, 6, 1, 1, 2,
+            0, 2,
+            0b11010100, 1, 2, 3, 1,
+        ]);
+    }
 }
