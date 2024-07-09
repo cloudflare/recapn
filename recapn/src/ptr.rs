@@ -5233,7 +5233,7 @@ impl BlobBuilder<'_> {
     }
 
     #[inline]
-    pub fn copy_from(&mut self, other: BlobReader) {
+    pub(crate) fn copy_from(&mut self, other: BlobReader) {
         assert_eq!(self.len, other.len);
 
         let dst = self.ptr.as_ptr();
@@ -5245,7 +5245,7 @@ impl BlobBuilder<'_> {
     }
 
     #[inline]
-    pub const fn as_slice(&self) -> &[u8] {
+    pub(crate) const fn as_slice(&self) -> &[u8] {
         unsafe {
             core::slice::from_raw_parts(self.ptr.as_ptr().cast_const(), self.len.get() as usize)
         }
