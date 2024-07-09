@@ -27,6 +27,28 @@ pub const fn table_size_from_count(count: u32) -> u32 {
     (count / 2) + 1
 }
 
+/// The inverse of `table_size_from_count`, returns the number of segments that can be held by a
+/// slice of `Word`s of the specified length.
+#[inline]
+pub const fn max_table_size_from_len(len: usize) -> u32 {
+    const MAX: u32 = u32::MAX - 1;
+    const MAX_TABLE: u32 = table_size_from_count(MAX);
+
+    let Some(r) = len.checked_mul(2) else {
+        return MAX_TABLE;
+    };
+
+    let Some(r) = r.checked_sub(1) else {
+        return 0
+    };
+
+    if r > MAX_TABLE as usize {
+        return MAX_TABLE
+    }
+
+    r as u32
+}
+
 /// Writes the stream framing table to the specified slice.
 ///
 /// The slice size must match the table size returned by [`size_of`].

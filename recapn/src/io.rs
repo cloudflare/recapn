@@ -347,7 +347,10 @@ fn map_read_err(err: ReadError) -> StreamError {
 #[cfg(feature = "std")]
 pub fn read_from_stream<R: io::Read>(r: &mut R, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
     let mut first = [Word::NULL; 1];
-    let segment_table_buffer: tinyvec::TinyVec<[Word; 32]>;
+
+    const TABLE_STACK_BUF_LEN: usize = 32;
+    let mut table_stack_buf: [Word; TABLE_STACK_BUF_LEN];
+    let mut table_heap_buf: Box<[Word]>;
 
     r.read_exact(Word::slice_to_bytes_mut(&mut first))?;
 
@@ -358,16 +361,24 @@ pub fn read_from_stream<R: io::Read>(r: &mut R, options: StreamOptions) -> Resul
                 return Err(StreamError::Table(TableReadError::TooManySegments));
             }
 
-            let mut buffer = tinyvec::tiny_vec!();
-            buffer.resize(required + 1, Word::NULL);
+            let buffer =
+                if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
+                    // There's too many segments for our stack buffer, so we need to allocate
+                    // a buffer on the heap
+
+                    table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
+                    &mut *table_heap_buf
+                } else {
+                    table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
+                    &mut table_stack_buf[..(required + 1)]
+                };
+
             let (buffer_first, rest) = buffer.split_first_mut().unwrap();
             *buffer_first = first[0];
 
             r.read_exact(Word::slice_to_bytes_mut(rest))?;
 
-            segment_table_buffer = buffer;
-
-            StreamTableRef::try_read(&segment_table_buffer)
+            StreamTableRef::try_read(buffer)
                 .expect("failed to read segment table")
                 .0
         }
@@ -470,9 +481,11 @@ impl<R: io::BufRead> PackedStream<R> {
 
 #[cfg(feature = "std")]
 pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
-    let mut first = [Word::NULL; 1];
-    let segment_table_buffer: tinyvec::TinyVec<[Word; 32]>;
+    const TABLE_STACK_BUF_LEN: usize = 32;
+    let mut table_stack_buf: [Word; TABLE_STACK_BUF_LEN];
+    let mut table_heap_buf: Box<[Word]>;
 
+    let mut first = [Word::NULL; 1];
     stream.read_exact(&mut first)?;
 
     let table = match StreamTableRef::try_read(&first) {
@@ -484,16 +497,24 @@ pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, opt
                 return Err(StreamError::Table(TableReadError::TooManySegments));
             }
 
-            let mut buffer = tinyvec::tiny_vec!();
-            buffer.resize(required + 1, Word::NULL);
+            let buffer =
+                if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
+                    // There's too many segments for our stack buffer, so we need to allocate
+                    // a buffer on the heap
+
+                    table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
+                    &mut *table_heap_buf
+                } else {
+                    table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
+                    &mut table_stack_buf[..(required + 1)]
+                };
+
             let (buffer_first, rest) = buffer.split_first_mut().unwrap();
             *buffer_first = first[0];
 
             stream.read_exact(rest)?;
 
-            segment_table_buffer = buffer;
-
-            StreamTableRef::try_read(&segment_table_buffer)
+            StreamTableRef::try_read(buffer)
                 .expect("failed to read segment table")
                 .0
         }

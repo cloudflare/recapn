@@ -7,7 +7,6 @@ edition = "2021"
 [features]
 default = ["std"]
 alloc = []
-std = ["tinyvec", "alloc"]
+std = ["alloc"]
 
 [dependencies]
-tinyvec = { version = "1.6", features = ["rustc_1_40", "alloc"], optional = true }
