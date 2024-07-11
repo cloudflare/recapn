@@ -428,17 +428,19 @@ _p::generate_file! {
                 fields: {
                     ID, id, id_mut, u64 = { slot: 0, default: 0 },
                     FILENAME, filename, filename_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
-                    IMPORTS, imports, imports_mut, _p::List<_p::Struct<Import>> = {
+                    IMPORTS, imports, imports_mut, _p::List<_p::Struct<__file::code_generator_request::requested_file::Import>> = {
                         slot: 1, default: _p::eslpr()
                     },
                 },
-            },
-            struct Import {
-                mod: import,
-                size: { data: 1, ptrs: 1 },
-                fields: {
-                    ID, id, id_mut, u64 = { slot: 0, default: 0 },
-                    NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                nested: {
+                    struct Import {
+                        mod: import,
+                        size: { data: 1, ptrs: 1 },
+                        fields: {
+                            ID, id, id_mut, u64 = { slot: 0, default: 0 },
+                            NAME, name, name_mut, _p::Text = { slot: 0, default: _p::text::Reader::empty() },
+                        },
+                    },
                 },
             },
         },
