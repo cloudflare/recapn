@@ -1040,4 +1040,3 @@ pub mod test_all_types {
         _p::StructBuilder<'a, T>,
     >;
 }
-

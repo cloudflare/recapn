@@ -3,5 +3,6 @@ members = [
     "recapn",
     "recapnc",
     "recapn-rpc",
+    "tests",
 ]
 resolver = "2"
