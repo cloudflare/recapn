@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::{Result, Context, ensure};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
 use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
 use recapn::alloc::{self, AllocLen, SegmentOffset, Word};
 use recapn::ReaderOf;
@@ -12,8 +12,7 @@ use syn::PathSegment;
 use syn::punctuated::Punctuated;
 
 use crate::quotes::{
-    GeneratedFile, GeneratedStruct, GeneratedField, GeneratedItem, GeneratedWhich, FieldDescriptor,
-    GeneratedVariant, GeneratedEnum, GeneratedConst,
+    FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem, GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich
 };
 use crate::gen::capnp_schema_capnp as schema;
 use schema::{Node, Field, Value, CodeGeneratorRequest, Type};
@@ -29,17 +28,6 @@ pub mod ident;
 use self::ident::{ScopedIdentifierSet, Scope, IdentifierSet};
 
 const NO_DISCRIMINANT: u16 = 0xffff;
-
-#[derive(Debug)]
-struct FileInfo {
-    pub mod_ident: syn::Ident,
-}
-
-#[derive(Debug)]
-struct StructInfo {
-    pub type_info: TypeInfo,
-    pub mod_ident: syn::Ident,
-}
 
 #[derive(Clone, Debug, Hash)]
 struct ModScope {
@@ -115,15 +103,35 @@ impl TypeInfo {
 }
 
 #[derive(Debug)]
-struct EnumInfo {
-    pub enumerants: Vec<syn::Ident>,
+struct FileInfo {
+    pub mod_ident: syn::Ident,
+    pub path: String,
+}
+
+#[derive(Debug)]
+struct StructInfo {
     pub type_info: TypeInfo,
+    pub mod_ident: syn::Ident,
+}
+
+#[derive(Debug)]
+struct EnumInfo {
+    pub type_info: TypeInfo,
+    pub enumerants: Vec<syn::Ident>,
 }
 
 #[derive(Debug)]
 struct ConstInfo {
     pub ident: syn::Ident,
     pub scope: TypeScope,
+}
+
+#[derive(Debug)]
+enum NodeInfo {
+    File(FileInfo),
+    Struct(StructInfo),
+    Enum(EnumInfo),
+    Const(ConstInfo),
 }
 
 struct NodeContext<'a> {
@@ -163,20 +171,12 @@ impl FieldKind {
     }
 }
 
-#[derive(Debug)]
-enum NodeInfo {
-    File(FileInfo),
-    Struct(StructInfo),
-    Enum(EnumInfo),
-    Const(ConstInfo),
-}
-
 pub struct GeneratorContext<'a> {
     nodes: HashMap<u64, NodeContext<'a>>,
 }
 
 impl<'a> GeneratorContext<'a> {
-    pub fn new(request: &ReaderOf<'a, CodeGeneratorRequest>) -> Result<Self>{
+    pub fn new(request: &ReaderOf<'a, CodeGeneratorRequest>) -> Result<Self> {
         let mut identifiers = ScopedIdentifierSet::new();
         let mut nodes = request.nodes()
             .into_iter()
@@ -202,9 +202,13 @@ impl<'a> GeneratorContext<'a> {
 
         ensure!(node.info.is_none(), "node already has associated info");
 
-        let display_name = file.display_name().as_str()?;
-        let mod_ident = identifiers.make_unique(None, display_name)?;
-        node.info = Some(NodeInfo::File(FileInfo { mod_ident: mod_ident.clone() }));
+        let path = file.display_name().try_get()?.as_bytes().escape_ascii().to_string();
+        let mod_ident = identifiers.make_unique(None, &path)?;
+        let file_path = format!("{path}.rs");
+        node.info = Some(NodeInfo::File(FileInfo {
+            mod_ident: mod_ident.clone(),
+            path: file_path,
+        }));
 
         let mut scope = Scope::file(ModScope { id: file.id(), mod_ident });
 
@@ -291,7 +295,7 @@ impl<'a> GeneratorContext<'a> {
                         })
                         .collect::<Result<_>>()?
                 };
-        
+
                 *info = Some(NodeInfo::Enum(EnumInfo {
                     enumerants,
                     type_info: TypeInfo {
@@ -314,30 +318,48 @@ impl<'a> GeneratorContext<'a> {
         Ok(())
     }
 
-    pub fn generate_file(&self, id: u64) -> Result<GeneratedFile> {
+    pub fn generate_file(&self, id: u64) -> Result<(GeneratedFile, GeneratedRootFile)> {
         let NodeContext {
             node,
-            info: Some(NodeInfo::File(FileInfo { mod_ident }))
+            info: Some(NodeInfo::File(FileInfo { mod_ident, path }))
         } = &self.nodes[&id] else { anyhow::bail!("expected file node") };
+
+        let mut required_imports = HashSet::new();
 
         let items = node.nested_nodes()
             .into_iter()
-            .map(|nested| self.generate_item(nested.id()))
+            .map(|nested| self.generate_item(nested.id(), &mut required_imports))
             .collect::<Result<_>>()?;
-        Ok(GeneratedFile { items, ident: mod_ident.clone() })
+        let file = GeneratedFile { items, ident: mod_ident.clone() };
+
+        let imports = required_imports.iter().map(|id| {
+            let NodeContext {
+                info: Some(NodeInfo::File(FileInfo { mod_ident, .. })),
+                ..
+            } = &self.nodes[id] else { anyhow::bail!("expected imported file node") };
+
+            Ok(mod_ident.clone())
+        }).collect::<Result<Vec<_>, _>>()?;
+        let root_mod = GeneratedRootFile {
+            ident: mod_ident.clone(),
+            imports,
+            path: path.clone(),
+        };
+
+        Ok((file, root_mod))
     }
 
-    fn generate_item(&self, id: u64) -> Result<GeneratedItem> {
+    fn generate_item(&self, id: u64, required_imports: &mut HashSet<u64>) -> Result<GeneratedItem> {
         let NodeContext { node, info } = &self.nodes[&id];
         match (node.which()?, info) {
             (NodeKind::Struct(s), Some(NodeInfo::Struct(info))) => {
-                Ok(GeneratedItem::Struct(self.generate_struct(node, &s, info)?))
+                Ok(GeneratedItem::Struct(self.generate_struct(node, &s, info, required_imports)?))
             },
             (NodeKind::Enum(_), Some(NodeInfo::Enum(info))) => {
                 Ok(GeneratedItem::Enum(self.generate_enum(info)?))
             },
             (NodeKind::Const(c), Some(NodeInfo::Const(info))) => {
-                Ok(GeneratedItem::Const(self.generate_const(&c, info)?))
+                Ok(GeneratedItem::Const(self.generate_const(&c, info, required_imports)?))
             }
             (NodeKind::Interface(_), None) => todo!(),
             (NodeKind::Annotation(_), None) => todo!(),
@@ -346,7 +368,7 @@ impl<'a> GeneratorContext<'a> {
         }
     }
 
-    fn generate_struct(&self, node: &ReaderOf<Node>, struct_group: &ReaderOf<Struct>, info: &StructInfo) -> Result<GeneratedStruct> {
+    fn generate_struct(&self, node: &ReaderOf<Node>, struct_group: &ReaderOf<Struct>, info: &StructInfo, required_imports: &mut HashSet<u64>) -> Result<GeneratedStruct> {
         let (fields, variants) = struct_group.fields()
             .into_iter()
             .partition::<Vec<_>, _>(|field| field.discriminant_value() == NO_DISCRIMINANT);
@@ -356,7 +378,7 @@ impl<'a> GeneratorContext<'a> {
         let mut accessor_idents = IdentifierSet::new();
 
         let fields = fields.into_iter().map(|field| {
-            self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents)
+            self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents, required_imports)
         }).collect::<Result<_>>()?;
 
         assert_eq!(struct_group.discriminant_count() as usize, variants.len());
@@ -371,10 +393,10 @@ impl<'a> GeneratorContext<'a> {
                 let name = field.name().as_str()?;
                 let discriminant_ident = discriminant_idents.make_unique(AsPascalCase(name))?;
 
-                let generated_field = self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents)?;
+                let generated_field = self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents, required_imports)?;
                 let variant = GeneratedVariant {
                     discriminant_ident,
-                    discriminant_field_type: self.field_type(&field, &struct_mod_scope)?.0,
+                    discriminant_field_type: self.field_type(&field, &struct_mod_scope, required_imports)?.0,
                     case: field.discriminant_value(),
                     field: generated_field,
                 };
@@ -390,22 +412,20 @@ impl<'a> GeneratorContext<'a> {
             ptrs: struct_group.pointer_count(),
         });
 
-        let nested_items = node.nested_nodes()
-            .into_iter()
-            .map(|nested| self.generate_item(nested.id()));
-        let nested_groups = node.r#struct()
-            .get()
-            .into_iter()
-            .flat_map(|node| node
-                .fields()
-                .into_iter()
-                .filter_map(|field| field
-                    .group()
-                    .get()
-                    .map(|group| self.generate_item(group.type_id()))
-                )
-            );
-        let all_items = nested_items.chain(nested_groups).collect::<Result<_>>()?;
+        let mut nested_items = Vec::new();
+        for nested in node.nested_nodes() {
+            let item = self.generate_item(nested.id(), required_imports)?;
+            nested_items.push(item);
+        }
+
+        if let Some(node) = node.r#struct().get() {
+            for field in node.fields() {
+                if let Some(group) = field.group().get() {
+                    let item = self.generate_item(group.type_id(), required_imports)?;
+                    nested_items.push(item);
+                }
+            }
+        }
 
         Ok(GeneratedStruct {
             ident: info.type_info.type_ident.clone(),
@@ -414,7 +434,7 @@ impl<'a> GeneratorContext<'a> {
             size,
             fields,
             which,
-            nested_items: all_items,
+            nested_items,
         })
     }
 
@@ -430,12 +450,13 @@ impl<'a> GeneratorContext<'a> {
         }: &StructInfo,
         descriptor_idents: &mut IdentifierSet,
         accessor_idents: &mut IdentifierSet,
+        required_imports: &mut HashSet<u64>,
     ) -> Result<GeneratedField> {
         let name = field.name().as_str()?;
         let accessor_ident = accessor_idents.make_unique(AsSnakeCase(name))?;
         let descriptor_ident = descriptor_idents.make_unique(AsShoutySnakeCase(name))?;
-        let (field_type, kind) = self.field_type(field, scope)?;
-        let descriptor = self.descriptor(field, scope)?;
+        let (field_type, kind) = self.field_type(field, scope, required_imports)?;
+        let descriptor = self.descriptor(field, scope, required_imports)?;
         let type_name = type_ident.clone();
         let own_accessor_ident = match kind { 
             FieldKind::Data => None,
@@ -445,23 +466,23 @@ impl<'a> GeneratorContext<'a> {
         Ok(GeneratedField { type_name, field_type, own_accessor_ident, accessor_ident, descriptor_ident, descriptor })
     }
 
-    fn field_type(&self, field: &ReaderOf<Field>, scope: &TypeScope) -> Result<(Box<syn::Type>, FieldKind)> {
+    fn field_type(&self, field: &ReaderOf<Field>, scope: &TypeScope, required_imports: &mut HashSet<u64>) -> Result<(Box<syn::Type>, FieldKind)> {
         match field.which()? {
             schema::field::Which::Slot(slot) => {
                 let type_info = slot.r#type().get();
-                let syn_type = self.resolve_type(scope, &type_info)?;
+                let syn_type = self.resolve_type(scope, &type_info, required_imports)?;
                 let kind = FieldKind::from_proto(&type_info)?;
                 Ok((syn_type, kind))
             }
             schema::field::Which::Group(group) => {
-                let type_name = self.resolve_type_name(scope, group.type_id())?; 
+                let type_name = self.resolve_type_name(scope, group.type_id(), required_imports)?; 
                 let syn_type = Box::new(syn::parse_quote!(_p::Group<#type_name>));
                 Ok((syn_type, FieldKind::Pointer))
             }
         }
     }
 
-    fn descriptor(&self, field: &ReaderOf<Field>, scope: &TypeScope) -> Result<Option<FieldDescriptor>> {
+    fn descriptor(&self, field: &ReaderOf<Field>, scope: &TypeScope, required_imports: &mut HashSet<u64>) -> Result<Option<FieldDescriptor>> {
         Ok(match field.which()? {
             schema::field::Which::Slot(slot) => {
                 let type_info = slot.r#type().get();
@@ -469,7 +490,7 @@ impl<'a> GeneratorContext<'a> {
                     None
                 } else {
                     let default_value = slot.default_value().get_option();
-                    let value = self.generate_value(scope, &type_info, default_value.as_ref())?;
+                    let value = self.generate_value(scope, &type_info, default_value.as_ref(), required_imports)?;
                     Some(FieldDescriptor { slot: slot.offset(), default: value })
                 }
             }
@@ -477,7 +498,7 @@ impl<'a> GeneratorContext<'a> {
         })
     }
 
-    fn resolve_type(&self, scope: &TypeScope, info: &ReaderOf<Type>) -> Result<Box<syn::Type>> {
+    fn resolve_type(&self, scope: &TypeScope, info: &ReaderOf<Type>, required_imports: &mut HashSet<u64>) -> Result<Box<syn::Type>> {
         Ok(Box::new(match info.which()? {
             TypeKind::Void(()) => syn::parse_quote!(()),
             TypeKind::Bool(()) => syn::parse_quote!(bool),
@@ -495,15 +516,15 @@ impl<'a> GeneratorContext<'a> {
             TypeKind::Data(()) => syn::parse_quote!(_p::Data),
             TypeKind::List(list) => {
                 let element_type = list.element_type().get();
-                let resolved = self.resolve_type(scope, &element_type)?;
+                let resolved = self.resolve_type(scope, &element_type, required_imports)?;
                 syn::parse_quote!(_p::List<#resolved>)
             },
             TypeKind::Enum(e) => {
-                let type_name = self.resolve_type_name(scope, e.type_id())?;
+                let type_name = self.resolve_type_name(scope, e.type_id(), required_imports)?;
                 syn::parse_quote!(_p::Enum<#type_name>)
             },
             TypeKind::Struct(s) => {
-                let type_name = self.resolve_type_name(scope, s.type_id())?;
+                let type_name = self.resolve_type_name(scope, s.type_id(), required_imports)?;
                 syn::parse_quote!(_p::Struct<#type_name>)
             },
             TypeKind::Interface(_) => todo!("resolve interface types"),
@@ -522,18 +543,22 @@ impl<'a> GeneratorContext<'a> {
         }))
     }
 
-    fn resolve_type_name(&self, ref_scope: &TypeScope, id: u64) -> Result<syn::Path> {
+    fn resolve_type_name(&self, ref_scope: &TypeScope, id: u64, required_imports: &mut HashSet<u64>) -> Result<syn::Path> {
         let Some(info) = &self.nodes[&id].info else { anyhow::bail!("missing type info for {}", id) };
         match info {
             NodeInfo::Struct(StructInfo { type_info, .. }) |
             NodeInfo::Enum(EnumInfo { type_info, .. }) => {
+                if type_info.scope.file != ref_scope.file {
+                    let _ = required_imports.insert(type_info.scope.file.id);
+                }
+
                 Ok(type_info.resolve_path(ref_scope))
             },
             NodeInfo::File(_) | NodeInfo::Const(_) => anyhow::bail!("unexpected node type"),
         }
     }
 
-    fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>) -> Result<TokenStream> {
+    fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>, required_imports: &mut HashSet<u64>) -> Result<TokenStream> {
         macro_rules! value_or_default {
             ($field:ident) => {{
                 let value = value.and_then(|v| v.$field().get()).unwrap_or_default();
@@ -581,7 +606,7 @@ impl<'a> GeneratorContext<'a> {
                 }
             }
             TypeKind::List(list) => {
-                let element_type = self.resolve_type(scope, &list.element_type().get())?;
+                let element_type = self.resolve_type(scope, &list.element_type().get(), required_imports)?;
                 let any = value.and_then(|v| v.list().field())
                     .map(|v| v.ptr().read_as::<AnyList>());
                 match any {
@@ -696,12 +721,12 @@ impl<'a> GeneratorContext<'a> {
         Ok(GeneratedEnum { name: type_ident.clone(), enumerants: enumerants.clone() })
     }
 
-    fn generate_const(&self, node: &ReaderOf<Const>, info: &ConstInfo) -> Result<GeneratedConst> {
+    fn generate_const(&self, node: &ReaderOf<Const>, info: &ConstInfo, required_imports: &mut HashSet<u64>) -> Result<GeneratedConst> {
         let type_info = node.r#type().get();
         Ok(GeneratedConst {
             ident: info.ident.clone(),
-            const_type: self.resolve_type(&info.scope, &type_info)?,
-            value: self.generate_value(&info.scope, &type_info, node.value().get_option().as_ref())?,
+            const_type: self.resolve_type(&info.scope, &type_info, required_imports)?,
+            value: self.generate_value(&info.scope, &type_info, node.value().get_option().as_ref(), required_imports)?,
         })
     }
 }

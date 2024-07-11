@@ -1,3 +1,5 @@
+use std::fs;
+
 use anyhow::{Result, Context};
 
 use quote::ToTokens;
@@ -5,6 +7,7 @@ use recapn::message::{Reader, ReaderOptions};
 use recapn::io::{self, StreamOptions};
 use recapnc::generator::GeneratorContext;
 use recapnc::gen::capnp_schema_capnp::CodeGeneratorRequest;
+use recapnc::quotes::GeneratedRoot;
 
 fn main() -> Result<()> {
     let mut stdin = std::io::stdin().lock();
@@ -14,13 +17,23 @@ fn main() -> Result<()> {
 
     let context = GeneratorContext::new(&request)?;
 
+    let mut root_mod = GeneratedRoot { files: Vec::new() };
+
     for file in request.requested_files() {
-        let tokens = context.generate_file(file.id())?.into_token_stream();
-        let parsed = syn::parse2::<syn::File>(tokens)
-            .with_context(|| format!("parsing generated file"))?;
+        let (file, root) = context.generate_file(file.id())?;
+
+        let parsed = syn::parse2::<syn::File>(file.to_token_stream())
+            .context("parsing generated file")?;
         let printable = prettyplease::unparse(&parsed);
-        println!("{}", printable);
+
+        fs::write(&root.path, printable)?;
+
+        root_mod.files.push(root);
     }
+
+    let parsed = syn::parse2::<syn::File>(root_mod.to_token_stream()).context("parsing generated file")?;
+    let printable = prettyplease::unparse(&parsed);
+    fs::write("mod.rs", printable)?;
 
     Ok(())
 }

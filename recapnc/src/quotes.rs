@@ -32,6 +32,41 @@ macro_rules! to_tokens {
     };
 }
 
+pub struct GeneratedRoot {
+    pub files: Vec<GeneratedRootFile>,
+}
+
+to_tokens!(GeneratedRoot |self| {
+    let Self { files } = self;
+    quote! {
+        #(#files)*
+    }
+});
+
+pub struct GeneratedRootFile {
+    pub ident: syn::Ident,
+    pub imports: Vec<syn::Ident>,
+    pub path: String,
+}
+
+to_tokens!(GeneratedRootFile |self| {
+    let Self { ident, imports, path } = self;
+    quote! {
+        #[path = "."]
+        pub mod #ident {
+            #![allow(unused_imports)]
+            use super::#ident as __file;
+            mod __imports {
+                #(pub use super::super::#imports;)*
+            }
+
+            #[path = #path]
+            mod #ident;
+            pub use #ident::*;
+        }
+    }
+});
+
 pub struct GeneratedFile {
     pub ident: syn::Ident,
     pub items: Vec<GeneratedItem>,
