@@ -53,35 +53,6 @@ use crate::{any, data, text, Error, ErrorKind, Family, NotInSchema, Result};
 mod internal {
     use super::*;
 
-    pub trait ReadData {
-        fn read<T: Data>(&self, slot: usize, default: T) -> T;
-    }
-
-    impl<'b, 'p, T: Table> ReadData for StructReader<'b, 'p, T> {
-        #[inline]
-        fn read<D: Data>(&self, slot: usize, default: D) -> D {
-            self.data_field_with_default(slot, default)
-        }
-    }
-
-    pub trait WriteData: ReadData {
-        fn write<T: Data>(&mut self, slot: usize, value: T, default: T);
-    }
-
-    impl<'b, 'p, T: Table> ReadData for StructBuilder<'b, 'p, T> {
-        #[inline]
-        fn read<D: Data>(&self, slot: usize, default: D) -> D {
-            unsafe { self.data_field_with_default_unchecked(slot, default) }
-        }
-    }
-
-    impl<'b, 'p, T: Table> WriteData for StructBuilder<'b, 'p, T> {
-        #[inline]
-        fn write<D: Data>(&mut self, slot: usize, value: D, default: D) {
-            unsafe { self.set_field_with_default_unchecked(slot, value, default) }
-        }
-    }
-
     pub trait Accessable {
         type Group<G: FieldGroup>;
         unsafe fn group<G: FieldGroup>(self) -> Self::Group<G>;
