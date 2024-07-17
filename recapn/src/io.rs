@@ -208,7 +208,7 @@ pub struct SegmentSet<S> {
 #[cfg(feature = "alloc")]
 impl SegmentSet<Box<[Word]>> {
     pub fn new(table: SegmentSetTable, data: Box<[Word]>) -> Self {
-        assert!(table.last_start() < data.len(), "incomplete data!");
+        assert!(table.last_start() <= data.len(), "incomplete data!");
 
         Self { slice: data, table }
     }
@@ -560,4 +560,26 @@ pub fn write_message_packed<W: io::Write>(mut w: W, segments: &MessageSegments) 
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn message_with_zero_size_final_segment() {
+        let msg = [
+            Word([
+                1, 0, 0, 0, // A message with 2 segments
+                2, 0, 0, 0, // where the first segment is 2 words
+            ]),
+            Word::NULL, // The last segment is 0 words.
+            Word::NULL,
+            Word::NULL,
+        ];
+        let slice = Word::slice_to_bytes(msg.as_slice());
+
+        let _ = read_from_stream(slice, StreamOptions::DEFAULT).unwrap();
+    }
 }
