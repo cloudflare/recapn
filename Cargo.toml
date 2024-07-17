@@ -4,5 +4,6 @@ members = [
     "recapnc",
     "recapn-rpc",
     "tests",
+    "fuzz",
 ]
 resolver = "2"
