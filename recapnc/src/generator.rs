@@ -475,8 +475,8 @@ impl<'a> GeneratorContext<'a> {
                 Ok((syn_type, kind))
             }
             schema::field::Which::Group(group) => {
-                let type_name = self.resolve_type_name(scope, group.type_id(), required_imports)?; 
-                let syn_type = Box::new(syn::parse_quote!(_p::Group<#type_name>));
+                let path = self.resolve_type_name(scope, group.type_id(), required_imports)?; 
+                let syn_type = Box::new(syn::TypePath { qself: None, path }.into());
                 Ok((syn_type, FieldKind::Pointer))
             }
         }
@@ -520,12 +520,12 @@ impl<'a> GeneratorContext<'a> {
                 syn::parse_quote!(_p::List<#resolved>)
             },
             TypeKind::Enum(e) => {
-                let type_name = self.resolve_type_name(scope, e.type_id(), required_imports)?;
-                syn::parse_quote!(_p::Enum<#type_name>)
+                let path = self.resolve_type_name(scope, e.type_id(), required_imports)?;
+                syn::TypePath { qself: None, path }.into()
             },
             TypeKind::Struct(s) => {
-                let type_name = self.resolve_type_name(scope, s.type_id(), required_imports)?;
-                syn::parse_quote!(_p::Struct<#type_name>)
+                let path = self.resolve_type_name(scope, s.type_id(), required_imports)?;
+                syn::TypePath { qself: None, path }.into()
             },
             TypeKind::Interface(_) => todo!("resolve interface types"),
             TypeKind::AnyPointer(ptr) => match ptr.which()? {
@@ -589,7 +589,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::text::Reader::from_slice(#bytes))
                     }
-                    _ => quote!(_p::text::Reader::empty()),
+                    _ => quote!(None),
                 }
             }
             TypeKind::Data(()) => {
@@ -602,7 +602,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::data::Reader::from_slice(#bytes))
                     }
-                    _ => quote!(_p::data::Reader::empty()),
+                    _ => quote!(None),
                 }
             }
             TypeKind::List(list) => {
@@ -634,7 +634,7 @@ impl<'a> GeneratorContext<'a> {
 
                         todo!()
                     }
-                    _ => quote!(_p::ListReader::empty(_p::ElementSize::size_of::<#element_type>())),
+                    _ => quote!(None),
                 }
             }
             TypeKind::Enum(info) => {
@@ -679,7 +679,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::StructReader::slice_unchecked(#words, #size))
                     }
-                    _ => quote!(_p::StructReader::empty()),
+                    _ => quote!(None),
                 }
             }
             TypeKind::Interface(_) => {
@@ -691,15 +691,15 @@ impl<'a> GeneratorContext<'a> {
                 match kind.which()? {
                     AnyPtrKind::Unconstrained(unconstrained) => match (unconstrained.which()?, ptr) {
                         (ConstraintKind::AnyKind(_), None) => {
-                            quote!(_p::ptr::PtrReader::null())
+                            quote!(None)
                         }
                         (ConstraintKind::Struct(_), None) => {
-                            quote!(_p::ptr::StructReader::empty())
+                            quote!(None)
                         }
                         (ConstraintKind::List(_), None) => {
-                            quote!(_p::ptr::ListReader::empty())
+                            quote!(None)
                         }
-                        (ConstraintKind::Capability(_), None) => quote!(()),
+                        (ConstraintKind::Capability(_), None) => quote!(None),
                         _ => todo!("generate default values for 'unconstrained' ptr types")
                     },
                     AnyPtrKind::Parameter(_) => todo!("generate default values for generic types"),

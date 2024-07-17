@@ -37,36 +37,34 @@
 //! lifetimes respectively. So `&'b ptr::StructReader<'p, T>` could be extended to
 //! `&'borrow ptr::StructReader<'pointer, T>`.
 
-use core::convert::TryFrom;
-use core::marker::PhantomData;
+use core::convert::{TryFrom, Infallible as Never};
 use core::str::Utf8Error;
 
 use crate::any::{AnyList, AnyPtr, AnyStruct};
-use crate::internal::Sealed;
 use crate::list::{self, ElementSize, InfalliblePtrs, List, TooManyElementsError};
 use crate::orphan::{Orphan, Orphanage};
 use crate::ptr::{self, Data, ElementCount, ErrorHandler, CopySize, IgnoreErrors, StructSize, UnwrapErrors};
 use crate::rpc::{Capable, Empty, InsertableInto, Table};
-use crate::ty::{self, EnumResult, ListValue, StructReader as _};
+use crate::ty::{self, kind, EnumResult, StructReader as _};
 use crate::{any, data, text, Error, ErrorKind, Family, NotInSchema, Result};
 
 mod internal {
     use super::*;
 
     pub trait Accessable {
-        type Group<G: FieldGroup>;
-        unsafe fn group<G: FieldGroup>(self) -> Self::Group<G>;
+        type Group<G: Group>;
+        unsafe fn group<G: Group>(self) -> Self::Group<G>;
     
         type Data<D: Data>;
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D>;
 
         type Enum<E: ty::Enum>;
-        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<Enum<E>>) -> Self::Enum<E>;
+        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<E>) -> Self::Enum<E>;
     }
 
     impl<'b, 'p, T: Table> Accessable for StructReader<'b, 'p, T> {
-        type Group<G: FieldGroup> = G::Reader<'p, T>;
-        unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
+        type Group<G: Group> = G::Reader<'p, T>;
+        unsafe fn group<G: Group>(self) -> Self::Group<G> {
             ty::StructReader::from_ptr(self.clone())
         }
         type Data<D: Data> = D;
@@ -74,7 +72,7 @@ mod internal {
             self.data_field_with_default(info.slot as usize, info.default)
         }
         type Enum<E: ty::Enum> = EnumResult<E>;
-        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<Enum<E>>) -> Self::Enum<E> {
+        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<E>) -> Self::Enum<E> {
             let &FieldInfo { slot, default } = info;
             let default: u16 = default.into();
             let value = self.data_field_with_default::<u16>(slot as usize, default);
@@ -83,32 +81,32 @@ mod internal {
     }
 
     impl<'b, 'p, T: Table> Accessable for StructBuilder<'b, 'p, T> {
-        type Group<G: FieldGroup> = G::Builder<'b, T>;
-        unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
+        type Group<G: Group> = G::Builder<'b, T>;
+        unsafe fn group<G: Group>(self) -> Self::Group<G> {
             ty::StructBuilder::from_ptr(self.by_ref())
         }
         type Data<D: Data> = DataField<D, Self>;
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D> {
             DataField { descriptor: info, repr: self }
         }
-        type Enum<E: ty::Enum> = DataField<Enum<E>, Self>;
-        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<Enum<E>>) -> Self::Enum<E> {
-            DataField { descriptor: info, repr: self }
+        type Enum<E: ty::Enum> = EnumField<E, Self>;
+        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<E>) -> Self::Enum<E> {
+            EnumField { descriptor: info, repr: self }
         }
     }
 
     impl<'p, T: Table> Accessable for OwnedStructBuilder<'p, T> {
-        type Group<G: FieldGroup> = G::Builder<'p, T>;
-        unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
+        type Group<G: Group> = G::Builder<'p, T>;
+        unsafe fn group<G: Group>(self) -> Self::Group<G> {
             ty::StructBuilder::from_ptr(self)
         }
         type Data<D: Data> = DataField<D, Self>;
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D> {
             DataField { descriptor: info, repr: self }
         }
-        type Enum<E: ty::Enum> = DataField<Enum<E>, Self>;
-        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<Enum<E>>) -> Self::Enum<E> {
-            DataField { descriptor: info, repr: self }
+        type Enum<E: ty::Enum> = EnumField<E, Self>;
+        unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<E>) -> Self::Enum<E> {
+            EnumField { descriptor: info, repr: self }
         }
     }
 }
@@ -119,8 +117,20 @@ pub type StructReader<'b, 'p, T> = &'b ptr::StructReader<'p, T>;
 pub type StructBuilder<'b, 'p, T> = &'b mut ptr::StructBuilder<'p, T>;
 use ptr::StructBuilder as OwnedStructBuilder;
 
+/// A "type kind" constraining trait with specializations for field types.
+pub trait TypeKind {
+    type Kind;
+}
+
+impl<T> TypeKind for T
+where
+    T: ty::TypeKind,
+{
+    type Kind = T::Kind;
+}
+
 /// Describes a group of fields. This is primarily used for clearing unions and groups of fields within a struct.
-pub trait FieldGroup: ty::StructView {
+pub trait Group: ty::TypeKind<Kind = kind::Group<Self>> + ty::StructView {
     unsafe fn clear<'b, 'p, T: Table>(a: StructBuilder<'b, 'p, T>);
 }
 
@@ -140,22 +150,76 @@ pub trait FieldType: Sized + 'static {
     unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor);
 }
 
+impl<T> FieldType for T
+where 
+    T: TypeKind + 'static,
+    T::Kind: FieldType,
+{
+    type Descriptor = <T::Kind as FieldType>::Descriptor;
+
+    type Accessor<A: Accessable> = <T::Kind as FieldType>::Accessor<A>;
+    #[inline]
+    unsafe fn accessor<A: Accessable>(a: A, descriptor: &'static Self::Descriptor) -> Self::Accessor<A> {
+        <T::Kind as FieldType>::accessor(a, descriptor)
+    }
+
+    type VariantAccessor<A: Accessable> = <T::Kind as FieldType>::VariantAccessor<A>;
+    #[inline]
+    unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
+        <T::Kind as FieldType>::variant(a, descriptor)
+    }
+
+    #[inline]
+    unsafe fn clear<'a, 'b, T2: Table>(a: StructBuilder<'b, 'a, T2>, descriptor: &'static Self::Descriptor) {
+        <T::Kind as FieldType>::clear(a, descriptor)
+    }
+}
+
+/// A marker trait for pointer types. This allows us to generalize pointers for generic pointer
+/// fields.
+pub trait Ptr: TypeKind<Kind = kind::PtrField<Self>> + 'static {
+    type Default;
+}
+
+impl<T: Ptr> FieldType for kind::PtrField<T> {
+    type Descriptor = FieldInfo<Option<T::Default>>;
+
+    type Accessor<A: Accessable> = PtrField<T, A>;
+    #[inline]
+    unsafe fn accessor<A: Accessable>(a: A, descriptor: &'static Self::Descriptor) -> Self::Accessor<A> {
+        PtrField { repr: a, descriptor }
+    }
+
+    type VariantAccessor<A: Accessable> = PtrVariant<T, A>;
+    #[inline]
+    unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
+        PtrVariant { repr: a, descriptor }
+    }
+
+    #[inline]
+    unsafe fn clear<T2: Table>(a: StructBuilder<T2>, descriptor: &'static Self::Descriptor) {
+        a.ptr_field_mut_unchecked(descriptor.slot as u16).clear()
+    }
+}
+
 impl FieldType for () {
     type Descriptor = ();
+
     type Accessor<A: Accessable> = ();
     #[inline]
     unsafe fn accessor<A: Accessable>(_: A, _: &'static Self::Descriptor) -> Self::Accessor<A> { () }
-    type VariantAccessor<A: Accessable> = VoidVariant<Self, A>;
+
+    type VariantAccessor<A: Accessable> = VoidVariant<A>;
     #[inline]
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
-        VoidVariant { t: PhantomData, variant: &descriptor.variant, repr: a }
+        VariantAccessor { repr: a, descriptor }
     }
 
     #[inline]
     unsafe fn clear<'b, 'p, T: Table>(_: StructBuilder<'b, 'p, T>, _: &'static Self::Descriptor) {}
 }
 
-impl<D: Data> FieldType for D {
+impl<D: Data> FieldType for kind::Data<D> {
     type Descriptor = FieldInfo<D>;
     type Accessor<A: Accessable> = A::Data<D>;
     #[inline]
@@ -165,7 +229,7 @@ impl<D: Data> FieldType for D {
     type VariantAccessor<A: Accessable> = DataVariant<D, A>;
     #[inline]
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
-        DataVariant { repr: a, descriptor: &descriptor.field, variant: &descriptor.variant }
+        VariantAccessor { repr: a, descriptor }
     }
     #[inline]
     unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor) {
@@ -175,6 +239,22 @@ impl<D: Data> FieldType for D {
 
 /// An alias that makes it easier to name the descriptor type for a given type.
 pub type Descriptor<V> = <V as FieldType>::Descriptor;
+
+/// Describes a variant in a union in a struct. Because this is not attached to a value, it can
+/// also be used as group info, as groups aren't values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VariantInfo {
+    pub slot: u32,
+    pub case: u16,
+}
+
+/// Variant info paired with a field descriptor type.
+pub struct VariantField<D> {
+    pub variant: VariantInfo,
+    pub field: D,
+}
+
+pub type VariantDescriptor<V> = VariantField<Descriptor<V>>;
 
 /// A trait used to abstract away how a field type is viewed. This is primarily used for unions,
 /// where we want one type to represent the union in generated code which would be generic over
@@ -273,22 +353,9 @@ pub type VariantOwned<'p, T, V> = <V as FieldType>::VariantAccessor<ptr::StructB
 
 /// Describes a value in a "slot" in a struct. This does not include groups or void, which don't
 /// have an associated default value or slot.
-pub struct FieldInfo<V: ty::Value> {
+pub struct FieldInfo<T> {
     pub slot: u32,
-    pub default: V::Default,
-}
-
-/// Describes a variant in a union in a struct. Because this is not attached to a value, it can
-/// also be used as group info, as groups aren't values.
-pub struct VariantInfo {
-    pub slot: u32,
-    pub case: u16,
-}
-
-/// Describes a value in a union variant in a struct.
-pub struct VariantDescriptor<V: FieldType> {
-    pub variant: VariantInfo,
-    pub field: Descriptor<V>,
+    pub default: T,
 }
 
 pub trait UnionViewer<A> {
@@ -297,35 +364,147 @@ pub trait UnionViewer<A> {
     unsafe fn get(accessable: A) -> Result<Self::View, NotInSchema>;
 }
 
-/// A wrapper type used to implement methods for struct fields.
-pub struct Struct<S: ty::Struct> {
-    s: PhantomData<fn() -> S>,
+pub struct FieldAccessor<V: FieldType, Repr> {
+    descriptor: &'static Descriptor<V>,
+    repr: Repr,
 }
 
-impl<S: ty::Struct> Sealed for Struct<S> {}
-impl<S: ty::Struct> ty::Value for Struct<S> {
-    type Default = ptr::StructReader<'static>;
-}
-impl<S: ty::Struct> ListValue for Struct<S> {
-    const ELEMENT_SIZE: ElementSize = ElementSize::InlineComposite(S::SIZE);
+pub type FieldReader<'b, 'p, T, V> = FieldAccessor<V, StructReader<'b, 'p, T>>;
+pub type FieldBuilder<'b, 'p, T, V> = FieldAccessor<V, StructBuilder<'b, 'p, T>>;
+pub type FieldOwner<'p, T, V> = FieldAccessor<V, OwnedStructBuilder<'p, T>>;
+
+impl<'b, 'p, T: Table, V: FieldType> FieldBuilder<'b, 'p, T, V> {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
+    #[inline]
+    pub fn by_ref<'c>(&'c mut self) -> FieldBuilder<'c, 'p, T, V> {
+        FieldBuilder {
+            descriptor: self.descriptor,
+            repr: &mut *self.repr,
+        }
+    }
 }
 
-/// Represents a group of fields in a Cap'n Proto struct.
-pub struct Group<G: FieldGroup> {
-    v: PhantomData<fn() -> G>,
+impl<'p, T: Table, V: FieldType> FieldOwner<'p, T, V> {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
+    #[inline]
+    pub fn by_ref<'c>(&'c mut self) -> FieldOwner<'c, T, V> {
+        FieldOwner {
+            descriptor: self.descriptor,
+            repr: self.repr.by_ref(),
+        }
+    }
 }
 
-impl<G: FieldGroup> FieldType for Group<G> {
+pub struct VariantAccessor<V: FieldType, Repr> {
+    descriptor: &'static VariantDescriptor<V>,
+    repr: Repr,
+}
+
+pub type VariantReader<'b, 'p, T, V> = VariantAccessor<V, StructReader<'b, 'p, T>>;
+
+impl<'b, 'p, T: Table, V: FieldType> VariantReader<'b, 'p, T, V> {
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        let VariantInfo { slot, case } = self.descriptor.variant;
+        self.repr.data_field::<u16>(slot as usize) == case
+    }
+
+    /// Gets the generic field accessor for this type if the field is set.
+    #[inline]
+    pub fn field(&self) -> Option<Accessor<'b, 'p, T, V>> {
+        if self.is_set() {
+            Some(unsafe { self.field_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// Gets the generic field accessor for this type without checking if the field is set.
+    #[inline]
+    pub unsafe fn field_unchecked(&self) -> Accessor<'b, 'p, T, V> {
+        V::accessor(self.repr, &self.descriptor.field)
+    }
+}
+
+pub type VariantBuilder<'b, 'p, T, V> = VariantAccessor<V, StructBuilder<'b, 'p, T>>;
+
+impl<'b, 'p, T: Table, V: FieldType> VariantBuilder<'b, 'p, T, V> {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
+    #[inline]
+    pub fn by_ref<'c>(&'c mut self) -> VariantBuilder<'c, 'p, T, V> {
+        VariantBuilder {
+            descriptor: self.descriptor,
+            repr: &mut *self.repr,
+        }
+    }
+
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        let VariantInfo { slot, case } = self.descriptor.variant;
+        self.repr.data_field::<u16>(slot as usize) == case
+    }
+
+    /// Gets the generic field accessor for this type if the field is set.
+    #[inline]
+    pub fn field(self) -> Option<AccessorMut<'b, 'p, T, V>> {
+        if self.is_set() {
+            Some(unsafe { self.field_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// Gets the generic field accessor for this type without checking if the field is set.
+    #[inline]
+    pub unsafe fn field_unchecked(self) -> AccessorMut<'b, 'p, T, V> {
+        V::accessor(self.repr, &self.descriptor.field)
+    }
+
+    #[inline]
+    pub fn init_field(self) -> AccessorMut<'b, 'p, T, V> {
+        if !self.is_set() {
+            let VariantInfo { slot, case } = self.descriptor.variant;
+            unsafe {
+                self.repr.set_field_unchecked::<u16>(slot as usize, case);
+                V::clear(self.repr, &self.descriptor.field);
+            }
+        }
+        unsafe { V::accessor(self.repr, &self.descriptor.field) }
+    }
+
+    #[inline]
+    fn set_variant(&mut self) {
+        let VariantInfo { slot, case } = self.descriptor.variant;
+        unsafe { self.repr.set_field_unchecked(slot as usize, case) }
+    }
+}
+
+pub type VoidVariant<Repr> = VariantAccessor<(), Repr>;
+pub type VoidVariantBuilder<'b, 'p, T> = VariantBuilder<'b, 'p, T, ()>;
+
+impl<'b, 'p, T: Table> VoidVariantBuilder<'b, 'p, T> {
+    #[inline]
+    pub fn set(&mut self) {
+        self.set_variant();
+    }
+}
+
+impl<G: Group> FieldType for kind::Group<G> {
     type Descriptor = ();
     type Accessor<A: Accessable> = A::Group<G>;
     #[inline]
     unsafe fn accessor<A: Accessable>(a: A, _: &'static Self::Descriptor) -> Self::Accessor<A> {
         unsafe { a.group::<G>() }
     }
-    type VariantAccessor<A: Accessable> = VoidVariant<Self, A>;
+    type VariantAccessor<A: Accessable> = VariantAccessor<Self, A>;
     #[inline]
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
-        VoidVariant { t: PhantomData, variant: &descriptor.variant, repr: a }
+        VariantAccessor { repr: a, descriptor }
     }
     #[inline]
     unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, _: &'static Self::Descriptor) {
@@ -333,104 +512,33 @@ impl<G: FieldGroup> FieldType for Group<G> {
     }
 }
 
-pub struct Capability<C: ty::Capability> {
-    c: PhantomData<fn() -> C>,
-}
+pub type GroupVariant<G, Repr> = VariantAccessor<kind::Group<G>, Repr>;
 
-impl<C: ty::Capability> Sealed for Capability<C> {}
-impl<C: ty::Capability> ty::Value for Capability<C> {
-    /// Capabilities don't have defaults
-    type Default = ();
-}
-impl<C: ty::Capability> ListValue for Capability<C> {
-    const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
-}
+pub type GroupVariantReader<'b, 'p, T, G> = VariantReader<'b, 'p, T, kind::Group<G>>;
 
-/// A wrapper type used to implement methods for enum fields.
-pub struct Enum<E: ty::Enum> {
-    e: PhantomData<fn() -> E>,
-}
-
-impl<E: ty::Enum> Sealed for Enum<E> {}
-impl<E: ty::Enum> ty::Value for Enum<E> {
-    type Default = E;
-}
-impl<E: ty::Enum> ListValue for Enum<E> {
-    const ELEMENT_SIZE: ElementSize = ElementSize::TwoBytes;
-}
-
-/// A variant accessor type for "void" types (`Void` and groups).
-/// 
-/// This includes not just the Void primitive, but also groups, which are kinda like voids in
-/// the sense that they aren't actual "things" on the wire. Void fields take up no encoding space
-/// and groups don't take up any encoding space either. They also have no associated data, so they
-/// don't have an associated descriptor, just variant info.
-pub struct VoidVariant<T, Repr> {
-    t: PhantomData<fn() -> T>,
-    variant: &'static VariantInfo,
-    repr: Repr,
-}
-
-impl<'b, 'p, T: Table, U> VoidVariant<U, StructReader<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
-}
-
-impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructReader<'b, 'p, T>> {
+impl<'b, 'p, T: Table, G: Group> GroupVariantReader<'b, 'p, T, G> {
     #[inline]
     pub fn get(&self) -> Option<G::Reader<'p, T>> {
-        if self.is_set() {
-            Some(ty::StructReader::from_ptr(self.repr.clone()))
-        } else {
-            None
-        }
+        self.field()
     }
 
     #[inline]
     pub unsafe fn get_unchecked(&self) -> G::Reader<'p, T> {
-        ty::StructReader::from_ptr(self.repr.clone())
+        self.field_unchecked()
     }
 }
 
-impl<'b, 'p, T: Table, U> VoidVariant<U, StructBuilder<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
-    }
+pub type GroupVariantBuilder<'b, 'p, T, G> = VariantBuilder<'b, 'p, T, kind::Group<G>>;
 
-    #[inline]
-    fn set_variant(&mut self) {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.set_field_unchecked(slot as usize, case) }
-    }
-}
-
-impl<'b, 'p, T: Table> VoidVariant<(), StructBuilder<'b, 'p, T>> {
-    #[inline]
-    pub fn set(&mut self) {
-        self.set_variant();
-    }
-}
-
-impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p, T>> {
+impl<'b, 'p, T: Table, G: Group> GroupVariantBuilder<'b, 'p, T, G> {
     #[inline]
     pub fn get(self) -> Option<G::Builder<'b, T>> {
-        if self.is_set() {
-            unsafe { Some(ty::StructBuilder::from_ptr(self.repr.by_ref())) }
-        } else {
-            None
-        }
+        self.field()
     }
 
     #[inline]
     pub unsafe fn get_unchecked(self) -> G::Builder<'b, T> {
-        ty::StructBuilder::from_ptr(self.repr.by_ref())
+        self.field_unchecked()
     }
 
     #[inline]
@@ -443,64 +551,43 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p
     }
 }
 
-pub struct DataField<D: ty::Value, Repr> {
-    descriptor: &'static FieldInfo<D>,
-    repr: Repr,
-}
+pub type DataField<D, Repr> = FieldAccessor<kind::Data<D>, Repr>;
 
-impl<'b, 'p, T: Table, D: Data> DataField<D, StructBuilder<'b, 'p, T>> {
+pub type DataFieldBuilder<'b, 'p, T, D> = FieldBuilder<'b, 'p, T, kind::Data<D>>;
+
+impl<'b, 'p, T: Table, D: Data> DataFieldBuilder<'b, 'p, T, D> {
     #[inline]
     pub fn get(&self) -> D {
         unsafe { self.repr.data_field_with_default_unchecked(self.descriptor.slot as usize, self.descriptor.default) }
     }
-
     #[inline]
     pub fn set(&mut self, value: D) {
         unsafe { self.repr.set_field_with_default_unchecked(self.descriptor.slot as usize, value, self.descriptor.default) }
     }
 }
 
-pub struct DataVariant<D: ty::Value, Repr> {
-    descriptor: &'static FieldInfo<D>,
-    variant: &'static VariantInfo,
-    repr: Repr,
-}
+pub type DataVariant<D, Repr> = VariantAccessor<kind::Data<D>, Repr>;
 
-impl<'b, 'p, T: Table, D: Data> DataVariant<D, StructReader<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
+pub type DataVariantReader<'b, 'p, T, D> = DataVariant<D, StructReader<'b, 'p, T>>;
 
+impl<'b, 'p, T: Table, D: Data> DataVariantReader<'b, 'p, T, D> {
     #[inline]
     pub fn get(&self) -> Option<D> {
-        let &FieldInfo { slot, default } = self.descriptor;
-        if self.is_set() {
-            Some(self.repr.data_field_with_default(slot as usize, default))
-        } else {
-            None
-        }
+        self.field()
     }
 
     #[inline]
     pub fn get_or_default(&self) -> D {
-        self.get().unwrap_or(self.descriptor.default)
+        self.get().unwrap_or(self.descriptor.field.default)
     }
 }
 
-impl<'b, 'p, T: Table, D: Data> DataVariant<D, StructBuilder<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
+pub type DataVariantBuilder<'b, 'p, T, D> = DataVariant<D, StructBuilder<'b, 'p, T>>;
 
+impl<'b, 'p, T: Table, D: Data> DataVariantBuilder<'b, 'p, T, D> {
     #[inline]
     pub fn get(&self) -> Option<D> {
-        let &FieldInfo { slot, default } = self.descriptor;
+        let FieldInfo { slot, default } = self.descriptor.field;
         if self.is_set() {
             Some(unsafe { self.repr.data_field_with_default_unchecked(slot as usize, default) })
         } else {
@@ -510,13 +597,13 @@ impl<'b, 'p, T: Table, D: Data> DataVariant<D, StructBuilder<'b, 'p, T>> {
 
     #[inline]
     pub fn get_or_default(&self) -> D {
-        self.get().unwrap_or(self.descriptor.default)
+        self.get().unwrap_or(self.descriptor.field.default)
     }
 
     #[inline]
     pub fn set(&mut self, value: D) {
-        let &VariantInfo { slot: variant_slot, case } = self.variant;
-        let &FieldInfo { slot, default } = self.descriptor;
+        let VariantInfo { slot: variant_slot, case } = self.descriptor.variant;
+        let FieldInfo { slot, default } = self.descriptor.field;
         unsafe {
             self.repr.set_field_unchecked(variant_slot as usize, case);
             self.repr.set_field_with_default_unchecked(slot as usize, value, default);
@@ -524,17 +611,19 @@ impl<'b, 'p, T: Table, D: Data> DataVariant<D, StructBuilder<'b, 'p, T>> {
     }
 }
 
-impl<E: ty::Enum> FieldType for Enum<E> {
-    type Descriptor = FieldInfo<Self>;
+impl<E: ty::Enum> FieldType for kind::Enum<E> {
+    type Descriptor = FieldInfo<E>;
 
     type Accessor<A: Accessable> = A::Enum<E>;
+    #[inline]
     unsafe fn accessor<A: Accessable>(a: A, descriptor: &'static Self::Descriptor) -> Self::Accessor<A> {
         a.enum_value(descriptor)
     }
 
-    type VariantAccessor<A: Accessable> = DataVariant<Self, A>;
+    type VariantAccessor<A: Accessable> = EnumVariant<E, A>;
+    #[inline]
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
-        DataVariant { descriptor: &descriptor.field, variant: &descriptor.variant, repr: a }
+        EnumVariant { repr: a, descriptor }
     }
 
     #[inline]
@@ -543,7 +632,9 @@ impl<E: ty::Enum> FieldType for Enum<E> {
     }
 }
 
-impl<'b, 'p, T: Table, E: ty::Enum> DataField<Enum<E>, StructBuilder<'b, 'p, T>> {
+pub type EnumField<E, Repr> = FieldAccessor<kind::Enum<E>, Repr>;
+
+impl<'b, 'p, T: Table, E: ty::Enum> EnumField<E, StructBuilder<'b, 'p, T>> {
     #[inline]
     pub fn get(&self) -> EnumResult<E> {
         let &FieldInfo { slot, default } = self.descriptor;
@@ -566,44 +657,29 @@ impl<'b, 'p, T: Table, E: ty::Enum> DataField<Enum<E>, StructBuilder<'b, 'p, T>>
     }
 }
 
-impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructReader<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
+pub type EnumVariant<E, Repr> = VariantAccessor<kind::Enum<E>, Repr>;
 
+pub type EnumVariantReader<'b, 'p, T, E> = EnumVariant<E, StructReader<'b, 'p, T>>;
+
+impl<'b, 'p, T: Table, E: ty::Enum> EnumVariantReader<'b, 'p, T, E> {
     #[inline]
     pub fn get(&self) -> Option<EnumResult<E>> {
-        if self.is_set() {
-            let &FieldInfo { slot, default } = self.descriptor;
-            let default: u16 = default.into();
-            let value = self.repr.data_field_with_default::<u16>(slot as usize, default);
-            Some(E::try_from(value))
-        } else {
-            None
-        }
+        self.field()
     }
 
     #[inline]
     pub fn get_or_default(&self) -> EnumResult<E> {
-        self.get().unwrap_or(Ok(self.descriptor.default))
+        self.get().unwrap_or(Ok(self.descriptor.field.default))
     }
 }
 
-impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructBuilder<'b, 'p, T>> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
-    }
+pub type EnumVariantBuilder<'b, 'p, T, E> = EnumVariant<E, StructBuilder<'b, 'p, T>>;
 
+impl<'b, 'p, T: Table, E: ty::Enum> EnumVariantBuilder<'b, 'p, T, E> {
     #[inline]
     pub fn get(&self) -> Option<EnumResult<E>> {
         if self.is_set() {
-            let &FieldInfo { slot, default } = self.descriptor;
+            let FieldInfo { slot, default } = self.descriptor.field;
             let default: u16 = default.into();
             let value = unsafe { self.repr.data_field_with_default_unchecked(slot as usize, default) };
             Some(E::try_from(value))
@@ -614,13 +690,13 @@ impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructBuilder<'b, 'p, T
 
     #[inline]
     pub fn get_or_default(&self) -> EnumResult<E> {
-        self.get().unwrap_or(Ok(self.descriptor.default))
+        self.get().unwrap_or(Ok(self.descriptor.field.default))
     }
 
     #[inline]
     pub fn set(&mut self, value: E) {
-        let &VariantInfo { slot: variant_slot, case } = self.variant;
-        let &FieldInfo { slot, default } = self.descriptor;
+        let VariantInfo { slot: variant_slot, case } = self.descriptor.variant;
+        let FieldInfo { slot, default } = self.descriptor.field;
         let value: u16 = value.into();
         let default: u16 = default.into();
         unsafe {
@@ -630,16 +706,13 @@ impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructBuilder<'b, 'p, T
     }
 }
 
-pub struct PtrField<V: ty::Value, Repr> {
-    descriptor: &'static FieldInfo<V>,
-    repr: Repr,
-}
+pub type PtrField<P, Repr> = FieldAccessor<kind::PtrField<P>, Repr>;
 
-pub type PtrFieldReader<'b, 'p, T, V> = PtrField<V, StructReader<'b, 'p, T>>;
-pub type PtrFieldBuilder<'b, 'p, T, V> = PtrField<V, StructBuilder<'b, 'p, T>>;
-pub type PtrFieldOwner<'p, T, V> = PtrField<V, OwnedStructBuilder<'p, T>>;
+pub type PtrFieldReader<'b, 'p, T, P> = PtrField<P, StructReader<'b, 'p, T>>;
+pub type PtrFieldBuilder<'b, 'p, T, P> = PtrField<P, StructBuilder<'b, 'p, T>>;
+pub type PtrFieldOwner<'p, T, P> = PtrField<P, OwnedStructBuilder<'p, T>>;
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrFieldReader<'b, 'p, T, V> {
+impl<'b, 'p, T: Table, P: Ptr> PtrFieldReader<'b, 'p, T, P> {
     #[inline]
     fn raw_ptr(&self) -> ptr::PtrReader<'p, T> {
         self.repr.ptr_field(self.descriptor.slot as u16)
@@ -656,17 +729,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrFieldReader<'b, 'p, T, V> {
     }
 }
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrFieldBuilder<'b, 'p, T, V> {
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
-    #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrFieldBuilder<'c, 'p, T, V> {
-        PtrField {
-            descriptor: self.descriptor,
-            repr: &mut *self.repr,
-        }
-    }
-
+impl<'b, 'p, T: Table, P: Ptr> PtrFieldBuilder<'b, 'p, T, P> {
     #[inline]
     fn raw_read_ptr(&self) -> ptr::PtrReader<T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
@@ -694,12 +757,12 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrFieldBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<P, T>) {
         self.raw_build_ptr().adopt(orphan.into_inner());
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, V, T> {
+    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, P, T> {
         Orphan::new(self.raw_build_ptr().disown_into(orphanage))
     }
 
@@ -714,17 +777,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrFieldBuilder<'b, 'p, T, V> {
     }
 }
 
-impl<'p, T: Table, V: ty::Value> PtrFieldOwner<'p, T, V> {
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
-    #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrFieldOwner<'c, T, V> {
-        PtrField {
-            descriptor: self.descriptor,
-            repr: self.repr.by_ref(),
-        }
-    }
-
+impl<'p, T: Table, P: Ptr> PtrFieldOwner<'p, T, P> {
     #[inline]
     fn raw_read_ptr(&self) -> ptr::PtrReader<T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
@@ -752,12 +805,12 @@ impl<'p, T: Table, V: ty::Value> PtrFieldOwner<'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<P, T>) {
         self.raw_build_ptr().adopt(orphan.into_inner());
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, V, T> {
+    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, P, T> {
         Orphan::new(self.raw_build_ptr().disown_into(orphanage))
     }
 
@@ -772,33 +825,24 @@ impl<'p, T: Table, V: ty::Value> PtrFieldOwner<'p, T, V> {
     }
 }
 
-/// A base type for accessing union variant fields.
-pub struct PtrVariant<V: ty::Value, Repr> {
-    descriptor: &'static FieldInfo<V>,
-    variant: &'static VariantInfo,
-    repr: Repr,
-}
+pub type PtrVariant<P, Repr> = VariantAccessor<kind::PtrField<P>, Repr>;
 
 pub type PtrVariantReader<'b, 'p, T, V> = PtrVariant<V, StructReader<'b, 'p, T>>;
 pub type PtrVariantBuilder<'b, 'p, T, V> = PtrVariant<V, StructBuilder<'b, 'p, T>>;
 pub type PtrVariantOwner<'p, T, V> = PtrVariant<V, OwnedStructBuilder<'p, T>>;
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrVariantReader<'b, 'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
-
+impl<'b, 'p, T: Table, P: Ptr> PtrVariantReader<'b, 'p, T, P> {
     #[inline]
     fn raw_ptr(&self) -> Option<ptr::PtrReader<'b, T>> {
-        self.is_set().then(|| self.repr.ptr_field(self.descriptor.slot as u16))
+        self.is_set().then(|| self.repr.ptr_field(self.descriptor.field.slot as u16))
     }
 
     #[inline]
-    pub fn field(&self) -> Option<PtrFieldReader<'b, 'p, T, V>> {
-        self.is_set().then(|| PtrField { descriptor: self.descriptor, repr: self.repr })
+    fn raw_ptr_or_null(&self) -> ptr::PtrReader<'b, T> {
+        match self.raw_ptr() {
+            Some(ptr) => ptr,
+            None => ptr::PtrReader::null().imbue_from(self.repr),
+        }
     }
 
     #[inline]
@@ -811,55 +855,20 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantReader<'b, 'p, T, V> {
     }
 }
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
-    }
-
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
-    #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrVariantBuilder<'c, 'p, T, V> {
-        PtrVariant {
-            descriptor: self.descriptor,
-            variant: self.variant,
-            repr: &mut *self.repr,
-        }
-    }
-
+impl<'b, 'p, T: Table, P: Ptr> PtrVariantBuilder<'b, 'p, T, P> {
     #[inline]
     fn raw_read_ptr(&self) -> Option<ptr::PtrReader<T>> {
-        self.is_set().then(|| unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) })
+        self.is_set().then(|| unsafe { self.repr.ptr_field_unchecked(self.descriptor.field.slot as u16) })
     }
 
     #[inline]
     fn raw_build_ptr(&mut self) -> Option<ptr::PtrBuilder<T>> {
-        self.is_set().then(|| unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.slot as u16) })
+        self.is_set().then(|| unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.field.slot as u16) })
     }
 
     #[inline]
     fn into_raw_build_ptr(self) -> Option<ptr::PtrBuilder<'b, T>> {
-        self.is_set().then(|| unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.slot as u16) })
-    }
-
-    #[inline]
-    pub fn init_field(self) -> PtrFieldBuilder<'b, 'p, T, V> {
-        if !self.is_set() {
-            let &VariantInfo { slot, case } = self.variant;
-            unsafe {
-                self.repr.set_field_unchecked::<u16>(slot as usize, case);
-                self.repr.ptr_field_mut_unchecked(self.descriptor.slot as u16).clear();
-            }
-        }
-        PtrField { descriptor: self.descriptor, repr: self.repr }
-    }
-
-    #[inline]
-    pub fn field(self) -> Option<PtrFieldBuilder<'b, 'p, T, V>> {
-        self.is_set().then(|| PtrField { descriptor: self.descriptor, repr: self.repr })
+        self.is_set().then(|| unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.field.slot as u16) })
     }
 
     #[inline]
@@ -872,19 +881,19 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<P, T>) {
         if !self.is_set() {
-            let &VariantInfo { slot, case } = self.variant;
+            let VariantInfo { slot, case } = self.descriptor.variant;
             unsafe {
                 self.repr.set_field_unchecked::<u16>(slot as usize, case);
             }
         }
-        let mut ptr = unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.slot as u16) };
+        let mut ptr = unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.field.slot as u16) };
         ptr.adopt(orphan.into_inner());
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Option<Orphan<'c, V, T>> {
+    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Option<Orphan<'c, P, T>> {
         self.raw_build_ptr().map(|mut p| Orphan::new(p.disown_into(orphanage)))
     }
 
@@ -901,60 +910,278 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
     }
 }
 
-impl<'p, T: Table, V: ty::Value> PtrVariantOwner<'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
+impl<'p, T: Table, P: Ptr> PtrVariantOwner<'p, T, P> {
+}
+
+impl<S: ty::Struct> TypeKind for kind::Struct<S> {
+    type Kind = kind::PtrField<Self>;
+}
+impl<S: ty::Struct> Ptr for kind::Struct<S> {
+    type Default = ptr::StructReader<'static>;
+}
+
+pub type StructField<S, Repr> = PtrField<kind::Struct<S>, Repr>;
+
+pub type StructFieldReader<'b, 'p, T, S> = StructField<S, StructReader<'b, 'p, T>>;
+pub type StructFieldBuilder<'b, 'p, T, S> = StructField<S, StructBuilder<'b, 'p, T>>;
+pub type StructFieldOwner<'p, T, S> = StructField<S, OwnedStructBuilder<'p, T>>;
+
+impl<S: ty::Struct, Repr> StructField<S, Repr> {
     #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
+    fn default_ptr(&self) -> ptr::StructReader<'static> {
+        self.descriptor.default.clone().unwrap_or(ptr::StructReader::empty())
+    }
+
+    /// Returns the default value of the field
+    #[inline]
+    pub fn default(&self) -> S::Reader<'static, Empty> {
+        ty::StructReader::from_ptr(self.default_ptr())
     }
 }
 
-/// A macro to make implementing FieldType and AccessableField for non-generic ptr types easy
-macro_rules! field_type_items {
-    () => {
-        type Descriptor = FieldInfo<Self>;
-
-        type Accessor<A: Accessable> = PtrField<Self, A>;
-        #[inline]
-        unsafe fn accessor<A: Accessable>(a: A, descriptor: &'static Self::Descriptor) -> Self::Accessor<A> {
-            PtrField { descriptor, repr: a }
-        }
-
-        type VariantAccessor<A: Accessable> = PtrVariant<Self, A>;
-        #[inline]
-        unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
-            PtrVariant { descriptor: &descriptor.field, variant: &descriptor.variant, repr: a }
-        }
-
-        #[inline]
-        unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor) {
-            a.ptr_field_mut_unchecked(descriptor.slot as u16).clear();
-        }
-    };
-}
-
-// impls for list
-
-impl<V: 'static> FieldType for List<V> {
-    field_type_items!{}
-}
-
-impl<'b, 'p, T: Table, V> PtrFieldReader<'b, 'p, T, List<V>>
-where
-    V: ty::DynListValue,
-{
+impl<'b, 'p, T: Table, S: ty::Struct> StructFieldReader<'b, 'p, T, S> {
     #[inline]
-    fn default(&self) -> list::Reader<'static, V, T> {
-        let default = &self.descriptor.default;
-        assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
+    fn default_imbued_ptr(&self) -> ptr::StructReader<'static, T> {
+        self.default_ptr().imbue_from(self.repr)
+    }
 
-        List::new(default.clone().imbue_from(self.repr))
+    #[inline]
+    fn get_ptr(&self) -> ptr::StructReader<'b, T> {
+        match self.raw_ptr().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            _ => self.default_imbued_ptr(),
+        }
+    }
+
+    #[inline]
+    pub fn get(&self) -> S::Reader<'b, T> {
+        ty::StructReader::from_ptr(self.get_ptr())
+    }
+
+    #[inline]
+    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+        self.try_get_option().ok().flatten()
+    }
+
+    #[inline]
+    fn try_get_ptr(&self) -> Result<ptr::StructReader<'b, T>> {
+        match self.raw_ptr().to_struct() {
+            Ok(Some(ptr)) => Ok(ptr),
+            Ok(None) => Ok(self.default_imbued_ptr()),
+            Err(err) => Err(err),
+        }
+    }
+
+    #[inline]
+    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+        self.try_get_ptr().map(ty::StructReader::from_ptr)
+    }
+
+    #[inline]
+    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+        match self.raw_ptr().to_struct() {
+            Ok(Some(ptr)) => Ok(Some(ty::StructReader::from_ptr(ptr))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl<'b, 'p, T: Table, S: ty::Struct> StructFieldBuilder<'b, 'p, T, S> {
+    /// Returns a builder for the field. If it's not set or a error occurs while reading the
+    /// existing value, the field default is set in its place instead.
+    #[inline]
+    pub fn get(self) -> S::Builder<'b, T> {
+        let default = self.default_ptr();
+        let ptr = match self.into_raw_build_ptr().to_struct_mut(Some(S::SIZE)) {
+            Ok(ptr) => ptr,
+            Err((_, ptr)) => {
+                let mut builder = ptr.init_struct(S::SIZE);
+                builder.copy_with_caveats(&default, false);
+                builder
+            }
+        };
+        unsafe { ty::StructBuilder::from_ptr(ptr) }
+    }
+
+    #[inline]
+    pub fn init(self) -> S::Builder<'b, T> {
+        unsafe { ty::StructBuilder::from_ptr(self.into_raw_build_ptr().init_struct(S::SIZE)) }
+    }
+
+    /// Returns a builder for the field. If it's not set or a error occurs while reading the
+    /// existing value, the struct default is set instead.
+    #[inline]
+    pub fn get_or_init(self) -> S::Builder<'b, T> {
+        let ptr = self.into_raw_build_ptr().to_struct_mut_or_init(S::SIZE);
+        unsafe { ty::StructBuilder::from_ptr(ptr) }
+    }
+
+    /// Try to set this field to a copy of the given value.
+    ///
+    /// If an error occurs while reading the input value, it's passed to the error handler, which
+    /// can choose to write null instead or return an error.
+    #[inline]
+    pub fn try_set<T2, E>(
+        self,
+        value: &S::Reader<'_, T2>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        T2: InsertableInto<T>,
+        E: ErrorHandler,
+    {
+        self.into_raw_build_ptr().try_set_struct(value.as_ptr(), ptr::CopySize::Minimum(S::SIZE), err_handler)
+    }
+
+    #[inline]
+    pub fn set<T2>(self, value: &S::Reader<'_, T2>)
+    where
+        T2: InsertableInto<T>,
+    {
+        self.try_set(value, IgnoreErrors).unwrap()
+    }
+}
+
+pub type StructVariant<S, Repr> = PtrVariant<kind::Struct<S>, Repr>;
+
+pub type StructVariantReader<'b, 'p, T, S> = StructVariant<S, StructReader<'b, 'p, T>>;
+pub type StructVariantBuilder<'b, 'p, T, S> = StructVariant<S, StructBuilder<'b, 'p, T>>;
+pub type StructVariantOwner<'p, T, S> = StructVariant<S, OwnedStructBuilder<'p, T>>;
+
+impl<S: ty::Struct, Repr> StructVariant<S, Repr> {
+    #[inline]
+    fn default_ptr(&self) -> ptr::StructReader<'static> {
+        self.descriptor.field.default.clone().unwrap_or(ptr::StructReader::empty())
+    }
+
+    /// Returns the default value of the field
+    #[inline]
+    pub fn default(&self) -> S::Reader<'static, Empty> {
+        ty::StructReader::from_ptr(self.default_ptr())
+    }
+}
+
+impl<'b, 'p, T: Table, S: ty::Struct> StructVariantReader<'b, 'p, T, S> {
+    #[inline]
+    fn default_imbued_ptr(&self) -> ptr::StructReader<'static, T> {
+        self.default_ptr().imbue_from(self.repr)
+    }
+
+    #[inline]
+    fn default_imbued(&self) -> S::Reader<'static, T> {
+        ty::StructReader::from_ptr(self.default_imbued_ptr())
+    }
+
+    #[inline]
+    pub fn get_or_default(&self) -> S::Reader<'b, T> {
+        let ptr = match self.raw_ptr_or_null().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            _ => self.default_imbued_ptr(),
+        };
+
+        ty::StructReader::from_ptr(ptr)
+    }
+
+    #[inline]
+    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+        self.try_get_option().ok().flatten()
+    }
+
+    #[inline]
+    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+        let ptr = match self.raw_ptr_or_null().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            Ok(None) => self.default_imbued_ptr(),
+            Err(err) => return Err(err),
+        };
+
+        Ok(ty::StructReader::from_ptr(ptr))
+    }
+
+    #[inline]
+    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+        self.field()
+            .map(|r| r.try_get_option())
+            .transpose()
+            .map(Option::flatten)
+    }
+}
+
+impl<'b, 'p, T: Table, S: ty::Struct> StructVariantBuilder<'b, 'p, T, S> {
+    /// Returns a builder for the field. If it's not set or a error occurs while reading the
+    /// existing value, the field default is set in its place instead.
+    #[inline]
+    pub fn get(self) -> S::Builder<'b, T> {
+        self.init_field().get()
+    }
+
+    #[inline]
+    pub fn init(self) -> S::Builder<'b, T> {
+        self.init_field().init()
+    }
+
+    /// Returns a builder for the field. If it's not set or a error occurs while reading the
+    /// existing value, the struct default is set instead.
+    #[inline]
+    pub fn get_or_init(self) -> S::Builder<'b, T> {
+        self.init_field().get_or_init()
+    }
+
+    #[inline]
+    pub fn try_set<E>(
+        self,
+        value: &S::Reader<'_, impl InsertableInto<T>>,
+        err_handler: E,
+    ) -> Result<(), E::Error>
+    where
+        E: ErrorHandler,
+    {
+        self.init_field().try_set(value, err_handler)
+    }
+
+    #[inline]
+    pub fn set(self, value: &S::Reader<'_, impl InsertableInto<T>>) {
+        self.init_field().set(value)
+    }
+}
+
+impl<V: 'static> TypeKind for List<V> {
+    type Kind = kind::PtrField<Self>;
+}
+impl<V: 'static> Ptr for List<V> {
+    type Default = ptr::ListReader<'static>;
+}
+
+pub type ListField<V, Repr> = PtrField<List<V>, Repr>;
+
+pub type ListFieldReader<'b, 'p, T, V> = ListField<V, StructReader<'b, 'p, T>>;
+pub type ListFieldBuilder<'b, 'p, T, V> = ListField<V, StructBuilder<'b, 'p, T>>;
+pub type ListFieldOwner<'p, T, V> = ListField<V, OwnedStructBuilder<'p, T>>;
+
+impl<V: ty::DynListValue, Repr> ListField<V, Repr> {
+    #[inline]
+    fn default_ptr(&self) -> ptr::ListReader<'static> {
+        self.descriptor.default.clone()
+            .unwrap_or_else(|| ptr::ListReader::empty(V::PTR_ELEMENT_SIZE.to_element_size()))
+    }
+
+    /// Returns the default value of the field
+    #[inline]
+    pub fn default(&self) -> list::Reader<'static, V, Empty> {
+        List::new(self.default_ptr())
+    }
+}
+
+impl<'b, 'p, T: Table, V: ty::DynListValue> ListFieldReader<'b, 'p, T, V> {
+    #[inline]
+    fn default_imbued(&self) -> list::Reader<'static, V, T> {
+        self.default().imbue_from(self.repr)
     }
 
     #[inline]
     pub fn get(&self) -> list::Reader<'p, V, T> {
-        self.get_option().unwrap_or_else(|| self.default())
+        self.get_option().unwrap_or_else(|| self.default_imbued())
     }
 
     #[inline]
@@ -965,7 +1192,7 @@ where
     #[inline]
     pub fn try_get(&self) -> Result<list::Reader<'p, V, T>> {
         self.try_get_option()
-            .map(|op| op.unwrap_or_else(|| self.default()))
+            .map(|op| op.unwrap_or_else(|| self.default_imbued()))
     }
 
     #[inline]
@@ -981,23 +1208,25 @@ where
     }
 }
 
-impl<'b, 'p, T: Table, V> PtrFieldReader<'b, 'p, T, List<V>>
+impl<'b, 'p, T: Table, V: ty::DynListValue> ListFieldReader<'b, 'p, T, V>
 where
-    V: ty::DynListValue + for<'lb> list::ListAccessable<&'lb list::Reader<'p, V, T>>,
+    V: list::IterKind,
+    V::Iter: for<'lb> list::ListAccessable<&'lb list::ptr::Reader<'p, T>>,
 {
     #[inline]
     pub fn iter_by<S>(&self, strat: S) -> list::Iter<'p, V, S, T>
     where
-        S: for<'lb> list::IterStrategy<V, list::ElementReader<'p, 'lb, V, T>>,
+        S: for<'lb> list::IterStrategy<&'lb list::ptr::Reader<'p, T>, V>,
     {
         self.get().into_iter_by(strat)
     }
 }
 
-impl<'b, 'p, T: Table, V, Item> IntoIterator for PtrFieldReader<'b, 'p, T, List<V>>
+impl<'b, 'p, T: Table, V: ty::DynListValue, Item> IntoIterator for ListFieldReader<'b, 'p, T, V>
 where
-    V: ty::DynListValue + for<'lb> list::ListAccessable<&'lb list::Reader<'p, V, T>>,
-    InfalliblePtrs: for<'lb> list::IterStrategy<V, list::ElementReader<'p, 'lb, V, T>, Item = Item>,
+    V: list::IterKind,
+    V::Iter: for<'lb> list::ListAccessable<&'lb list::ptr::Reader<'p, T>>,
+    InfalliblePtrs: for<'lb> list::IterStrategy<&'lb list::ptr::Reader<'p, T>, V::Iter, Item = Item>,
 {
     type IntoIter = list::Iter<'p, V, InfalliblePtrs, T>;
     type Item = Item;
@@ -1008,44 +1237,7 @@ where
     }
 }
 
-impl<'b, 'p, T: Table, V: ty::DynListValue> PtrVariantReader<'b, 'p, T, List<V>> {
-    #[inline]
-    fn default(&self) -> list::Reader<'static, V, T> {
-        let default = &self.descriptor.default;
-        assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
-
-        List::new(default.clone().imbue_from(self.repr))
-    }
-
-    #[inline]
-    pub fn get_or_default(&self) -> list::Reader<'p, V, T> {
-        self.try_get_option()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| self.default())
-    }
-
-    #[inline]
-    pub fn get_option(&self) -> Option<list::Reader<'p, V, T>> {
-        self.try_get_option().ok().flatten()
-    }
-
-    #[inline]
-    pub fn try_get(&self) -> Result<list::Reader<'p, V, T>> {
-        self.try_get_option()
-            .map(|op| op.unwrap_or_else(|| self.default()))
-    }
-
-    #[inline]
-    pub fn try_get_option(&self) -> Result<Option<list::Reader<'p, V, T>>> {
-        self.field()
-            .map(|r| r.try_get_option())
-            .transpose()
-            .map(Option::flatten)
-    }
-}
-
-impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
+impl<'b, 'p, T: Table, V: ty::ListValue> ListFieldBuilder<'b, 'p, T, V> {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
     /// existing value, the default is set instead.
     #[inline]
@@ -1054,9 +1246,13 @@ impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
         match self.into_raw_build_ptr().to_list_mut(Some(V::ELEMENT_SIZE)) {
             Ok(ptr) => List::new(ptr),
             Err((_, ptr)) => {
-                assert_eq!(default.element_size(), V::ELEMENT_SIZE);
-                let mut new_list = ptr.init_list(V::ELEMENT_SIZE, default.len());
-                new_list.try_copy_from(default, UnwrapErrors).unwrap();
+                let new_list = if let Some(default) = default {
+                    let mut new_list = ptr.init_list(V::ELEMENT_SIZE, default.len());
+                    new_list.try_copy_from(default, UnwrapErrors).unwrap();
+                    new_list
+                } else {
+                    ptr.into_empty_list(V::ELEMENT_SIZE)
+                };
                 List::new(new_list)
             }
         }
@@ -1107,7 +1303,7 @@ impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
     }
 }
 
-impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
+impl<'b, 'p, T: Table> ListFieldBuilder<'b, 'p, T, AnyStruct> {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
     /// existing value, the default is set instead.
     #[inline]
@@ -1118,20 +1314,22 @@ impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
             .to_list_mut(expected_size.map(ElementSize::InlineComposite))
         {
             Ok(ptr) => ptr,
-            Err((_, ptr)) => {
-                let default_size = default.element_size();
-                let size = match expected_size {
-                    Some(e) => {
-                        let expected = ElementSize::InlineComposite(e);
-                        default_size.upgrade_to(expected)
-                            .expect("default value can't be upgraded to struct list!")
-                    },
-                    None => default_size,
-                };
-                let mut builder = ptr.init_list(size, default.len());
-                builder.try_copy_from(default, UnwrapErrors).unwrap();
-                builder
-            }
+            Err((_, ptr)) => if let Some(default) = default {
+                    let default_size = default.element_size();
+                    let size = match expected_size {
+                        Some(e) => {
+                            let expected = ElementSize::InlineComposite(e);
+                            default_size.upgrade_to(expected)
+                                .expect("default value can't be upgraded to struct list!")
+                        },
+                        None => default_size,
+                    };
+                    let mut builder = ptr.init_list(size, default.len());
+                    builder.try_copy_from(default, UnwrapErrors).unwrap();
+                    builder
+                } else {
+                    ptr.into_empty_list(ElementSize::InlineComposite(StructSize::EMPTY))
+                }
         };
         List::new(ptr)
     }
@@ -1148,157 +1346,53 @@ impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
     // TODO the rest of the accessors
 }
 
-impl<'b, 'p, T: Table, V: ty::DynListValue> PtrVariantBuilder<'b, 'p, T, List<V>> {
-    // TODO acceessors
-}
+pub type ListVariant<V, Repr> = PtrVariant<List<V>, Repr>;
 
-impl<S: ty::Struct> FieldType for Struct<S> {
-    field_type_items!{}
-}
+pub type ListVariantReader<'b, 'p, T, V> = ListVariant<V, StructReader<'b, 'p, T>>;
+pub type ListVariantBuilder<'b, 'p, T, V> = ListVariant<V, StructBuilder<'b, 'p, T>>;
+pub type ListVariantOwner<'p, T, V> = ListVariant<V, OwnedStructBuilder<'p, T>>;
 
-impl<S: ty::Struct, Repr> PtrField<Struct<S>, Repr> {
+impl<V: ty::DynListValue, Repr> ListVariant<V, Repr> {
     #[inline]
-    fn default_ptr(&self) -> ptr::StructReader<'static> {
-        self.descriptor.default.clone()
+    fn default_ptr(&self) -> ptr::ListReader<'static> {
+        self.descriptor.field.default.clone()
+            .unwrap_or_else(|| ptr::ListReader::empty(V::PTR_ELEMENT_SIZE.to_element_size()))
     }
 
     /// Returns the default value of the field
     #[inline]
-    pub fn default(&self) -> S::Reader<'static, Empty> {
-        ty::StructReader::from_ptr(self.default_ptr())
+    pub fn default(&self) -> list::Reader<'static, V, Empty> {
+        List::new(self.default_ptr())
     }
 }
 
-impl<'b, 'p, T: Table, S> PtrFieldReader<'b, 'p, T, Struct<S>>
-where
-    S: ty::Struct,
-{
+impl<'b, 'p, T: Table, V: ty::DynListValue> ListVariantReader<'b, 'p, T, V> {
     #[inline]
-    fn default_imbued_ptr(&self) -> ptr::StructReader<'static, T> {
-        self.default_ptr().imbue_from(self.repr)
+    fn default_imbued(&self) -> list::Reader<'static, V, T> {
+        self.default().imbue_from(self.repr)
     }
 
     #[inline]
-    pub fn get(&self) -> S::Reader<'b, T> {
-        ty::StructReader::from_ptr(match self.raw_ptr().to_struct() {
-            Ok(Some(ptr)) => ptr,
-            _ => self.default_imbued_ptr(),
-        })
-    }
-
-    #[inline]
-    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
-        self.try_get_option().ok().flatten()
-    }
-
-    #[inline]
-    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
-        Ok(ty::StructReader::from_ptr(match self.raw_ptr().to_struct() {
-            Ok(Some(ptr)) => ptr,
-            Ok(None) => self.default_imbued_ptr(),
-            Err(err) => return Err(err),
-        }))
-    }
-
-    #[inline]
-    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
-        match self.raw_ptr().to_struct() {
-            Ok(Some(ptr)) => Ok(Some(ty::StructReader::from_ptr(ptr))),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-        }
-    }
-}
-
-impl<'b, 'p: 'b, T: Table + 'p, S> PtrFieldBuilder<'b, 'p, T, Struct<S>>
-where
-    S: ty::Struct,
-{
-    /// Returns a builder for the field. If it's not set or a error occurs while reading the
-    /// existing value, the field default is set in its place instead.
-    #[inline]
-    pub fn get(self) -> S::Builder<'b, T> {
-        let default = &self.descriptor.default;
-        let ptr = match self.into_raw_build_ptr().to_struct_mut(Some(S::SIZE)) {
-            Ok(ptr) => ptr,
-            Err((_, ptr)) => {
-                let mut builder = ptr.init_struct(S::SIZE);
-                builder.copy_with_caveats(default, false);
-                builder
-            }
-        };
-        unsafe { ty::StructBuilder::from_ptr(ptr) }
-    }
-
-    #[inline]
-    pub fn init(self) -> S::Builder<'b, T> {
-        unsafe { ty::StructBuilder::from_ptr(self.into_raw_build_ptr().init_struct(S::SIZE)) }
-    }
-
-    /// Returns a builder for the field. If it's not set or a error occurs while reading the
-    /// existing value, the struct default is set instead.
-    #[inline]
-    pub fn get_or_init(self) -> S::Builder<'b, T> {
-        let ptr = self.into_raw_build_ptr().to_struct_mut_or_init(S::SIZE);
-        unsafe { ty::StructBuilder::from_ptr(ptr) }
-    }
-
-    /// Try to set this field to a copy of the given value.
-    ///
-    /// If an error occurs while reading the input value, it's passed to the error handler, which
-    /// can choose to write null instead or return an error.
-    #[inline]
-    pub fn try_set<T2, E>(
-        self,
-        value: &S::Reader<'_, T2>,
-        err_handler: E,
-    ) -> Result<(), E::Error>
-    where
-        T2: InsertableInto<T>,
-        E: ErrorHandler,
-    {
-        self.into_raw_build_ptr().try_set_struct(value.as_ptr(), ptr::CopySize::Minimum(S::SIZE), err_handler)
-    }
-
-    #[inline]
-    pub fn set<T2>(self, value: &S::Reader<'_, T2>)
-    where
-        T2: InsertableInto<T>,
-    {
-        self.try_set(value, IgnoreErrors).unwrap()
-    }
-}
-
-impl<'b, 'p: 'b, T: Table + 'p, S> PtrVariantReader<'b, 'p, T, Struct<S>>
-where
-    S: ty::Struct,
-{
-    #[inline]
-    fn default(&self) -> S::Reader<'b, T> {
-        self.descriptor.default.clone().imbue_from(self.repr).into()
-    }
-
-    #[inline]
-    pub fn get_or_default(&self) -> S::Reader<'b, T> {
+    pub fn get_or_default(&self) -> list::Reader<'p, V, T> {
         self.try_get_option()
             .ok()
             .flatten()
-            .unwrap_or_else(|| self.default())
+            .unwrap_or_else(|| self.default_imbued())
     }
 
     #[inline]
-    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+    pub fn get_option(&self) -> Option<list::Reader<'p, V, T>> {
         self.try_get_option().ok().flatten()
     }
 
     #[inline]
-    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+    pub fn try_get(&self) -> Result<list::Reader<'p, V, T>> {
         self.try_get_option()
-            .map(|op| op.unwrap_or_else(|| self.default()))
+            .map(|op| op.unwrap_or_else(|| self.default_imbued()))
     }
 
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+    pub fn try_get_option(&self) -> Result<Option<list::Reader<'p, V, T>>> {
         self.field()
             .map(|r| r.try_get_option())
             .transpose()
@@ -1306,60 +1400,32 @@ where
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p, S> PtrVariantBuilder<'b, 'p, T, Struct<S>>
-where
-    S: ty::Struct,
-{
-    /// Returns a builder for the field. If it's not set or a error occurs while reading the
-    /// existing value, the field default is set in its place instead.
-    #[inline]
-    pub fn get(self) -> S::Builder<'b, T> {
-        self.init_field().get()
-    }
-
-    #[inline]
-    pub fn init(self) -> S::Builder<'b, T> {
-        self.init_field().init()
-    }
-
-    /// Returns a builder for the field. If it's not set or a error occurs while reading the
-    /// existing value, the struct default is set instead.
-    #[inline]
-    pub fn get_or_init(self) -> S::Builder<'b, T> {
-        self.init_field().get_or_init()
-    }
-
-    #[inline]
-    pub fn try_set<E>(
-        self,
-        value: &S::Reader<'_, impl InsertableInto<T>>,
-        err_handler: E,
-    ) -> Result<(), E::Error>
-    where
-        E: ErrorHandler,
-    {
-        self.init_field().try_set(value, err_handler)
-    }
-
-    #[inline]
-    pub fn set(self, value: &S::Reader<'_, impl InsertableInto<T>>) {
-        self.init_field().set(value)
-    }
+impl<'b, 'p, T: Table, V: ty::DynListValue> ListVariantBuilder<'b, 'p, T, V> {
+    // TODO acceessors
 }
 
-impl FieldType for text::Text {
-    field_type_items!{}
+impl TypeKind for text::Text {
+    type Kind = kind::PtrField<Self>;
+}
+impl Ptr for text::Text {
+    type Default = text::Reader<'static>;
 }
 
-impl<Repr> PtrField<text::Text, Repr> {
+pub type TextField<Repr> = PtrField<text::Text, Repr>;
+
+pub type TextFieldReader<'b, 'p, T> = TextField<StructReader<'b, 'p, T>>;
+pub type TextFieldBuilder<'b, 'p, T> = TextField<StructBuilder<'b, 'p, T>>;
+pub type TextFieldOwner<'p, T> = TextField<OwnedStructBuilder<'p, T>>;
+
+impl<Repr> TextField<Repr> {
     /// Returns the default value of the field
     #[inline]
     pub fn default(&self) -> text::Reader<'static> {
-        self.descriptor.default
+        self.descriptor.default.clone().unwrap_or(text::Reader::empty())
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, text::Text> {
+impl<'b, 'p, T: Table> TextFieldReader<'b, 'p, T> {
     #[inline]
     pub fn get(&self) -> text::Reader<'b> {
         self.get_option().unwrap_or_else(|| self.default())
@@ -1401,12 +1467,12 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, text::Text> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, text::Text> {
+impl<'b, 'p, T: Table> TextFieldBuilder<'b, 'p, T> {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> text::Builder<'b> {
-        let default = self.descriptor.default;
+        let default = self.default();
         let blob = match self.into_raw_build_ptr().to_blob_mut() {
             Ok(b) => b,
             Err((_, ptr)) => ptr.set_blob(default.into()),
@@ -1461,27 +1527,36 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, text::Text> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantReader<'b, 'p, T, text::Text> {
+impl<'b, 'p, T: Table> PtrVariantReader<'b, 'p, T, text::Text> {
 
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, text::Text> {
+impl<'b, 'p, T: Table> PtrVariantBuilder<'b, 'p, T, text::Text> {
 
 }
 
-impl FieldType for data::Data {
-    field_type_items!{}
+impl TypeKind for data::Data {
+    type Kind = kind::PtrField<Self>;
+}
+impl Ptr for data::Data {
+    type Default = data::Reader<'static>;
 }
 
-impl<Repr> PtrField<data::Data, Repr> {
+pub type DataBlobField<Repr> = PtrField<data::Data, Repr>;
+
+pub type DataBlobFieldReader<'b, 'p, T> = DataBlobField<StructReader<'b, 'p, T>>;
+pub type DataBlobFieldBuilder<'b, 'p, T> = DataBlobField<StructBuilder<'b, 'p, T>>;
+pub type DataBlobFieldOwner<'p, T> = DataBlobField<OwnedStructBuilder<'p, T>>;
+
+impl<Repr> DataBlobField<Repr> {
     /// Returns the default value of the field
     #[inline]
     pub fn default(&self) -> data::Reader<'static> {
-        self.descriptor.default.clone().into()
+        self.descriptor.default.clone().unwrap_or(data::Reader::empty())
     }
 }
 
-impl<'b, 'p, T: Table + 'p> PtrFieldReader<'b, 'p, T, data::Data> {
+impl<'b, 'p, T: Table> DataBlobFieldReader<'b, 'p, T> {
     #[inline]
     pub fn get(&self) -> data::Reader<'b> {
         self.get_option().unwrap_or_else(|| self.default())
@@ -1508,12 +1583,12 @@ impl<'b, 'p, T: Table + 'p> PtrFieldReader<'b, 'p, T, data::Data> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, data::Data> {
+impl<'b, 'p, T: Table> DataBlobFieldBuilder<'b, 'p, T> {
     /// Returns a builder for the field. If it's not set or a error occurs while reading the
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> data::Builder<'b> {
-        let default = self.descriptor.default;
+        let default = self.default();
         match self.into_raw_build_ptr().to_blob_mut() {
             Ok(data) => data,
             Err((_, ptr)) => ptr.set_blob(default.into()),
@@ -1564,8 +1639,11 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, data::Data> {
     // TODO accessors
 }
 
-impl FieldType for AnyPtr {
-    field_type_items!();
+impl TypeKind for AnyPtr {
+    type Kind = kind::PtrField<Self>;
+}
+impl Ptr for AnyPtr {
+    type Default = ptr::PtrReader<'static>;
 }
 
 impl<'b, 'p: 'b, T: Table + 'p> PtrVariantReader<'b, 'p, T, AnyPtr> {
@@ -1576,15 +1654,24 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, AnyPtr> {
     // TODO accessors
 }
 
-impl FieldType for AnyStruct {
-    field_type_items!{}
+impl TypeKind for AnyStruct {
+    type Kind = kind::PtrField<Self>;
+}
+impl Ptr for AnyStruct {
+    type Default = ptr::StructReader<'static>;
 }
 
-impl<Repr> PtrField<AnyStruct, Repr> {
+pub type AnyStructField<Repr> = PtrField<AnyStruct, Repr>;
+
+pub type AnyStructFieldReader<'b, 'p, T> = AnyStructField<StructReader<'b, 'p, T>>;
+pub type AnyStructFieldBuilder<'b, 'p, T> = AnyStructField<StructBuilder<'b, 'p, T>>;
+pub type AnyStructFieldOwner<'p, T> = AnyStructField<OwnedStructBuilder<'p, T>>;
+
+impl<Repr> AnyStructField<Repr> {
     /// Returns the default value of the field
     #[inline]
     fn default_ptr(&self) -> ptr::StructReader<'static> {
-        self.descriptor.default.clone()
+        self.descriptor.default.clone().unwrap_or(ptr::StructReader::empty())
     }
 
     /// Returns the default value of the field
@@ -1594,7 +1681,7 @@ impl<Repr> PtrField<AnyStruct, Repr> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, AnyStruct> {
+impl<'b, 'p, T: Table> AnyStructFieldReader<'b, 'p, T> {
     #[inline]
     fn default_imbued(&self) -> any::StructReader<'static, T> {
         self.default().imbue_from(self.repr)
@@ -1626,27 +1713,30 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, AnyStruct> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, AnyStruct> {
+impl<'b, 'p, T: Table> AnyStructFieldBuilder<'b, 'p, T> {
     // TODO accessors
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantReader<'b, 'p, T, AnyStruct> {
+impl<'b, 'p, T: Table> PtrVariantReader<'b, 'p, T, AnyStruct> {
     // TODO accessors
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, AnyStruct> {
+impl<'b, 'p, T: Table> PtrVariantBuilder<'b, 'p, T, AnyStruct> {
     // TODO accessors
 }
 
-impl FieldType for AnyList {
-    field_type_items!{}
+impl TypeKind for AnyList {
+    type Kind = kind::PtrField<Self>;
+}
+impl Ptr for AnyList {
+    type Default = ptr::ListReader<'static>;
 }
 
 impl<Repr> PtrField<AnyList, Repr> {
     /// Returns the default value of the field
     #[inline]
     fn default_ptr(&self) -> ptr::ListReader<'static> {
-        self.descriptor.default.clone()
+        self.descriptor.default.clone().unwrap_or(ptr::ListReader::empty(ElementSize::InlineComposite(StructSize::EMPTY)))
     }
 
     /// Returns the default value of the field
@@ -1656,7 +1746,7 @@ impl<Repr> PtrField<AnyList, Repr> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, AnyList> {
+impl<'b, 'p, T: Table> PtrFieldReader<'b, 'p, T, AnyList> {
     #[inline]
     fn default_imbued(&self) -> any::ListReader<'static, T> {
         self.default().imbue_from(self.repr)
@@ -1688,42 +1778,48 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, AnyList> {
     }
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, AnyList> {
+impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, AnyList> {
     // TODO accessors
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantReader<'b, 'p, T, AnyList> {
+impl<'b, 'p, T: Table> PtrVariantReader<'b, 'p, T, AnyList> {
     // TODO accessors
 }
 
-impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, AnyList> {
+impl<'b, 'p, T: Table> PtrVariantBuilder<'b, 'p, T, AnyList> {
     // TODO accessors
 }
 
-impl<C: ty::Capability> FieldType for Capability<C> {
-    field_type_items!{}
+impl<S: ty::Capability> TypeKind for kind::Capability<S> {
+    type Kind = kind::PtrField<Self>;
+}
+impl<C: ty::Capability> Ptr for kind::Capability<C> {
+    /// Capabilities don't have defaults
+    type Default = Never;
 }
 
-impl<'b, 'p, T, C> PtrFieldReader<'b, 'p, T, Capability<C>>
-where
-    T: Table,
-    C: ty::Capability,
-{
+pub type CapabilityField<C, Repr> = PtrField<kind::Capability<C>, Repr>;
+
+pub type CapabilityFieldReader<'b, 'p, T, C> = CapabilityField<C, StructReader<'b, 'p, T>>;
+pub type CapabilityFieldBuilder<'b, 'p, T, C> = CapabilityField<C, StructBuilder<'b, 'p, T>>;
+
+impl<'b, 'p, T: Table, C: ty::Capability> CapabilityFieldReader<'b, 'p, T, C> {
     // TODO accessors
 }
 
-impl<'b, 'p, T, C> PtrFieldBuilder<'b, 'p, T, Capability<C>>
-where
-    T: Table,
-    C: ty::Capability,
-{
+impl<'b, 'p, T: Table, C: ty::Capability> CapabilityFieldBuilder<'b, 'p, T, C> {
     // TODO accessors
 }
 
-impl<'b, 'p, T: Table, C: ty::Capability> PtrVariantReader<'b, 'p, T, Capability<C>> {
+pub type CapabilityVariant<C, Repr> = PtrVariant<kind::Capability<C>, Repr>;
+
+pub type CapabilityVariantReader<'b, 'p, T, C> = CapabilityVariant<C, StructReader<'b, 'p, T>>;
+pub type CapabilityVariantBuilder<'b, 'p, T, C> = CapabilityVariant<C, StructBuilder<'b, 'p, T>>;
+
+impl<'b, 'p, T: Table, C: ty::Capability> CapabilityVariantReader<'b, 'p, T, C> {
     // TODO accessors
 }
 
-impl<'b, 'p, T: Table, C: ty::Capability> PtrVariantBuilder<'b, 'p, T, Capability<C>> {
+impl<'b, 'p, T: Table, C: ty::Capability> CapabilityVariantBuilder<'b, 'p, T, C> {
     // TODO accessors
 }

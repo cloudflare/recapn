@@ -230,6 +230,9 @@ to_tokens!(GeneratedStruct |self| {
     };
     let struct_group_marker = if let Some(StructSize { data, ptrs }) = size {
         quote! {
+            impl _p::ty::TypeKind for #name {
+                type Kind = _p::ty::kind::Struct<Self>;
+            }
             impl _p::ty::Struct for #name {
                 const SIZE: _p::StructSize = _p::StructSize { data: #data, ptrs: #ptrs };
             }
@@ -237,7 +240,10 @@ to_tokens!(GeneratedStruct |self| {
     } else {
         let clears = self.clear_all();
         quote! {
-            impl _p::FieldGroup for #name {
+            impl _p::ty::TypeKind for #name {
+                type Kind = _p::ty::kind::Group<Self>;
+            }
+            impl _p::Group for #name {
                 unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
                     #(#clears)*
                 }
@@ -644,6 +650,9 @@ to_tokens!(GeneratedEnum |self| {
             }
         }
 
+        impl _p::ty::TypeKind for #name {
+            type Kind = _p::ty::kind::Enum<Self>;
+        }
         impl _p::ty::Enum for #name {}
     }
 });

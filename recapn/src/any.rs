@@ -27,7 +27,6 @@
 //    * Default
 //    * PartialEq (readers + builders)
 
-use crate::field::Struct;
 use crate::internal::Sealed;
 use crate::list::{self, List, ElementSize};
 use crate::orphan::{Orphan, Orphanage};
@@ -90,14 +89,6 @@ impl<T: Capable> Capable for AnyPtr<T> {
 
 impl<T> IntoFamily for AnyPtr<T> {
     type Family = AnyPtr;
-}
-
-impl ty::Value for AnyPtr {
-    type Default = ptr::PtrReader<'static, Empty>;
-}
-
-impl ty::ListValue for AnyPtr {
-    const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
 }
 
 // PtrReader impls
@@ -186,16 +177,6 @@ impl<'a, T: Table> PtrReader<'a, T> {
     #[inline]
     pub fn try_read_option_as<U: ty::ReadPtr<Self>>(self) -> Result<Option<U::Output>> {
         U::try_get_option(self)
-    }
-
-    #[inline]
-    pub fn read_as_struct<S: ty::Struct>(self) -> <Struct<S> as FromPtr<Self>>::Output {
-        self.read_as::<Struct<S>>()
-    }
-
-    #[inline]
-    pub fn read_as_list_of<V: ty::DynListValue>(self) -> <List<V> as FromPtr<Self>>::Output {
-        self.read_as::<List<V>>()
     }
 }
 
@@ -364,16 +345,6 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     #[inline]
     pub fn try_read_option_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(&'b self) -> Result<Option<U::Output>> {
         U::try_get_option(self.as_reader())
-    }
-
-    #[inline]
-    pub fn read_as_struct<'b, S: ty::Struct>(&'b self) -> <Struct<S> as FromPtr<PtrReader<'b, T>>>::Output {
-        self.read_as::<Struct<S>>()
-    }
-
-    #[inline]
-    pub fn read_as_list_of<'b, V: ty::DynListValue>(&'b self) -> <List<V> as FromPtr<PtrReader<'b, T>>>::Output {
-        self.read_as::<List<V>>()
     }
 
     #[inline]
@@ -581,10 +552,6 @@ impl<T: Capable> Capable for AnyStruct<T> {
 
 impl<T> IntoFamily for AnyStruct<T> {
     type Family = AnyStruct;
-}
-
-impl ty::Value for AnyStruct {
-    type Default = ptr::StructReader<'static, Empty>;
 }
 
 impl ty::DynListValue for AnyStruct {
@@ -898,13 +865,6 @@ impl<T: Capable> Capable for AnyList<T> {
 
 impl<T> IntoFamily for AnyList<T> {
     type Family = AnyList;
-}
-
-impl ty::Value for AnyList {
-    type Default = ptr::ListReader<'static, Empty>;
-}
-impl ty::ListValue for AnyList {
-    const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
 }
 
 // ListReader impls
