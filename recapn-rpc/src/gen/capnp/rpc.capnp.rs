@@ -1,4 +1,4 @@
-﻿#![allow(unused, unsafe_code)]
+#![allow(unused, unsafe_code)]
 use recapn::prelude::gen as _p;
 use super::{__file, __imports};
 #[derive(Clone)]
@@ -5515,4 +5515,3 @@ pub mod exception {
     }
     impl _p::ty::Enum for Type {}
 }
-
