@@ -345,7 +345,7 @@ fn map_read_err(err: ReadError) -> StreamError {
 }
 
 #[cfg(feature = "std")]
-pub fn read_from_stream<R: io::Read>(r: &mut R, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
+pub fn read_from_stream<R: io::Read>(mut r: R, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
     let mut first = [Word::NULL; 1];
 
     const TABLE_STACK_BUF_LEN: usize = 32;
@@ -530,7 +530,7 @@ pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, opt
 }
 
 #[cfg(feature = "std")]
-pub fn write_message<W: io::Write>(w: &mut W, segments: &MessageSegments) -> Result<(), io::Error> {
+pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments) -> Result<(), io::Error> {
     let stream_table = StreamTable::from_segments(segments);
     let message_segment_bytes = segments.clone().into_iter().map(|s| s.as_bytes());
     let mut io_slice_box = iter::once(stream_table.as_bytes())
@@ -542,7 +542,7 @@ pub fn write_message<W: io::Write>(w: &mut W, segments: &MessageSegments) -> Res
 }
 
 #[cfg(feature = "std")]
-pub fn write_message_packed<W: io::Write>(w: &mut W, segments: &MessageSegments) -> Result<(), io::Error> {
+pub fn write_message_packed<W: io::Write>(mut w: W, segments: &MessageSegments) -> Result<(), io::Error> {
     let mut buffer = [0u8; 256];
 
     let stream_table = StreamTable::from_segments(segments);
