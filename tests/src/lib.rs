@@ -2,6 +2,10 @@
 
 pub mod gen;
 
+pub mod build_gen {
+    include!(concat!(env!("OUT_DIR"), "/mod.rs"));
+}
+
 use recapn::message::Message;
 use recapn::text;
 use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
@@ -27,4 +31,15 @@ fn make_all_types() {
     inner.float32_field().set(32.32);
     inner.float64_field().set(64.64);
     builder.enum_field().set(TestEnum::Bar);
+}
+
+#[test]
+fn make_build_gen_type() {
+    let mut message = Message::global();
+    let mut builder = message.builder();
+    let mut foo = builder.by_ref().init_struct_root::<build_gen::build_capnp::Foo>();
+    let mut bar = foo.bar().init();
+    bar.flub().set(1234);
+
+    assert_eq!(builder.segments().first().as_words().len(), 3);
 }

@@ -382,3 +382,156 @@ pub mod prelude {
 
 pub mod quotes;
 pub mod generator;
+
+use anyhow::Context;
+use quote::ToTokens;
+use recapn::io::{self, StreamOptions};
+use recapn::message::{Reader, ReaderOptions};
+use recapn::ReaderOf;
+
+use std::{env, fs};
+use std::ffi::{OsStr, OsString};
+use std::io::Read;
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+use gen::capnp_schema_capnp::CodeGeneratorRequest;
+use generator::GeneratorContext;
+use quotes::GeneratedRoot;
+
+/// Read from an existing CodeGeneratorRequest and write files based on the given output path.
+pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl AsRef<Path>) -> anyhow::Result<()> {
+    let out = out.as_ref();
+    let context = GeneratorContext::new(&request)?;
+
+    let mut root_mod = GeneratedRoot { files: Vec::new() };
+
+    for file in request.requested_files() {
+        let (file, root) = context.generate_file(file.id())?;
+
+        let parsed = syn::parse2::<syn::File>(file.to_token_stream())
+            .context("parsing generated file")?;
+        let printable = prettyplease::unparse(&parsed);
+
+        fs::write(out.join(Path::new(&root.path)), printable)?;
+
+        root_mod.files.push(root);
+    }
+
+    let parsed = syn::parse2::<syn::File>(root_mod.to_token_stream()).context("parsing generated file")?;
+    let printable = prettyplease::unparse(&parsed);
+    fs::write(out.join("mod.rs"), printable)?;
+
+    Ok(())
+}
+
+/// Read a CodeGeneratorRequest capnp message from a stream and write files based on the given output path.
+pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> anyhow::Result<()> {
+    let message = io::read_from_stream(r, StreamOptions::default())?;
+    let reader = Reader::new(&message, ReaderOptions::default());
+    let request = reader.root().read_as_struct::<CodeGeneratorRequest>();
+
+    generate_from_request(&request, out)
+}
+
+pub struct CapnpCommand {
+    files: Vec<Box<Path>>,
+    src_prefixes: Vec<Box<Path>>,
+    import_paths: Vec<Box<Path>>,
+    standard_import: bool,
+    exe_path: Option<Box<OsStr>>,
+}
+
+impl CapnpCommand {
+    pub fn new() -> Self {
+        Self {
+            files: Vec::new(),
+            src_prefixes: Vec::new(),
+            import_paths: Vec::new(),
+            standard_import: true,
+            exe_path: None,
+        }
+    }
+
+    pub fn src_prefix(&mut self, p: impl AsRef<Path>) -> &mut Self {
+        self.src_prefixes.push(Box::from(p.as_ref()));
+        self
+    }
+
+    pub fn import_path(&mut self, p: impl AsRef<Path>) -> &mut Self {
+        self.import_paths.push(Box::from(p.as_ref()));
+        self
+    }
+
+    pub fn file(&mut self, p: impl AsRef<Path>) -> &mut Self {
+        self.files.push(Box::from(p.as_ref()));
+        self
+    }
+
+    pub fn no_standard_import(&mut self) -> &mut Self {
+        self.standard_import = false;
+        self
+    }
+
+    /// Returns a new Command with the exe path specified for this command.
+    pub fn exe_command(&self) -> Command {
+        if let Some(path) = &self.exe_path {
+            Command::new(path)
+        } else {
+            Command::new("capnp")
+        }
+    }
+
+    /// Creates the process command to execute the compiler
+    pub fn to_command(&self) -> Command {
+        let mut cmd = self.exe_command();
+
+        cmd.args(["compile", "-o-"]);
+
+        if !self.standard_import {
+            cmd.arg("--no-standard-import");
+        }
+
+        cmd.args(self.import_paths.iter().map(|p| {
+            let mut s = OsString::from("--import-path=");
+            s.push(&**p);
+            s
+        }));
+
+        cmd.args(self.src_prefixes.iter().map(|p| {
+            let mut s = OsString::from("--src-prefix=");
+            s.push(&**p);
+            s
+        }));
+
+        cmd.args(self.files.iter().map(|p| &**p));
+
+        cmd.env_remove("PWD");
+
+        cmd
+    }
+
+    pub fn write_to<T: AsRef<Path>>(&self, path: T) {
+        let stat = self.exe_command()
+            .arg("--version")
+            .status()
+            .expect("failed to spawn capnp compiler");
+
+        assert!(stat.success(), "`capnp --version` returned an error: {}", stat);
+
+        let mut cmd = self.to_command()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("failed to spawn capnp compiler");
+        let out = cmd.stdout.take().expect("missing stdout in child capnp process");
+
+        generate_from_request_stream(out, path.as_ref()).expect("failed to generate code for capnp files");
+
+        cmd.wait().expect("capnp command failed");
+    }
+
+    pub fn write_to_out_dir(&self) {
+        self.write_to(env::var_os("OUT_DIR").expect("missing OUT_DIR environment variable"))
+    }
+}
