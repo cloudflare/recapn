@@ -12,12 +12,12 @@ use crate::ReaderOf;
 use crate::{NotInSchema, IntoFamily, Result};
 
 /// An enum marker trait.
-pub trait Enum: Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
+pub trait Enum: TypeKind<Kind = kind::Enum<Self>> + Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
 
 pub type EnumResult<E> = Result<E, NotInSchema>;
 
 /// A capability marker trait.
-pub trait Capability: 'static {
+pub trait Capability: TypeKind<Kind = kind::Capability<Self>> + 'static {
     /// The typeless client this type is a wrapper around.
     type Client;
 
@@ -40,7 +40,7 @@ pub trait StructView: 'static {
 /// A marker that indicates that a type represents a struct.
 /// 
 /// This provides the struct's size, along with the reader and builder associated types.
-pub trait Struct: StructView {
+pub trait Struct: TypeKind<Kind = kind::Struct<Self>> + StructView {
     const SIZE: StructSize;
 }
 
@@ -154,6 +154,19 @@ pub trait FromPtr<T> {
     fn get(ptr: T) -> Self::Output;
 }
 
+/// Inherits all kind implementations. This way we can 
+impl<T, U> FromPtr<U> for T
+where
+    T: TypeKind,
+    T::Kind: FromPtr<U>,
+{
+    type Output = <T::Kind as FromPtr<U>>::Output;
+
+    fn get(ptr: U) -> Self::Output {
+        <T::Kind as FromPtr<U>>::get(ptr)
+    }
+}
+
 /// A trait used to describe types which can be read from other pointer types (fallible).
 pub trait ReadPtr<T>: FromPtr<T> {
     fn try_get_option(ptr: T) -> Result<Option<Self::Output>>;
@@ -161,7 +174,7 @@ pub trait ReadPtr<T>: FromPtr<T> {
     fn get_option(ptr: T) -> Option<Self::Output>;
 }
 
-impl<'a, S: Struct, T: Table> FromPtr<any::StructReader<'a, T>> for field::Struct<S> {
+impl<'a, S: Struct, T: Table> FromPtr<any::StructReader<'a, T>> for kind::Struct<S> {
     type Output = ReaderOf<'a, S, T>;
 
     fn get(ptr: any::StructReader<'a, T>) -> Self::Output {
@@ -169,7 +182,7 @@ impl<'a, S: Struct, T: Table> FromPtr<any::StructReader<'a, T>> for field::Struc
     }
 }
 
-impl<'a, S: Struct, T: Table> FromPtr<any::PtrReader<'a, T>> for field::Struct<S> {
+impl<'a, S: Struct, T: Table> FromPtr<any::PtrReader<'a, T>> for kind::Struct<S> {
     type Output = ReaderOf<'a, S, T>;
 
     fn get(reader: any::PtrReader<'a, T>) -> Self::Output {
@@ -180,7 +193,7 @@ impl<'a, S: Struct, T: Table> FromPtr<any::PtrReader<'a, T>> for field::Struct<S
     }
 }
 
-impl<'a, S: Struct, T: Table> ReadPtr<any::PtrReader<'a, T>> for field::Struct<S> {
+impl<'a, S: Struct, T: Table> ReadPtr<any::PtrReader<'a, T>> for kind::Struct<S> {
     fn try_get_option(reader: any::PtrReader<'a, T>) -> Result<Option<Self::Output>> {
         match reader.as_ref().to_struct() {
             Ok(Some(ptr)) => Ok(Some(ptr.into())),
@@ -200,11 +213,6 @@ impl<'a, S: Struct, T: Table> ReadPtr<any::PtrReader<'a, T>> for field::Struct<S
     }
 }
 
-/// A trait used to specify that a type is used to represent a Cap'n Proto value.
-pub trait Value: Sealed + 'static {
-    type Default;
-}
-
 /// A type representing a fixed size Cap'n Proto value that can be stored in a list.
 ///
 /// Note not every type that be stored in a list will implement this trait. Dynamically
@@ -213,8 +221,19 @@ pub trait ListValue: DynListValue {
     /// The size of elements of this value when stored in a list.
     const ELEMENT_SIZE: ElementSize;
 }
+impl<T> ListValue for T
+where
+    T: list::TypeKind + 'static,
+    T::Kind: ListValue,
+{
+    const ELEMENT_SIZE: ElementSize = <T::Kind as ListValue>::ELEMENT_SIZE;
+}
 
-pub trait DynListValue: Value {
+impl<D: ptr::Data> ListValue for kind::Data<D> {
+    const ELEMENT_SIZE: ElementSize = <D as ptr::Data>::ELEMENT_SIZE;
+}
+
+pub trait DynListValue: 'static {
     const PTR_ELEMENT_SIZE: ptr::PtrElementSize;
 }
 impl<T: ListValue> DynListValue for T {
@@ -238,34 +257,48 @@ pub type UInt64 = u64;
 pub type Float32 = f32;
 pub type Float64 = f64;
 
-macro_rules! impl_value {
-    ($ty:ty, $size:ident) => {
-        impl Sealed for $ty {}
-        impl Value for $ty {
-            type Default = Self;
-        }
-        impl ListValue for $ty {
-            const ELEMENT_SIZE: ElementSize = ElementSize::$size;
-        }
-    };
+/// A generic "type kind" constraining trait.
+/// 
+/// Type kinds allow us to write generic trait implementations over non-overlapping types. This
+/// pattern of implementing over type kinds is used heavily in this library and primarily starts
+/// here.
+/// 
+/// As you might know, you cannot have multiple implementation blocks with overlapping definitions.
+/// This generally means that you can't have more than one generic implementation over a generic
+/// type. In this library, we need that! Most of the library is generic in some way.
+pub trait TypeKind {
+    /// The kind this type is.
+    type Kind;
 }
 
-impl_value!(Void, Void);
-impl_value!(Bool, Bit);
-impl_value!(UInt8, Byte);
-impl_value!(Int8, Byte);
-impl_value!(UInt16, TwoBytes);
-impl_value!(Int16, TwoBytes);
-impl_value!(UInt32, FourBytes);
-impl_value!(Int32, FourBytes);
-impl_value!(UInt64, EightBytes);
-impl_value!(Int64, EightBytes);
-impl_value!(Float32, FourBytes);
-impl_value!(Float64, EightBytes);
+/// Contains "kind" marker types used for writting blanket implementations over non-overlapping
+/// types.
+pub mod kind {
+    use core::marker::PhantomData;
 
-impl<V: 'static> Value for List<V> {
-    type Default = ptr::ListReader<'static>;
-}
-impl<V: 'static> ListValue for List<V> {
-    const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
+    use crate::field;
+    use crate::list;
+    use crate::ptr;
+    use crate::ty;
+
+    type Fantom<T> = PhantomData<fn() -> T>;
+
+    /// A type kind for primitive data types like uint8, int32, f64, and bool. See [`ptr::Data`].
+    pub struct Data<D: ?Sized + ptr::Data>(Fantom<D>);
+    /// A type kind for enum types. See [`ty::Enum`].
+    pub struct Enum<E: ?Sized + ty::Enum>(Fantom<E>);
+    /// A type kind for capability types. See [`ty::Capability`].
+    pub struct Capability<C: ?Sized + ty::Capability>(Fantom<C>);
+    /// A type kind for user struct types. See [`ty::Struct`].
+    pub struct Struct<S: ?Sized + ty::Struct>(Fantom<S>);
+    /// A type kind for user group types. See [`field::Group`].
+    pub struct Group<G: ?Sized + field::Group>(Fantom<G>);
+    /// A type kind for pointer field types. This is not the same as pointer list types which use
+    /// [`PtrList`] instead. Most notably, [`Struct`] kinds are not considered [`PtrList`] kinds,
+    /// but are considered [`PtrField`] kinds.
+    pub struct PtrField<P: ?Sized + field::Ptr>(Fantom<P>);
+    /// A type kind for pointer list types. This is not the same as pointer field types which use
+    /// [`PtrField`] instead. Most notably, [`Struct`] kinds are considered [`PtrField`] kinds,
+    /// but are not considered [`PtrList`] kinds.
+    pub struct PtrList<P: ?Sized + list::Ptr>(Fantom<P>);
 }

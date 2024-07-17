@@ -89,6 +89,9 @@ impl _p::StructView for TestImport2 {
     type Reader<'a, T: _p::rpc::Table> = test_import2::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = test_import2::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for TestImport2 {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for TestImport2 {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 0u16,
@@ -96,43 +99,40 @@ impl _p::ty::Struct for TestImport2 {
     };
 }
 impl TestImport2 {
-    const FOO: _p::Descriptor<_p::Struct<__imports::capnp_test_capnp::TestAllTypes>> = _p::Descriptor::<
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
+    const FOO: _p::Descriptor<__imports::capnp_test_capnp::TestAllTypes> = _p::Descriptor::<
+        __imports::capnp_test_capnp::TestAllTypes,
     > {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
-    const BAR: _p::Descriptor<
-        _p::Struct<__imports::capnp_test_import_capnp::TestImport>,
-    > = _p::Descriptor::<_p::Struct<__imports::capnp_test_import_capnp::TestImport>> {
+    const BAR: _p::Descriptor<__imports::capnp_test_import_capnp::TestImport> = _p::Descriptor::<
+        __imports::capnp_test_import_capnp::TestImport,
+    > {
         slot: 1u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> test_import2::Reader<'p, T> {
     #[inline]
     pub fn foo(
         &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::Struct<__imports::capnp_test_capnp::TestAllTypes>> {
+    ) -> _p::Accessor<'_, 'p, T, __imports::capnp_test_capnp::TestAllTypes> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_capnp::TestAllTypes,
-            > as _p::field::FieldType>::accessor(&self.0, &TestImport2::FOO)
+            <__imports::capnp_test_capnp::TestAllTypes as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestImport2::FOO,
+            )
         }
     }
     #[inline]
     pub fn bar(
         &self,
-    ) -> _p::Accessor<
-        '_,
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_import_capnp::TestImport>,
-    > {
+    ) -> _p::Accessor<'_, 'p, T, __imports::capnp_test_import_capnp::TestImport> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_import_capnp::TestImport,
-            > as _p::field::FieldType>::accessor(&self.0, &TestImport2::BAR)
+            <__imports::capnp_test_import_capnp::TestImport as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestImport2::BAR,
+            )
         }
     }
 }
@@ -140,59 +140,45 @@ impl<'p, T: _p::rpc::Table + 'p> test_import2::Builder<'p, T> {
     #[inline]
     pub fn foo(
         &mut self,
-    ) -> _p::AccessorMut<
-        '_,
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
-    > {
+    ) -> _p::AccessorMut<'_, 'p, T, __imports::capnp_test_capnp::TestAllTypes> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_capnp::TestAllTypes,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestImport2::FOO)
+            <__imports::capnp_test_capnp::TestAllTypes as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestImport2::FOO,
+            )
         }
     }
     #[inline]
     pub fn bar(
         &mut self,
-    ) -> _p::AccessorMut<
-        '_,
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_import_capnp::TestImport>,
-    > {
+    ) -> _p::AccessorMut<'_, 'p, T, __imports::capnp_test_import_capnp::TestImport> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_import_capnp::TestImport,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestImport2::BAR)
+            <__imports::capnp_test_import_capnp::TestImport as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestImport2::BAR,
+            )
         }
     }
     #[inline]
     pub fn into_foo(
         self,
-    ) -> _p::AccessorOwned<
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
-    > {
+    ) -> _p::AccessorOwned<'p, T, __imports::capnp_test_capnp::TestAllTypes> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_capnp::TestAllTypes,
-            > as _p::field::FieldType>::accessor(self.0, &TestImport2::FOO)
+            <__imports::capnp_test_capnp::TestAllTypes as _p::field::FieldType>::accessor(
+                self.0,
+                &TestImport2::FOO,
+            )
         }
     }
     #[inline]
     pub fn into_bar(
         self,
-    ) -> _p::AccessorOwned<
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_import_capnp::TestImport>,
-    > {
+    ) -> _p::AccessorOwned<'p, T, __imports::capnp_test_import_capnp::TestImport> {
         unsafe {
-            <_p::Struct<
-                __imports::capnp_test_import_capnp::TestImport,
-            > as _p::field::FieldType>::accessor(self.0, &TestImport2::BAR)
+            <__imports::capnp_test_import_capnp::TestImport as _p::field::FieldType>::accessor(
+                self.0,
+                &TestImport2::BAR,
+            )
         }
     }
 }

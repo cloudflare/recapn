@@ -5,7 +5,7 @@ use crate::alloc::{
 };
 use crate::arena::{SegmentId, ArenaSegment, BuildArena, ReadArena};
 use crate::orphan::Orphanage;
-use crate::{any, ty, ReaderOf};
+use crate::{any, ty};
 use crate::ptr::{ObjectBuilder, PtrBuilder, PtrReader};
 use crate::rpc::{Empty, InsertableInto};
 use core::cell::{Cell, UnsafeCell};
@@ -522,11 +522,6 @@ impl<'a> Reader<'a> {
     #[inline]
     pub fn read_as<'b, T: ty::FromPtr<any::PtrReader<'b>>>(&'b self) -> T::Output {
         self.root().read_as::<T>()
-    }
-
-    #[inline]
-    pub fn read_as_struct<'b, S: ty::Struct>(&'b self) -> ReaderOf<'b, S> {
-        self.root().read_as_struct::<S>()
     }
 
     /// Calculates the message's total size in words.

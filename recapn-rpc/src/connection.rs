@@ -7,7 +7,6 @@ use recapn::arena::ReadArena;
 use recapn::orphan::Orphan;
 use recapn::rpc::Capable;
 use recapn::{any, list, message, BuilderOf, NotInSchema, ReaderOf};
-use recapn::field::{Struct, Enum};
 use recapn::message::{BuilderParts, Message, ReaderOptions};
 use recapn::ptr::{ElementCount, ElementSize, ObjectLen, ReturnErrors};
 use tokio::select;
@@ -33,8 +32,8 @@ use crate::gen::capnp_rpc_capnp as rpc_capnp;
 use rpc_capnp::CapDescriptor;
 use rpc_capnp::promised_answer::Op;
 
-const MAX_OPS: usize = ElementSize::size_of::<Struct<Op>>().max_elements().get() as usize;
-const MAX_CAPS: usize = ElementSize::size_of::<Struct<CapDescriptor>>().max_elements().get() as usize;
+const MAX_OPS: usize = ElementSize::size_of::<Op>().max_elements().get() as usize;
+const MAX_CAPS: usize = ElementSize::size_of::<CapDescriptor>().max_elements().get() as usize;
 
 type RpcSender = mpsc::Sender<RpcClient>;
 type RpcReceiver = mpsc::Receiver<RpcClient>;
@@ -69,7 +68,7 @@ fn exception_to_error(ex: &ReaderOf<rpc_capnp::Exception>) -> Error {
     Error::new(kind, Cow::Owned(msg))
 }
 
-type OpsList<'a> = list::StructListReader<'a, rpc_capnp::promised_answer::Op>;
+type OpsList<'a> = list::Reader<'a, rpc_capnp::promised_answer::Op>;
 fn to_pipeline_ops(list: OpsList) -> Result<Vec<PipelineOp>, Error> {
     list.into_iter().filter_map(|op| {
         use rpc_capnp::promised_answer::op::Which;
@@ -755,7 +754,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     pub fn try_handle_message(&mut self, incoming: impl IncomingMessage) -> Result<(), Error> {
         let message = incoming.message();
         let reader = recapn::message::Reader::new(message, self.options.reader_options.clone());
-        let reader = reader.read_as_struct::<rpc_capnp::Message>();
+        let reader = reader.read_as::<rpc_capnp::Message>();
 
         use rpc_capnp::message::Which;
         match reader.which() {
@@ -826,7 +825,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     fn handle_call(&mut self, message: ExternalMessage) -> Result<(), Error> {
         let reader = recapn::message::Reader::new(&*message, self.options.reader_options.clone());
-        let message = reader.read_as_struct::<rpc_capnp::Message>();
+        let message = reader.read_as::<rpc_capnp::Message>();
         let call = message.call().field().unwrap().try_get()?;
 
         let target = self.read_message_target(&call.target().try_get()?)?;
@@ -849,7 +848,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     fn handle_return(&mut self, message: ExternalMessage) -> Result<(), Error> {
         let reader = recapn::message::Reader::new(&*message, self.options.reader_options.clone());
-        let message = reader.read_as_struct::<rpc_capnp::Message>();
+        let message = reader.read_as::<rpc_capnp::Message>();
         let ret: ReaderOf<rpc_capnp::Return> = message.r#return().field().unwrap().try_get()?;
 
         let question_id = ret.answer_id();
@@ -970,7 +969,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         }
     }
 
-    fn read_cap_descriptors(&mut self, table: list::StructListReader<rpc_capnp::CapDescriptor>) -> Result<Vec<Option<Client>>, Error> {
+    fn read_cap_descriptors(&mut self, table: list::Reader<rpc_capnp::CapDescriptor>) -> Result<Vec<Option<Client>>, Error> {
         let mut descriptors = Vec::with_capacity(table.len() as usize);
         for d in table {
             let client = self.read_cap_descriptor(&d)?;

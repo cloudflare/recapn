@@ -6,19 +6,18 @@
 //! for different types of values. For example,
 //!
 //! * A list of primitives is a `List<V>` where V is the primitive value.
-//! * A list of enums is a `List<field::Enum<T>>` where T is the enum type.
-//! * A list of structs is a `List<field::Struct<T>>` where T is the struct type.
+//! * A list of enums is a `List<T>` where T is the enum type.
+//! * A list of structs is a `List<T>` where T is the struct type.
 //! * A list of lists is a `List<List<T>>` where T is the inner list type.
 
 use crate::any::{self, AnyList, AnyPtr, AnyStruct};
 use crate::data::{self, Data};
 use crate::ptr::{CopySize, ErrorHandler, IgnoreErrors};
 use crate::text::{self, Text};
-use crate::field::{Enum, Struct, Capability};
 use crate::internal::Sealed;
 use crate::ptr::{Data as FieldData, PtrElementSize, StructSize};
 use crate::rpc::{self, Capable, InsertableInto, Table};
-use crate::ty::{self, EnumResult};
+use crate::ty::{self, kind, EnumResult};
 use crate::{Error, Family, IntoFamily, Result, ErrorKind};
 
 use core::convert::TryFrom;
@@ -37,17 +36,8 @@ pub mod ptr {
 
 pub struct TooManyElementsError(pub(crate) ());
 
-pub type Reader<'a, V, T = rpc::Empty> = List<V, ptr::Reader<'a, T>>;
-pub type Builder<'a, V, T = rpc::Empty> = List<V, ptr::Builder<'a, T>>;
-
-pub type StructListReader<'a, S, T = rpc::Empty> = Reader<'a, Struct<S>, T>;
-pub type StructListBuilder<'a, S, T = rpc::Empty> = Builder<'a, Struct<S>, T>;
-
-pub type EnumListReader<'a, E, T = rpc::Empty> = Reader<'a, Enum<E>, T>;
-pub type EnumListBuilder<'a, E, T = rpc::Empty> = Builder<'a, Enum<E>, T>;
-
-pub type CapabilityListReader<'a, C, T = rpc::Empty> = Reader<'a, Capability<C>, T>;
-pub type CapabilityListBuilder<'a, C, T = rpc::Empty> = Builder<'a, Capability<C>, T>;
+pub type Reader<'p, V, T = rpc::Empty> = List<V, ptr::Reader<'p, T>>;
+pub type Builder<'p, V, T = rpc::Empty> = List<V, ptr::Builder<'p, T>>;
 
 /// A Cap'n Proto list.
 pub struct List<V, T = Family> {
@@ -177,29 +167,29 @@ impl<'a, V, T: Table> Reader<'a, V, T> {
 
     /// Get the element at the specified index, or None if the index is out of range.
     #[inline]
-    pub fn try_at<'b>(&'b self, index: u32) -> Option<ElementReader<'a, 'b, V, T>>
+    pub fn try_at<'b>(&'b self, index: u32) -> Option<ElementReader<'a, 'b, T, V>>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b ptr::Reader<'a, T>>,
     {
         (index < self.len()).then(|| unsafe { self.at_unchecked(index) })
     }
 
     /// Get the element at the specified index, or None if the index is out of range.
     #[inline]
-    pub fn at<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, V, T>
+    pub fn at<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, T, V>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b ptr::Reader<'a, T>>,
     {
         self.try_at(index).expect("index out of bounds")
     }
 
     /// Get the element at the specified index without bounds checks.
     #[inline]
-    pub unsafe fn at_unchecked<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, V, T>
+    pub unsafe fn at_unchecked<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, T, V>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b ptr::Reader<'a, T>>,
     {
-        V::get(self, index)
+        V::get(self.as_ref(), index)
     }
 }
 
@@ -217,7 +207,7 @@ impl<'a, V, T: Table> AsMut<ptr::Builder<'a, T>> for Builder<'a, V, T> {
     }
 }
 
-impl<'a, V, T: Table> Builder<'a, V, T> {
+impl<'p, V, T: Table> Builder<'p, V, T> {
     /// Gets the length of the list
     #[inline]
     pub fn len(&self) -> ElementCount {
@@ -246,35 +236,35 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
 
     /// Gets a mutable view of the element at the specified index, or None if the index is out of range.
     #[inline]
-    pub fn try_at<'b>(&'b mut self, index: u32) -> Option<ElementBuilder<'a, 'b, V, T>>
+    pub fn try_at<'b>(&'b mut self, index: u32) -> Option<ElementBuilder<'b, 'p, T, V>>
     where
-        V: ListAccessable<&'b mut Self>,
+        V: ListAccessable<&'b mut ptr::Builder<'p, T>>,
     {
         (index < self.len().get()).then(move || unsafe { self.at_unchecked(index) })
     }
 
     /// Get the element at the specified index, or panics if out of range.
     #[inline]
-    pub fn at<'b>(&'b mut self, index: u32) -> ElementBuilder<'a, 'b, V, T>
+    pub fn at<'b>(&'b mut self, index: u32) -> ElementBuilder<'b, 'p, T, V>
     where
-        V: ListAccessable<&'b mut Self>,
+        V: ListAccessable<&'b mut ptr::Builder<'p, T>>,
     {
         self.try_at(index).expect("index out of bounds")
     }
 
     /// Gets a mutable view of the element at the specified index without bounds checks.
     #[inline]
-    pub unsafe fn at_unchecked<'b>(&'b mut self, index: u32) -> ElementBuilder<'a, 'b, V, T>
+    pub unsafe fn at_unchecked<'b>(&'b mut self, index: u32) -> ElementBuilder<'b, 'p, T, V>
     where
-        V: ListAccessable<&'b mut Self>,
+        V: ListAccessable<&'b mut ptr::Builder<'p, T>>,
     {
-        V::get(self, index)
+        V::get(self.as_mut(), index)
     }
 
     #[inline]
-    pub fn try_into_element(self, index: u32) -> Result<ElementOwner<'a, V, T>, Self>
+    pub fn try_into_element(self, index: u32) -> Result<ElementOwner<'p, T, V>, Self>
     where
-        V: ListAccessable<Self>,
+        V: ListAccessable<ptr::Builder<'p, T>>,
     {
         if index < self.len().get() {
             Ok(unsafe { self.into_element_unchecked(index) })
@@ -284,47 +274,63 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     }
 
     #[inline]
-    pub fn into_element(self, index: u32) -> ElementOwner<'a, V, T>
+    pub fn into_element(self, index: u32) -> ElementOwner<'p, T, V>
     where
-        V: ListAccessable<Self>,
+        V: ListAccessable<ptr::Builder<'p, T>>,
     {
         self.try_into_element(index).ok().expect("index out of bounds")
     }
 
     #[inline]
-    pub unsafe fn into_element_unchecked(self, index: u32) -> ElementOwner<'a, V, T>
+    pub unsafe fn into_element_unchecked(self, index: u32) -> ElementOwner<'p, T, V>
     where
-        V: ListAccessable<Self>,
+        V: ListAccessable<ptr::Builder<'p, T>>,
     {
-        V::get(self, index)
+        V::get(self.repr, index)
     }
 }
 
 /// An element in a list reader
-pub type ElementReader<'a, 'b, V, T = rpc::Empty> =
-    <V as ListAccessable<&'b Reader<'a, V, T>>>::View;
+pub type ElementReader<'b, 'p, T, V> =
+    <V as ListAccessable<&'b ptr::Reader<'p, T>>>::View;
 /// An element in a list builder with a mutable borrow
-pub type ElementBuilder<'a, 'b, V, T = rpc::Empty> =
-    <V as ListAccessable<&'b mut Builder<'a, V, T>>>::View;
-pub type ElementOwner<'a, V, T = rpc::Empty> =
-    <V as ListAccessable<Builder<'a, V, T>>>::View;
+pub type ElementBuilder<'b, 'p, T, V> =
+    <V as ListAccessable<&'b mut ptr::Builder<'p, T>>>::View;
+pub type ElementOwner<'p, T, V> =
+    <V as ListAccessable<ptr::Builder<'p, T>>>::View;
+
+/// A "type kind" constraining trait that specializes list value type kinds.
+pub trait TypeKind {
+    type Kind;
+}
+
+impl<T> TypeKind for T
+where
+    T: ty::TypeKind,
+{
+    type Kind = T::Kind;
+}
+
+/// A marker trait for generic pointer element types. Note this does *not* include `AnyPtr` since it
+/// has specialized implementations of `ListAccessable` that return the `any::PtrBuilder` itself.
+pub trait Ptr: TypeKind<Kind = kind::PtrList<Self>> {}
+
+impl<T: Ptr + 'static> ty::ListValue for kind::PtrList<T> {
+    const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
+}
 
 /// A checked index view into a List.
-pub struct DataElement<T> {
+pub struct Element<V, T> {
+    v: PhantomData<fn() -> V>,
     list: T,
     idx: u32,
 }
 
-pub type DataElementBuilder<'a, 'b, V, T = rpc::Empty> = DataElement<&'b mut Builder<'a, V, T>>;
-
-pub struct PtrElement<T> {
-    list: T,
-    idx: u32,
+impl<V, T> Element<V, T> {
+    fn new(list: T, idx: u32) -> Self {
+        Self { v: PhantomData, list, idx }
+    }
 }
-
-pub type PtrElementReader<'a, 'b, V, T = rpc::Empty> = PtrElement<&'b Reader<'a, V, T>>;
-pub type PtrElementBuilder<'a, 'b, V, T = rpc::Empty> = PtrElement<&'b mut Builder<'a, V, T>>;
-pub type PtrElementOwner<'a, V, T = rpc::Empty> = PtrElement<Builder<'a, V, T>>;
 
 /// A helper used to provide element views into a list. Depending on the value type, this may simply
 /// return the value itself, or an element view which can be used to access one of the other getters
@@ -344,163 +350,180 @@ pub trait ListAccessable<T> {
     unsafe fn get(list: T, index: u32) -> Self::View;
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
-    type View = ();
+impl<T, U> ListAccessable<U> for T
+where 
+    T: TypeKind,
+    T::Kind: ListAccessable<U>,
+{
+    type View = <T::Kind as ListAccessable<U>>::View;
 
-    #[inline]
-    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View { () }
-}
-
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for () {
-    type View = ();
-
-    #[inline]
-    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View { () }
-}
-
-impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for V {
-    type View = V;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        list.as_ref().data_unchecked(idx)
+    unsafe fn get(list: U, index: u32) -> Self::View {
+        <T::Kind as ListAccessable<U>>::get(list, index)
     }
 }
 
-impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b mut Builder<'a, Self, T>> for V {
-    type View = DataElementBuilder<'a, 'b, Self, T>;
+impl<'b, 'p, T: Table> ListAccessable<&'b ptr::Reader<'p, T>> for () {
+    type View = ();
 
     #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        DataElement { list, idx }
+    unsafe fn get(_: &'b ptr::Reader<'p, T>, _: u32) -> Self::View { () }
+}
+
+impl<'b, 'p, T: Table> ListAccessable<&'b mut ptr::Builder<'p, T>> for () {
+    type View = ();
+
+    #[inline]
+    unsafe fn get(_: &'b mut ptr::Builder<'p, T>, _: u32) -> Self::View { () }
+}
+
+pub type DataElementBuilder<'b, 'p, T, D> = Element<kind::Data<D>, &'b mut ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table, D: FieldData> ListAccessable<&'b ptr::Reader<'p, T>> for kind::Data<D> {
+    type View = D;
+
+    #[inline]
+    unsafe fn get(list: &'b ptr::Reader<'p, T>, idx: u32) -> Self::View {
+        list.data_unchecked(idx)
     }
 }
 
-impl<'a, 'b, V: FieldData, T: Table> DataElementBuilder<'a, 'b, V, T> {
+impl<'b, 'p, T: Table, D: FieldData> ListAccessable<&'b mut ptr::Builder<'p, T>> for kind::Data<D> {
+    type View = DataElementBuilder<'b, 'p, T, D>;
+
+    #[inline]
+    unsafe fn get(list: &'b mut ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
+impl<'b, 'p, T: Table, D: FieldData> DataElementBuilder<'b, 'p, T, D> {
     /// A generic accessor for getting "field data", that is, primitive numeric and boolean types.
     #[inline]
-    pub fn get(&self) -> V {
-        unsafe { self.list.as_ref().data_unchecked(self.idx) }
+    pub fn get(&self) -> D {
+        unsafe { self.list.data_unchecked(self.idx) }
     }
     /// A generic accessor for setting "field data", that is, primitive numeric and boolean types.
     #[inline]
-    pub fn set(&mut self, value: V) {
-        unsafe { self.list.as_mut().set_data_unchecked(self.idx, value) }
+    pub fn set(&mut self, value: D) {
+        unsafe { self.list.set_data_unchecked(self.idx, value) }
     }
 }
 
-impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f32, T> {
+impl<'b, 'p, T: Table> DataElementBuilder<'b, 'p, T, f32> {
     #[inline]
     /// Canonicalizes NaN values by blowing away the NaN payload.
     pub fn set_canonical(&mut self, value: f32) {
         const CANONICAL_NAN: u32 = 0x7fc00000u32;
 
         if value.is_nan() {
-            unsafe { self.list.as_mut().set_data_unchecked(self.idx, CANONICAL_NAN) }
+            unsafe { self.list.set_data_unchecked(self.idx, CANONICAL_NAN) }
         } else {
             self.set(value)
         }
     }
 }
 
-impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f64, T> {
+impl<'b, 'p, T: Table> DataElementBuilder<'b, 'p, T, f64> {
     /// Canonicalizes NaN values by blowing away the NaN payload.
     #[inline]
     pub fn set_canonical(&mut self, value: f64) {
         const CANONICAL_NAN: u64 = 0x7ff8000000000000u64;
 
         if value.is_nan() {
-            unsafe { self.list.as_mut().set_data_unchecked(self.idx, CANONICAL_NAN) }
+            unsafe { self.list.set_data_unchecked(self.idx, CANONICAL_NAN) }
         } else {
             self.set(value)
         }
     }
 }
 
-impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b Reader<'a, Self, T>> for Enum<E> {
+impl<E: ty::Enum> ty::ListValue for kind::Enum<E> {
+    const ELEMENT_SIZE: ElementSize = ElementSize::TwoBytes;
+}
+
+pub type EnumElementBuilder<'b, 'p, T, E> = Element<kind::Enum<E>, &'b mut ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table, E: ty::Enum> ListAccessable<&'b ptr::Reader<'p, T>> for kind::Enum<E> {
     type View = EnumResult<E>;
 
     #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        let value = list.as_ref().data_unchecked(idx);
+    unsafe fn get(list: &'b ptr::Reader<'p, T>, idx: u32) -> Self::View {
+        let value = list.data_unchecked(idx);
         E::try_from(value)
     }
 }
 
-impl<'a, 'b, T: Table, E: ty::Enum> ListAccessable<&'b mut Builder<'a, Self, T>> for Enum<E> {
-    type View = DataElementBuilder<'a, 'b, Self, T>;
+impl<'b, 'p, T: Table, E: ty::Enum> ListAccessable<&'b mut ptr::Builder<'p, T>> for kind::Enum<E> {
+    type View = EnumElementBuilder<'b, 'p, T, E>;
 
     #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        DataElement { list, idx }
+    unsafe fn get(list: &'b mut ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, 'b, E: ty::Enum, T: Table> DataElementBuilder<'a, 'b, Enum<E>, T>
-where
-    T: Table,
-    E: ty::Enum,
-{
+impl<'b, 'p, E: ty::Enum, T: Table> EnumElementBuilder<'b, 'p, T, E> {
     #[inline]
     pub fn get(&self) -> EnumResult<E> {
-        let value = unsafe { self.list.as_ref().data_unchecked::<u16>(self.idx) };
+        let value = unsafe { self.list.data_unchecked::<u16>(self.idx) };
         E::try_from(value)
     }
     #[inline]
     pub fn set(&mut self, value: E) {
         let value = value.into();
-        unsafe { self.list.as_mut().set_data_unchecked::<u16>(self.idx, value) }
+        self.set_value(value)
+    }
+    #[inline]
+    pub fn set_value(&mut self, value: u16) {
+        unsafe { self.list.set_data_unchecked::<u16>(self.idx, value) }
     }
 }
 
-pub struct StructElement<T> {
-    list: T,
-    idx: u32,
+impl<S: ty::Struct> ty::ListValue for kind::Struct<S> {
+    const ELEMENT_SIZE: ElementSize = ElementSize::InlineComposite(S::SIZE);
 }
 
-pub type StructElementBuilder<'a, 'b, V, T = rpc::Empty> = StructElement<&'b mut Builder<'a, V, T>>;
-pub type StructElementOwner<'a, V, T = rpc::Empty> = StructElement<Builder<'a, V, T>>;
+pub type StructElement<S, Repr> = Element<kind::Struct<S>, Repr>;
 
-impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b Reader<'a, Self, T>> for Struct<S> {
-    type View = S::Reader<'a, T>;
+pub type StructElementBuilder<'b, 'p, T, S> = StructElement<S, &'b mut ptr::Builder<'p, T>>;
+pub type StructElementOwner<'p, T, S> = StructElement<S, ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table, S: ty::Struct> ListAccessable<&'b ptr::Reader<'p, T>> for kind::Struct<S> {
+    type View = S::Reader<'p, T>;
 
     #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
+    unsafe fn get(list: &'b ptr::Reader<'p, T>, idx: u32) -> Self::View {
+        ty::StructReader::from_ptr(list.struct_unchecked(idx))
     }
 }
 
-impl<'a, 'b, T: Table, S: ty::Struct> ListAccessable<&'b mut Builder<'a, Self, T>> for Struct<S> {
-    type View = StructElementBuilder<'a, 'b, Self, T>;
+impl<'b, 'p, T: Table, S: ty::Struct> ListAccessable<&'b mut ptr::Builder<'p, T>> for kind::Struct<S> {
+    type View = StructElementBuilder<'b, 'p, T, S>;
 
     #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        StructElement { list, idx }
+    unsafe fn get(list: &'b mut ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, T: Table, S: ty::Struct> ListAccessable<Builder<'a, Self, T>> for Struct<S> {
-    type View = StructElementOwner<'a, Self, T>;
+impl<'p, T: Table, S: ty::Struct> ListAccessable<ptr::Builder<'p, T>> for kind::Struct<S> {
+    type View = StructElementOwner<'p, T, S>;
 
     #[inline]
-    unsafe fn get(list: Builder<'a, Self, T>, idx: u32) -> Self::View {
-        StructElement { list, idx }
+    unsafe fn get(list: ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, 'b, S, T> StructElementBuilder<'a, 'b, Struct<S>, T>
-where
-    S: ty::Struct,
-    T: Table,
-{
+impl<'b, 'p, T: Table, S: ty::Struct> StructElementBuilder<'b, 'p, T, S> {
     #[inline]
     pub fn get(self) -> S::Builder<'b, T> {
-        unsafe { ty::StructBuilder::from_ptr(self.list.as_mut().struct_mut_unchecked(self.idx)) }
+        unsafe { ty::StructBuilder::from_ptr(self.list.struct_mut_unchecked(self.idx)) }
     }
 
     #[inline]
     pub fn reader(&self) -> S::Reader<'_, T> {
-        ty::StructReader::from_ptr(unsafe { self.list.as_ref().struct_unchecked(self.idx) })
+        ty::StructReader::from_ptr(unsafe { self.list.struct_unchecked(self.idx) })
     }
 
     /// Mostly behaves like you'd expect `set` to behave, but with a caveat originating from
@@ -528,45 +551,47 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyStruct {
-    type View = any::StructReader<'b, T>;
+pub type AnyStructElement<Repr> = Element<AnyStruct, Repr>;
+
+pub type AnyStructElementBuilder<'b, 'p, T> = AnyStructElement<&'b mut ptr::Builder<'p, T>>;
+pub type AnyStructElementOwner<'p, T> = AnyStructElement<ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table> ListAccessable<&'b ptr::Reader<'p, T>> for AnyStruct {
+    type View = any::StructReader<'p, T>;
 
     #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        ty::StructReader::from_ptr(list.as_ref().struct_unchecked(idx))
+    unsafe fn get(list: &'b ptr::Reader<'p, T>, idx: u32) -> Self::View {
+        ty::StructReader::from_ptr(list.struct_unchecked(idx))
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyStruct {
-    type View = StructElementBuilder<'a, 'b, AnyStruct, T>;
+impl<'b, 'p, T: Table> ListAccessable<&'b mut ptr::Builder<'p, T>> for AnyStruct {
+    type View = AnyStructElementBuilder<'b, 'p, T>;
 
     #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        StructElement { list, idx }
+    unsafe fn get(list: &'b mut ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, T: Table> ListAccessable<Builder<'a, Self, T>> for AnyStruct {
-    type View = StructElementOwner<'a, Self, T>;
+impl<'p, T: Table> ListAccessable<ptr::Builder<'p, T>> for AnyStruct {
+    type View = AnyStructElementOwner<'p, T>;
 
     #[inline]
-    unsafe fn get(list: Builder<'a, Self, T>, idx: u32) -> Self::View {
-        StructElement { list, idx }
+    unsafe fn get(list: ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, 'b, T> StructElementBuilder<'a, 'b, AnyStruct, T>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table> AnyStructElementBuilder<'b, 'p, T> {
     #[inline]
     pub fn get(self) -> any::StructBuilder<'b, T> {
-        unsafe { self.list.repr.struct_mut_unchecked(self.idx).into() }
+        unsafe { self.list.struct_mut_unchecked(self.idx).into() }
     }
 
     #[inline]
     pub fn reader(&self) -> any::StructReader<'_, T> {
-        unsafe { self.list.as_ref().struct_unchecked(self.idx).into() }
+        unsafe { self.list.struct_unchecked(self.idx).into() }
     }
 
     /// Mostly behaves like you'd expect `set` to behave, but with a caveat originating from
@@ -594,27 +619,55 @@ where
     }
 }
 
-impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b Reader<'a, Self, T>> for List<V> {
-    type View = PtrElementReader<'a, 'b, Self, T>;
+pub type PtrElement<P, Repr> = Element<kind::PtrList<P>, Repr>;
 
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
+pub type PtrElementReader<'b, 'p, T, P> = PtrElement<P, &'b ptr::Reader<'p, T>>;
+pub type PtrElementBuilder<'b, 'p, T, P> = PtrElement<P, &'b mut ptr::Builder<'p, T>>;
+pub type PtrElementOwner<'p, T, P> = PtrElement<P, ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table, P: Ptr> ListAccessable<&'b ptr::Reader<'p, T>> for kind::PtrList<P> {
+    type View = PtrElementReader<'b, 'p, T, P>;
+
+    unsafe fn get(list: &'b ptr::Reader<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
     }
 }
 
-impl<'a, 'b, V, T> PtrElementReader<'a, 'b, List<V>, T>
-where
-    T: Table,
-    V: ty::DynListValue,
-{
+impl<'b, 'p, T: Table, P: Ptr> ListAccessable<&'b mut ptr::Builder<'p, T>> for kind::PtrList<P> {
+    type View = PtrElementBuilder<'b, 'p, T, P>;
+
+    unsafe fn get(list: &'b mut ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
+impl<'p, T: Table, P: Ptr> ListAccessable<ptr::Builder<'p, T>> for kind::PtrList<P> {
+    type View = PtrElementOwner<'p, T, P>;
+
+    unsafe fn get(list: ptr::Builder<'p, T>, idx: u32) -> Self::View {
+        Element::new(list, idx)
+    }
+}
+
+impl<V> TypeKind for List<V> {
+    type Kind = kind::PtrList<Self>;
+}
+impl<V> Ptr for List<V> {}
+
+pub type ListElement<V, Repr> = PtrElement<List<V>, Repr>;
+
+pub type ListElementReader<'b, 'p, T, V> = ListElement<V, &'b ptr::Reader<'p, T>>;
+pub type ListElementBuilder<'b, 'p, T, V> = ListElement<V, &'b mut ptr::Builder<'p, T>>;
+pub type ListElementOwner<'p, T, V> = ListElement<V, ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table, V: ty::DynListValue> ListElementReader<'b, 'p, T, V> {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'p, T> {
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     #[inline]
-    fn empty_list(&self) -> Reader<'a, V, T> {
+    fn empty_list(&self) -> Reader<'p, V, T> {
         List::new(ptr::Reader::empty(ElementSize::Pointer).imbue_from(self.list))
     }
 
@@ -627,7 +680,7 @@ where
     /// Returns the list value in this element, or an empty list if the list is null
     /// or an error occurs while reading.
     #[inline]
-    pub fn get(&self) -> Reader<'a, V, T> {
+    pub fn get(&self) -> Reader<'p, V, T> {
         match self.try_get_option() {
             Ok(Some(reader)) => reader,
             _ => self.empty_list(),
@@ -637,7 +690,7 @@ where
     /// Returns the list value in this element, or None if the list element is null or
     /// an error occurs while reading.
     #[inline]
-    pub fn get_option(&self) -> Option<Reader<'a, V, T>> {
+    pub fn get_option(&self) -> Option<Reader<'p, V, T>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Some(reader),
             _ => None,
@@ -647,7 +700,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns an
     /// empty list. If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get(&self) -> Result<Reader<'a, V, T>> {
+    pub fn try_get(&self) -> Result<Reader<'p, V, T>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Ok(reader),
             Ok(None) => Ok(self.empty_list()),
@@ -658,7 +711,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns Ok(None).
     /// If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<Reader<'a, V, T>>> {
+    pub fn try_get_option(&self) -> Result<Option<Reader<'p, V, T>>> {
         match self.ptr_reader().to_list(Some(PtrElementSize::size_of::<V>())) {
             Ok(Some(reader)) => Ok(Some(List::new(reader))),
             Ok(None) => Ok(None),
@@ -667,28 +720,15 @@ where
     }
 }
 
-impl<'a, 'b, T: Table, V: ty::ListValue> ListAccessable<&'b mut Builder<'a, Self, T>> for List<V> {
-    type View = PtrElementBuilder<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
-}
-
-impl<'a, 'b, T, V> PtrElementBuilder<'a, 'b, List<V>, T>
-where
-    T: Table,
-    V: ty::ListValue,
-{
+impl<'b, 'p, T: Table, V: ty::ListValue> ListElementBuilder<'b, 'p, T, V> {
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
     fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     /// Gets the value of the element in the list as a builder. If the value is null or invalid
@@ -776,18 +816,15 @@ where
     }
 }
 
-impl<'a, 'b, T> PtrElementBuilder<'a, 'b, List<AnyStruct>, T>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table> ListElementBuilder<'b, 'p, T, AnyStruct> {
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
     fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     /// Gets the value of the element in the list as a builder. If the value is null or invalid
@@ -891,26 +928,25 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyList {
-    type View = PtrElementReader<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
+impl TypeKind for AnyList {
+    type Kind = kind::PtrList<Self>;
 }
+impl Ptr for AnyList {}
 
-impl<'a, 'b, T> PtrElementReader<'a, 'b, AnyList, T>
-where
-    T: Table,
-{
+pub type AnyListElement<Repr> = PtrElement<AnyList, Repr>;
+
+pub type AnyListElementReader<'b, 'p, T> = AnyListElement<&'b ptr::Reader<'p, T>>;
+pub type AnyListElementBuilder<'b, 'p, T> = AnyListElement<&'b mut ptr::Builder<'p, T>>;
+pub type AnyListElementOwner<'p, T> = AnyListElement<ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table> AnyListElementReader<'b, 'p, T> {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'p, T> {
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     #[inline]
-    fn empty_list(&self) -> any::ListReader<'a, T> {
+    fn empty_list(&self) -> any::ListReader<'p, T> {
         any::ListReader::from(ptr::Reader::empty(ElementSize::Pointer).imbue_from(self.list))
     }
 
@@ -923,7 +959,7 @@ where
     /// Returns the list value in this element, or an empty list if the list is null
     /// or an error occurs while reading.
     #[inline]
-    pub fn get(&self) -> any::ListReader<'a, T> {
+    pub fn get(&self) -> any::ListReader<'p, T> {
         match self.try_get_option() {
             Ok(Some(reader)) => reader,
             _ => self.empty_list(),
@@ -933,7 +969,7 @@ where
     /// Returns the list value in this element, or None if the list element is null or
     /// an error occurs while reading.
     #[inline]
-    pub fn get_option(&self) -> Option<any::ListReader<'a, T>> {
+    pub fn get_option(&self) -> Option<any::ListReader<'p, T>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Some(reader),
             _ => None,
@@ -943,7 +979,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns an
     /// empty list. If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get(&self) -> Result<any::ListReader<'a, T>> {
+    pub fn try_get(&self) -> Result<any::ListReader<'p, T>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Ok(reader),
             Ok(None) => Ok(self.empty_list()),
@@ -954,7 +990,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns Ok(None).
     /// If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<any::ListReader<'a, T>>> {
+    pub fn try_get_option(&self) -> Result<Option<any::ListReader<'p, T>>> {
         match self.ptr_reader().to_list(None) {
             Ok(Some(reader)) => Ok(Some(any::ListReader::from(reader))),
             Ok(None) => Ok(None),
@@ -963,27 +999,15 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyList {
-    type View = PtrElementBuilder<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
-}
-
-impl<'a, 'b, T> PtrElementBuilder<'a, 'b, AnyList, T>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table> AnyListElementBuilder<'b, 'p, T> {
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
     fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     /// Gets the value of the element in the list as a builder. If the value is null or invalid
@@ -1054,22 +1078,20 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Data {
-    type View = PtrElementReader<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
+impl TypeKind for Data {
+    type Kind = kind::PtrList<Self>;
 }
+impl Ptr for Data {}
 
-impl<'a, 'b, T> PtrElementReader<'a, 'b, Data, T>
-where
-    T: Table,
-{
+pub type DataBlobElement<Repr> = PtrElement<Data, Repr>;
+
+pub type DataBlobElementReader<'b, 'p, T> = DataBlobElement<&'b ptr::Reader<'p, T>>;
+pub type DataBlobElementBuilder<'b, 'p, T> = DataBlobElement<&'b mut ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table> DataBlobElementReader<'b, 'p, T> {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'p, T> {
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     /// Returns whether this list element is a null pointer.
@@ -1081,7 +1103,7 @@ where
     /// Returns the list value in this element, or an empty list if the list is null
     /// or an error occurs while reading.
     #[inline]
-    pub fn get(&self) -> data::Reader<'a> {
+    pub fn get(&self) -> data::Reader<'p> {
         match self.try_get_option() {
             Ok(Some(reader)) => reader,
             _ => data::Reader::empty(),
@@ -1091,7 +1113,7 @@ where
     /// Returns the list value in this element, or None if the list element is null or
     /// an error occurs while reading.
     #[inline]
-    pub fn get_option(&self) -> Option<data::Reader<'a>> {
+    pub fn get_option(&self) -> Option<data::Reader<'p>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Some(reader),
             _ => None,
@@ -1101,7 +1123,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns an
     /// empty list. If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get(&self) -> Result<data::Reader<'a>> {
+    pub fn try_get(&self) -> Result<data::Reader<'p>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Ok(reader),
             Ok(None) => Ok(data::Reader::empty()),
@@ -1112,7 +1134,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns Ok(None).
     /// If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<data::Reader<'a>>> {
+    pub fn try_get_option(&self) -> Result<Option<data::Reader<'p>>> {
         match self.ptr_reader().to_blob() {
             Ok(Some(reader)) => Ok(Some(data::Reader::from(reader))),
             Ok(None) => Ok(None),
@@ -1121,27 +1143,15 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Data {
-    type View = PtrElementBuilder<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
-}
-
-impl<'a, 'b, T> PtrElementBuilder<'a, 'b, Data, T>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table> DataBlobElementBuilder<'b, 'p, T> {
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
     fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
@@ -1177,22 +1187,20 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Text {
-    type View = PtrElementReader<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
+impl TypeKind for Text {
+    type Kind = kind::PtrList<Self>;
 }
+impl Ptr for Text {}
 
-impl<'a, 'b, T> PtrElementReader<'a, 'b, Text, T>
-where
-    T: Table,
-{
+pub type TextElement<Repr> = PtrElement<Text, Repr>;
+
+pub type TextElementReader<'b, 'p, T> = TextElement<&'b ptr::Reader<'p, T>>;
+pub type TextElementBuilder<'b, 'p, T> = TextElement<&'b mut ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T: Table> TextElementReader<'b, 'p, T> {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'p, T> {
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     /// Returns whether this list element is a null pointer.
@@ -1204,7 +1212,7 @@ where
     /// Returns the list value in this element, or an empty list if the list is null
     /// or an error occurs while reading.
     #[inline]
-    pub fn get(&self) -> text::Reader<'a> {
+    pub fn get(&self) -> text::Reader<'p> {
         match self.try_get_option() {
             Ok(Some(reader)) => reader,
             _ => text::Reader::empty(),
@@ -1214,7 +1222,7 @@ where
     /// Returns the list value in this element, or None if the list element is null or
     /// an error occurs while reading.
     #[inline]
-    pub fn get_option(&self) -> Option<text::Reader<'a>> {
+    pub fn get_option(&self) -> Option<text::Reader<'p>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Some(reader),
             _ => None,
@@ -1224,7 +1232,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns an
     /// empty list. If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get(&self) -> Result<text::Reader<'a>> {
+    pub fn try_get(&self) -> Result<text::Reader<'p>> {
         match self.try_get_option() {
             Ok(Some(reader)) => Ok(reader),
             Ok(None) => Ok(text::Reader::empty()),
@@ -1235,7 +1243,7 @@ where
     /// Returns the list value in this element. If the element is null, this returns Ok(None).
     /// If an error occurs while reading it is returned.
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<text::Reader<'a>>> {
+    pub fn try_get_option(&self) -> Result<Option<text::Reader<'p>>> {
         match self.ptr_reader().to_blob() {
             Ok(Some(b)) => text::Reader::new(b)
                 .ok_or_else(|| Error::from(ErrorKind::TextNotNulTerminated))
@@ -1246,27 +1254,15 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Text {
-    type View = PtrElementBuilder<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
-}
-
-impl<'a, 'b, T> PtrElementBuilder<'a, 'b, Text, T>
-where
-    T: Table,
-{
+impl<'b, 'p, T: Table> TextElementBuilder<'b, 'p, T> {
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
     fn into_ptr_builder(self) -> crate::ptr::PtrBuilder<'b, T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
@@ -1333,41 +1329,47 @@ where
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for AnyPtr {
+impl ty::ListValue for AnyPtr {
+    const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
+}
+
+impl<'a, 'b, T: Table> ListAccessable<&'b ptr::Reader<'a, T>> for AnyPtr {
     type View = any::PtrReader<'a, T>;
 
     #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        list.repr.ptr_unchecked(idx).into()
+    unsafe fn get(list: &'b ptr::Reader<'a, T>, idx: u32) -> Self::View {
+        list.ptr_unchecked(idx).into()
     }
 }
 
-impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyPtr {
+impl<'a, 'b, T: Table> ListAccessable<&'b mut ptr::Builder<'a, T>> for AnyPtr {
     type View = any::PtrBuilder<'b, T>;
 
     #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        list.repr.ptr_mut_unchecked(idx).into()
+    unsafe fn get(list: &'b mut ptr::Builder<'a, T>, idx: u32) -> Self::View {
+        list.ptr_mut_unchecked(idx).into()
     }
 }
 
-impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Capability<C> {
-    type View = PtrElementReader<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b Reader<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
+impl<C: ty::Capability> TypeKind for kind::Capability<C> {
+    type Kind = kind::PtrList<Self>;
 }
+impl<C: ty::Capability> Ptr for kind::Capability<C> {}
 
-impl<'a, 'b, C, T, Client> PtrElementReader<'a, 'b, Capability<C>, T>
+pub type CapabilityElement<C, Repr> = PtrElement<kind::Capability<C>, Repr>;
+
+pub type CapabilityElementReader<'b, 'p, T, C> = CapabilityElement<C, &'b ptr::Reader<'p, T>>;
+pub type CapabilityElementBuilder<'b, 'p, T, C> = CapabilityElement<C, &'b mut ptr::Builder<'p, T>>;
+pub type CapabilityElementOwner<'p, T, C> = CapabilityElement<C, ptr::Builder<'p, T>>;
+
+impl<'b, 'p, T, C, Client> CapabilityElementReader<'b, 'p, T, C>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client>,
 {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<'a, T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'p, T> {
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     #[inline]
@@ -1385,7 +1387,7 @@ where
     }
 }
 
-impl<'a, 'b, C, T, Client> PtrElementReader<'a, 'b, Capability<C>, T>
+impl<'b, 'p, T, C, Client> CapabilityElementReader<'b, 'p, T, C>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
@@ -1417,28 +1419,19 @@ where
     }
 }
 
-impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Capability<C> {
-    type View = PtrElementBuilder<'a, 'b, Self, T>;
-
-    #[inline]
-    unsafe fn get(list: &'b mut Builder<'a, Self, T>, idx: u32) -> Self::View {
-        PtrElement { list, idx }
-    }
-}
-
-impl<'a, 'b, C, T, Client> PtrElementBuilder<'a, 'b, Capability<C>, T>
+impl<'b, 'p, T, C, Client> CapabilityElementBuilder<'b, 'p, T, C>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client>,
 {
     #[inline]
     fn ptr_reader(&self) -> crate::ptr::PtrReader<T> {
-        unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
+        unsafe { self.list.ptr_unchecked(self.idx) }
     }
 
     #[inline]
     fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
-        unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
+        unsafe { self.list.ptr_mut_unchecked(self.idx) }
     }
 
     #[inline]
@@ -1461,7 +1454,7 @@ where
     }
 }
 
-impl<'a, 'b, C, T, Client> PtrElementBuilder<'a, 'b, Capability<C>, T>
+impl<'b, 'p, T, C, Client> CapabilityElementBuilder<'b, 'p, T, C>
 where
     C: ty::Capability<Client = Client>,
     T: rpc::CapTable<Cap = Client> + rpc::BreakableCapSystem,
@@ -1477,6 +1470,28 @@ where
 }
 
 // Iterators. WARNING! HELL BELOW
+// Ideally one day we'll get rid of all this crap and just use lending iterators.
+
+/// Walks the type kind tree to find what type is actually supposed to be used for the iterator.
+pub trait IterKind {
+    type Iter;
+}
+
+impl<T> IterKind for T
+where
+    T: TypeKind,
+    T::Kind: IterKind,
+{
+    type Iter = T::Kind;
+}
+
+impl IterKind for () {
+    type Iter = ();
+}
+
+impl<S: ty::Struct> IterKind for kind::Struct<S> {
+    type Iter = Self;
+}
 
 /// Describes the conversion from an element reader to a value which isn't dependent
 /// on the reader itself.
@@ -1494,65 +1509,66 @@ where
 /// 
 /// Custom strategies can be used by providing a closure to `into_iter_by` which will be
 /// called for every element in the list.
-pub trait IterStrategy<T, E> {
+pub trait IterStrategy<T, V: ListAccessable<T>> {
     /// The resulting type derived from this strategy
     type Item;
 
     /// Applies the strategy to get the output
-    fn get(&mut self, element: E) -> Self::Item;
+    fn get<'b>(&mut self, element: V::View) -> Self::Item;
 }
 
-impl<T, E, F, Output> IterStrategy<T, E> for F
+impl<T, V, F, Output> IterStrategy<T, V> for F
 where
-    F: FnMut(E) -> Output,
+    V: ListAccessable<T>,
+    F: FnMut(V::View) -> Output,
 {
     type Item = Output;
 
     #[inline]
-    fn get(&mut self, element: E) -> Self::Item {
+    fn get(&mut self, element: V::View) -> Self::Item {
         (self)(element)
     }
 }
 
 macro_rules! infallible_strategies {
     ($ty:ty) => {
-        impl IterStrategy<(), ()> for $ty {
+        impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, ()> for $ty {
             type Item = ();
 
             #[inline]
             fn get(&mut self, _: Self::Item) -> Self::Item {}
         }
 
-        impl<V: FieldData> IterStrategy<V, V> for $ty {
-            type Item = V;
+        impl<'b, 'p, T: Table, D: FieldData> IterStrategy<&'b ptr::Reader<'p, T>, kind::Data<D>> for $ty {
+            type Item = D;
 
             #[inline]
             fn get(&mut self, element: Self::Item) -> Self::Item { element }
         }
 
-        impl<E: ty::Enum> IterStrategy<Enum<E>, EnumResult<E>> for $ty {
+        impl<'b, 'p, T: Table, E: ty::Enum> IterStrategy<&'b ptr::Reader<'p, T>, kind::Enum<E>> for $ty {
             type Item = EnumResult<E>;
 
             #[inline]
             fn get(&mut self, element: Self::Item) -> Self::Item { element }
         }
 
-        impl<S: ty::Struct, R: ty::StructReader> IterStrategy<Struct<S>, R> for $ty {
-            type Item = R;
+        impl<'b, 'p, T: Table, S: ty::Struct> IterStrategy<&'b ptr::Reader<'p, T>, kind::Struct<S>> for $ty {
+            type Item = S::Reader<'p, T>;
 
             #[inline]
             fn get(&mut self, element: Self::Item) -> Self::Item { element }
         }
 
-        impl<'a, T: Table> IterStrategy<AnyStruct, any::StructReader<'a, T>> for $ty {
-            type Item = any::StructReader<'a, T>;
+        impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, AnyStruct> for $ty {
+            type Item = any::StructReader<'p, T>;
 
             #[inline]
             fn get(&mut self, element: Self::Item) -> Self::Item { element }
         }
 
-        impl<'a, T: Table> IterStrategy<AnyPtr, any::PtrReader<'a, T>> for $ty {
-            type Item = any::PtrReader<'a, T>;
+        impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, AnyPtr> for $ty {
+            type Item = any::PtrReader<'p, T>;
 
             #[inline]
             fn get(&mut self, element: Self::Item) -> Self::Item { element }
@@ -1567,47 +1583,34 @@ pub struct InfalliblePtrs;
 
 infallible_strategies!(InfalliblePtrs);
 
-impl<'a, 'b, T, V> IterStrategy<List<V>, PtrElementReader<'a, 'b, List<V>, T>> for InfalliblePtrs
-where
-    T: Table,
-    V: ty::DynListValue,
-{
-    type Item = Reader<'a, V, T>;
+impl<'b, 'p, T: Table, V: ty::DynListValue> IterStrategy<&'b ptr::Reader<'p, T>, List<V>> for InfalliblePtrs {
+    type Item = Reader<'p, V, T>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, List<V>, T>) -> Self::Item {
+    fn get(&mut self, element: ListElementReader<'b, 'p, T, V>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<AnyList, PtrElementReader<'a, 'b, AnyList, T>> for InfalliblePtrs
-where
-    T: Table,
-{
-    type Item = any::ListReader<'a, T>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, AnyList> for InfalliblePtrs {
+    type Item = any::ListReader<'p, T>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, AnyList, T>) -> Self::Item {
+    fn get(&mut self, element: AnyListElementReader<'b, 'p, T>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Data, PtrElementReader<'a, 'b, Data, T>> for InfalliblePtrs
-where
-    T: Table,
-{
-    type Item = data::Reader<'a>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, Data> for InfalliblePtrs {
+    type Item = data::Reader<'p>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, Data, T>) -> Self::Item {
+    fn get(&mut self, element: DataBlobElementReader<'b, 'p, T>) -> Self::Item {
         element.get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Text, PtrElementReader<'a, 'b, Text, T>> for InfalliblePtrs
-where
-    T: Table,
-{
-    type Item = text::Reader<'a>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, Text> for InfalliblePtrs {
+    type Item = text::Reader<'p>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, Text, T>) -> Self::Item {
+    fn get(&mut self, element: TextElementReader<'b, 'p, T>) -> Self::Item {
         element.get()
     }
 }
@@ -1618,69 +1621,58 @@ pub struct Fallible;
 
 infallible_strategies!(Fallible);
 
-impl<'a, 'b, T, V> IterStrategy<List<V>, PtrElementReader<'a, 'b, List<V>, T>> for Fallible
-where
-    T: Table,
-    V: ty::DynListValue,
-{
-    type Item = Result<Reader<'a, V, T>>;
+impl<'b, 'p, T: Table, V: ty::DynListValue> IterStrategy<&'b ptr::Reader<'p, T>, List<V>> for Fallible {
+    type Item = Result<Reader<'p, V, T>>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, List<V>, T>) -> Self::Item {
+    fn get(&mut self, element: ListElementReader<'b, 'p, T, V>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<AnyList, PtrElementReader<'a, 'b, AnyList, T>> for Fallible
-where
-    T: Table,
-{
-    type Item = Result<any::ListReader<'a, T>>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, AnyList> for Fallible {
+    type Item = Result<any::ListReader<'p, T>>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, AnyList, T>) -> Self::Item {
+    fn get(&mut self, element: AnyListElementReader<'b, 'p, T>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Data, PtrElementReader<'a, 'b, Data, T>> for Fallible
-where
-    T: Table,
-{
-    type Item = Result<data::Reader<'a>>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, Data> for Fallible {
+    type Item = Result<data::Reader<'p>>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, Data, T>) -> Self::Item {
+    fn get(&mut self, element: DataBlobElementReader<'b, 'p, T>) -> Self::Item {
         element.try_get()
     }
 }
 
-impl<'a, 'b, T> IterStrategy<Text, PtrElementReader<'a, 'b, Text, T>> for Fallible
-where
-    T: Table,
-{
-    type Item = Result<text::Reader<'a>>;
+impl<'b, 'p, T: Table> IterStrategy<&'b ptr::Reader<'p, T>, Text> for Fallible {
+    type Item = Result<text::Reader<'p>>;
 
-    fn get(&mut self, element: PtrElementReader<'a, 'b, Text, T>) -> Self::Item {
+    fn get(&mut self, element: TextElementReader<'b, 'p, T>) -> Self::Item {
         element.try_get()
     }
 }
 
 /// An iterator through a list that maps the element view into a new output.
 pub struct Iter<'a, V, S = InfalliblePtrs, T: Table = rpc::Empty> {
-    list: Reader<'a, V, T>,
+    v: PhantomData<fn() -> V>,
+    list: ptr::Reader<'a, T>,
     range: Range<u32>,
     strategy: S,
 }
 
-impl<'a, V, S, T, Item> Iterator for Iter<'a, V, S, T>
+impl<'p, V, S, T, Item> Iterator for Iter<'p, V, S, T>
 where
-    V: for<'b> ListAccessable<&'b Reader<'a, V, T>>,
-    S: for<'b> IterStrategy<V, ElementReader<'a, 'b, V, T>, Item = Item>,
+    V: IterKind,
+    V::Iter: for<'b> ListAccessable<&'b ptr::Reader<'p, T>>,
+    S: for<'b> IterStrategy<&'b ptr::Reader<'p, T>, V::Iter, Item = Item>,
     T: Table,
 {
     type Item = Item;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let element = unsafe { self.list.at_unchecked(self.range.next()?) };
+        let element = unsafe { <V::Iter as ListAccessable<_>>::get(&self.list, self.range.next()?) };
         Some(self.strategy.get(element))
     }
     #[inline]
@@ -1689,36 +1681,35 @@ where
     }
 }
 
-impl<'a, V, S, T, Item> DoubleEndedIterator for Iter<'a, V, S, T>
+impl<'p, V, S, T, Item> DoubleEndedIterator for Iter<'p, V, S, T>
 where
-    V: for<'b> ListAccessable<&'b Reader<'a, V, T>>,
-    S: for<'b> IterStrategy<V, <V as ListAccessable<&'b Reader<'a, V, T>>>::View, Item = Item>,
+    V: IterKind,
+    V::Iter: for<'b> ListAccessable<&'b ptr::Reader<'p, T>>,
+    S: for<'b> IterStrategy<&'b ptr::Reader<'p, T>, V::Iter, Item = Item>,
     T: Table,
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let element = unsafe { self.list.at_unchecked(self.range.next_back()?) };
+        let element = unsafe { <V::Iter as ListAccessable<_>>::get(&self.list, self.range.next_back()?) };
         Some(self.strategy.get(element))
     }
 }
 
-impl<'a, V, T> Reader<'a, V, T>
-where
-    T: Table,
-{
+impl<'a, V, T: Table> Reader<'a, V, T> {
     pub fn into_iter_by<S>(self, strat: S) -> Iter<'a, V, S, T> {
         let range = 0..self.len();
-        Iter { list: self, range, strategy: strat }
+        Iter { v: PhantomData, list: self.repr, range, strategy: strat }
     }
 }
 
-impl<'a, V, T, Item> IntoIterator for Reader<'a, V, T>
+impl<'p, V, T, Item> IntoIterator for Reader<'p, V, T>
 where
-    V: for<'b> ListAccessable<&'b Reader<'a, V, T>>,
+    V: IterKind,
+    V::Iter: for<'b> ListAccessable<&'b ptr::Reader<'p, T>>,
+    InfalliblePtrs: for<'b> IterStrategy<&'b ptr::Reader<'p, T>, V::Iter, Item = Item>,
     T: Table,
-    InfalliblePtrs: for<'lb> IterStrategy<V, ElementReader<'a, 'lb, V, T>, Item = Item>,
 {
-    type IntoIter = Iter<'a, V, InfalliblePtrs, T>;
+    type IntoIter = Iter<'p, V, InfalliblePtrs, T>;
     type Item = Item;
 
     fn into_iter(self) -> Self::IntoIter {

@@ -8,8 +8,8 @@ pub mod prelude {
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
-            self, Accessor, AccessorMut, Descriptor, Enum, FieldGroup, Group, Struct,
-            UnionViewer, Variant, VariantInfo, VariantDescriptor, VariantMut, ViewOf, Viewable,
+            self, Accessor, AccessorMut, Descriptor, Group, UnionViewer,
+            Variant, VariantInfo, VariantDescriptor, VariantMut, ViewOf, Viewable,
         };
         pub use recapn::list::{self, List};
         pub use recapn::ptr::{
@@ -50,6 +50,10 @@ pub mod prelude {
                 impl _p::ty::StructView for $name {
                     type Reader<'a, T: _p::Table> = $modname::Reader<'a, T>;
                     type Builder<'a, T: _p::Table> = $modname::Builder<'a, T>;
+                }
+
+                impl _p::ty::TypeKind for $name {
+                    type Kind = _p::ty::kind::Struct<Self>;
                 }
 
                 impl _p::ty::Struct for $name {
@@ -111,7 +115,11 @@ pub mod prelude {
                     type Builder<'a, T: _p::rpc::Table> = $modname::Builder<'a, T>;
                 }
 
-                impl _p::FieldGroup for $name {
+                impl _p::ty::TypeKind for $name {
+                    type Kind = _p::ty::kind::Group<Self>;
+                }
+
+                impl _p::Group for $name {
                     unsafe fn clear<'a, 'b, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
                         std::unimplemented!()
                     }

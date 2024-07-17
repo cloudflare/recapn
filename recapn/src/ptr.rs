@@ -25,7 +25,9 @@ pub use crate::data::ptr::{Reader as DataReader, Builder as DataBuilder};
 pub use crate::text::ptr::{Reader as TextReader, Builder as TextBuilder};
 
 /// A field type that can be found in the data section of a struct.
-pub trait Data: ty::Value<Default = Self> + ty::ListValue + Default + Copy + Sealed + 'static {
+pub trait Data: ty::TypeKind<Kind = ty::kind::Data<Self>> + Default + Copy + Sealed + 'static {
+    const ELEMENT_SIZE: ElementSize;
+
     unsafe fn read(ptr: *const u8, len: u32, slot: usize, default: Self) -> Self;
     unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self;
 
@@ -33,7 +35,14 @@ pub trait Data: ty::Value<Default = Self> + ty::ListValue + Default + Copy + Sea
     unsafe fn write_unchecked(ptr: *mut u8, slot: usize, value: Self, default: Self);
 }
 
+impl Sealed for bool {}
+impl ty::TypeKind for bool {
+    type Kind = ty::kind::Data<Self>;
+}
+
 impl Data for bool {
+    const ELEMENT_SIZE: ElementSize = ElementSize::Bit;
+
     #[inline]
     unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
         let byte_offset = slot / 8;
@@ -68,8 +77,15 @@ impl Data for bool {
 }
 
 macro_rules! impl_int {
-    ($ty:ty) => {
+    ($ty:ty, $size:ident) => {
+        impl Sealed for $ty {}
+        impl ty::TypeKind for $ty {
+            type Kind = ty::kind::Data<Self>;
+        }
+
         impl Data for $ty {
+            const ELEMENT_SIZE: ElementSize = ElementSize::$size;
+
             #[inline]
             unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
                 let slot_byte_offset = slot * core::mem::size_of::<Self>();
@@ -109,16 +125,23 @@ macro_rules! impl_int {
     };
 }
 
-impl_int!(u8);
-impl_int!(i8);
-impl_int!(u16);
-impl_int!(i16);
-impl_int!(u32);
-impl_int!(i32);
-impl_int!(u64);
-impl_int!(i64);
+impl_int!(u8, Byte);
+impl_int!(i8, Byte);
+impl_int!(u16, TwoBytes);
+impl_int!(i16, TwoBytes);
+impl_int!(u32, FourBytes);
+impl_int!(i32, FourBytes);
+impl_int!(u64, EightBytes);
+impl_int!(i64, EightBytes);
+
+impl Sealed for f32 {}
+impl ty::TypeKind for f32 {
+    type Kind = ty::kind::Data<Self>;
+}
 
 impl Data for f32 {
+    const ELEMENT_SIZE: ElementSize = ElementSize::FourBytes;
+
     #[inline]
     unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
         Self::from_bits(u32::read(ptr, len_bytes, slot, default.to_bits()))
@@ -138,7 +161,14 @@ impl Data for f32 {
     }
 }
 
+impl Sealed for f64 {}
+impl ty::TypeKind for f64 {
+    type Kind = ty::kind::Data<Self>;
+}
+
 impl Data for f64 {
+    const ELEMENT_SIZE: ElementSize = ElementSize::EightBytes;
+
     #[inline]
     unsafe fn read(ptr: *const u8, len_bytes: u32, slot: usize, default: Self) -> Self {
         Self::from_bits(u64::read(ptr, len_bytes, slot, default.to_bits()))
@@ -3952,6 +3982,16 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         })
     }
 
+    #[inline]
+    pub fn into_empty_list(self, size: ElementSize) -> ListBuilder<'a, T> {
+        ListBuilder::empty(
+            self.builder,
+            self.ptr,
+            self.table,
+            size,
+        )
+    }
+
     /// Gets a list builder for this pointer, or an empty list builder if the value is null or
     /// invalid.
     #[inline]
@@ -3961,12 +4001,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     ) -> ListBuilder<'a, T> {
         match self.to_list_mut(expected_element_size) {
             Ok(builder) => builder,
-            Err((_, this)) => ListBuilder::empty(
-                this.builder,
-                this.ptr,
-                this.table.clone(),
-                expected_element_size.unwrap_or(ElementSize::Void).into(),
-            ),
+            Err((_, this)) => this.into_empty_list(expected_element_size.unwrap_or(ElementSize::Void)),
         }
     }
 

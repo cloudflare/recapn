@@ -2,12 +2,13 @@ use core::marker::PhantomData;
 
 use crate::any::AnyStruct;
 use crate::data::Data;
-use crate::field::{Struct, Capability};
 use crate::list::List;
 use crate::ptr::{ElementCount, ElementSize, ObjectBuilder, OrphanBuilder, StructSize};
 use crate::rpc::{self, Capable, Table};
 use crate::text::{self, Text};
-use crate::{ty, Result};
+use crate::ty;
+use crate::ty::kind::{Struct, Capability};
+use crate::Result;
 
 pub struct Orphanage<'b, T: Table = rpc::Empty> {
     builder: ObjectBuilder<'b>,

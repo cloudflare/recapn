@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     let mut stdin = std::io::stdin().lock();
     let message = io::read_from_stream(&mut stdin, StreamOptions::default())?;
     let reader = Reader::new(&message, ReaderOptions::default());
-    let request = reader.root().read_as_struct::<CodeGeneratorRequest>();
+    let request = reader.read_as::<CodeGeneratorRequest>();
 
     let context = GeneratorContext::new(&request)?;
 

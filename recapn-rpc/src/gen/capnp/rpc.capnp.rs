@@ -89,6 +89,9 @@ impl _p::StructView for Message {
     type Reader<'a, T: _p::rpc::Table> = message::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = message::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Message {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Message {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -96,88 +99,76 @@ impl _p::ty::Struct for Message {
     };
 }
 impl Message {
-    const UNIMPLEMENTED: _p::VariantDescriptor<_p::Struct<Message>> = _p::VariantDescriptor::<
-        _p::Struct<Message>,
+    const UNIMPLEMENTED: _p::VariantDescriptor<Message> = _p::VariantDescriptor::<
+        Message,
     > {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 0u16,
         },
-        field: _p::Descriptor::<_p::Struct<Message>> {
+        field: _p::Descriptor::<Message> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const ABORT: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
-        _p::Struct<Exception>,
-    > {
+    const ABORT: _p::VariantDescriptor<Exception> = _p::VariantDescriptor::<Exception> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 1u16,
         },
-        field: _p::Descriptor::<_p::Struct<Exception>> {
+        field: _p::Descriptor::<Exception> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const CALL: _p::VariantDescriptor<_p::Struct<Call>> = _p::VariantDescriptor::<
-        _p::Struct<Call>,
-    > {
+    const CALL: _p::VariantDescriptor<Call> = _p::VariantDescriptor::<Call> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 2u16,
         },
-        field: _p::Descriptor::<_p::Struct<Call>> {
+        field: _p::Descriptor::<Call> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const RETURN: _p::VariantDescriptor<_p::Struct<Return>> = _p::VariantDescriptor::<
-        _p::Struct<Return>,
-    > {
+    const RETURN: _p::VariantDescriptor<Return> = _p::VariantDescriptor::<Return> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 3u16,
         },
-        field: _p::Descriptor::<_p::Struct<Return>> {
+        field: _p::Descriptor::<Return> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const FINISH: _p::VariantDescriptor<_p::Struct<Finish>> = _p::VariantDescriptor::<
-        _p::Struct<Finish>,
-    > {
+    const FINISH: _p::VariantDescriptor<Finish> = _p::VariantDescriptor::<Finish> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 4u16,
         },
-        field: _p::Descriptor::<_p::Struct<Finish>> {
+        field: _p::Descriptor::<Finish> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const RESOLVE: _p::VariantDescriptor<_p::Struct<Resolve>> = _p::VariantDescriptor::<
-        _p::Struct<Resolve>,
-    > {
+    const RESOLVE: _p::VariantDescriptor<Resolve> = _p::VariantDescriptor::<Resolve> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 5u16,
         },
-        field: _p::Descriptor::<_p::Struct<Resolve>> {
+        field: _p::Descriptor::<Resolve> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const RELEASE: _p::VariantDescriptor<_p::Struct<Release>> = _p::VariantDescriptor::<
-        _p::Struct<Release>,
-    > {
+    const RELEASE: _p::VariantDescriptor<Release> = _p::VariantDescriptor::<Release> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 6u16,
         },
-        field: _p::Descriptor::<_p::Struct<Release>> {
+        field: _p::Descriptor::<Release> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
     const OBSOLETE_SAVE: _p::VariantDescriptor<_p::AnyPtr> = _p::VariantDescriptor::<
@@ -189,19 +180,19 @@ impl Message {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: _p::ptr::PtrReader::null(),
+            default: None,
         },
     };
-    const BOOTSTRAP: _p::VariantDescriptor<_p::Struct<Bootstrap>> = _p::VariantDescriptor::<
-        _p::Struct<Bootstrap>,
+    const BOOTSTRAP: _p::VariantDescriptor<Bootstrap> = _p::VariantDescriptor::<
+        Bootstrap,
     > {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 8u16,
         },
-        field: _p::Descriptor::<_p::Struct<Bootstrap>> {
+        field: _p::Descriptor::<Bootstrap> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
     const OBSOLETE_DELETE: _p::VariantDescriptor<_p::AnyPtr> = _p::VariantDescriptor::<
@@ -213,112 +204,82 @@ impl Message {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: _p::ptr::PtrReader::null(),
+            default: None,
         },
     };
-    const PROVIDE: _p::VariantDescriptor<_p::Struct<Provide>> = _p::VariantDescriptor::<
-        _p::Struct<Provide>,
-    > {
+    const PROVIDE: _p::VariantDescriptor<Provide> = _p::VariantDescriptor::<Provide> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 10u16,
         },
-        field: _p::Descriptor::<_p::Struct<Provide>> {
+        field: _p::Descriptor::<Provide> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const ACCEPT: _p::VariantDescriptor<_p::Struct<Accept>> = _p::VariantDescriptor::<
-        _p::Struct<Accept>,
-    > {
+    const ACCEPT: _p::VariantDescriptor<Accept> = _p::VariantDescriptor::<Accept> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 11u16,
         },
-        field: _p::Descriptor::<_p::Struct<Accept>> {
+        field: _p::Descriptor::<Accept> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const JOIN: _p::VariantDescriptor<_p::Struct<Join>> = _p::VariantDescriptor::<
-        _p::Struct<Join>,
-    > {
+    const JOIN: _p::VariantDescriptor<Join> = _p::VariantDescriptor::<Join> {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 12u16,
         },
-        field: _p::Descriptor::<_p::Struct<Join>> {
+        field: _p::Descriptor::<Join> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const DISEMBARGO: _p::VariantDescriptor<_p::Struct<Disembargo>> = _p::VariantDescriptor::<
-        _p::Struct<Disembargo>,
+    const DISEMBARGO: _p::VariantDescriptor<Disembargo> = _p::VariantDescriptor::<
+        Disembargo,
     > {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 13u16,
         },
-        field: _p::Descriptor::<_p::Struct<Disembargo>> {
+        field: _p::Descriptor::<Disembargo> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
     #[inline]
-    pub fn unimplemented(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Message>> {
+    pub fn unimplemented(&self) -> _p::Variant<'_, 'p, T, Message> {
         unsafe {
-            <_p::Struct<
-                Message,
-            > as _p::field::FieldType>::variant(&self.0, &Message::UNIMPLEMENTED)
+            <Message as _p::field::FieldType>::variant(&self.0, &Message::UNIMPLEMENTED)
         }
     }
     #[inline]
-    pub fn abort(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
-        unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&self.0, &Message::ABORT)
-        }
+    pub fn abort(&self) -> _p::Variant<'_, 'p, T, Exception> {
+        unsafe { <Exception as _p::field::FieldType>::variant(&self.0, &Message::ABORT) }
     }
     #[inline]
-    pub fn call(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Call>> {
-        unsafe {
-            <_p::Struct<Call> as _p::field::FieldType>::variant(&self.0, &Message::CALL)
-        }
+    pub fn call(&self) -> _p::Variant<'_, 'p, T, Call> {
+        unsafe { <Call as _p::field::FieldType>::variant(&self.0, &Message::CALL) }
     }
     #[inline]
-    pub fn r#return(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Return>> {
-        unsafe {
-            <_p::Struct<
-                Return,
-            > as _p::field::FieldType>::variant(&self.0, &Message::RETURN)
-        }
+    pub fn r#return(&self) -> _p::Variant<'_, 'p, T, Return> {
+        unsafe { <Return as _p::field::FieldType>::variant(&self.0, &Message::RETURN) }
     }
     #[inline]
-    pub fn finish(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Finish>> {
-        unsafe {
-            <_p::Struct<
-                Finish,
-            > as _p::field::FieldType>::variant(&self.0, &Message::FINISH)
-        }
+    pub fn finish(&self) -> _p::Variant<'_, 'p, T, Finish> {
+        unsafe { <Finish as _p::field::FieldType>::variant(&self.0, &Message::FINISH) }
     }
     #[inline]
-    pub fn resolve(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Resolve>> {
-        unsafe {
-            <_p::Struct<
-                Resolve,
-            > as _p::field::FieldType>::variant(&self.0, &Message::RESOLVE)
-        }
+    pub fn resolve(&self) -> _p::Variant<'_, 'p, T, Resolve> {
+        unsafe { <Resolve as _p::field::FieldType>::variant(&self.0, &Message::RESOLVE) }
     }
     #[inline]
-    pub fn release(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Release>> {
-        unsafe {
-            <_p::Struct<
-                Release,
-            > as _p::field::FieldType>::variant(&self.0, &Message::RELEASE)
-        }
+    pub fn release(&self) -> _p::Variant<'_, 'p, T, Release> {
+        unsafe { <Release as _p::field::FieldType>::variant(&self.0, &Message::RELEASE) }
     }
     #[inline]
     pub fn obsolete_save(&self) -> _p::Variant<'_, 'p, T, _p::AnyPtr> {
@@ -330,11 +291,9 @@ impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn bootstrap(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Bootstrap>> {
+    pub fn bootstrap(&self) -> _p::Variant<'_, 'p, T, Bootstrap> {
         unsafe {
-            <_p::Struct<
-                Bootstrap,
-            > as _p::field::FieldType>::variant(&self.0, &Message::BOOTSTRAP)
+            <Bootstrap as _p::field::FieldType>::variant(&self.0, &Message::BOOTSTRAP)
         }
     }
     #[inline]
@@ -347,33 +306,21 @@ impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn provide(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Provide>> {
-        unsafe {
-            <_p::Struct<
-                Provide,
-            > as _p::field::FieldType>::variant(&self.0, &Message::PROVIDE)
-        }
+    pub fn provide(&self) -> _p::Variant<'_, 'p, T, Provide> {
+        unsafe { <Provide as _p::field::FieldType>::variant(&self.0, &Message::PROVIDE) }
     }
     #[inline]
-    pub fn accept(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Accept>> {
-        unsafe {
-            <_p::Struct<
-                Accept,
-            > as _p::field::FieldType>::variant(&self.0, &Message::ACCEPT)
-        }
+    pub fn accept(&self) -> _p::Variant<'_, 'p, T, Accept> {
+        unsafe { <Accept as _p::field::FieldType>::variant(&self.0, &Message::ACCEPT) }
     }
     #[inline]
-    pub fn join(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Join>> {
-        unsafe {
-            <_p::Struct<Join> as _p::field::FieldType>::variant(&self.0, &Message::JOIN)
-        }
+    pub fn join(&self) -> _p::Variant<'_, 'p, T, Join> {
+        unsafe { <Join as _p::field::FieldType>::variant(&self.0, &Message::JOIN) }
     }
     #[inline]
-    pub fn disembargo(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Disembargo>> {
+    pub fn disembargo(&self) -> _p::Variant<'_, 'p, T, Disembargo> {
         unsafe {
-            <_p::Struct<
-                Disembargo,
-            > as _p::field::FieldType>::variant(&self.0, &Message::DISEMBARGO)
+            <Disembargo as _p::field::FieldType>::variant(&self.0, &Message::DISEMBARGO)
         }
     }
     #[inline]
@@ -383,59 +330,46 @@ impl<'p, T: _p::rpc::Table + 'p> message::Reader<'p, T> {
 }
 impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
     #[inline]
-    pub fn unimplemented(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Message>> {
+    pub fn unimplemented(&mut self) -> _p::VariantMut<'_, 'p, T, Message> {
         unsafe {
-            <_p::Struct<
-                Message,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::UNIMPLEMENTED)
+            <Message as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Message::UNIMPLEMENTED,
+            )
         }
     }
     #[inline]
-    pub fn abort(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
+    pub fn abort(&mut self) -> _p::VariantMut<'_, 'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::ABORT)
+            <Exception as _p::field::FieldType>::variant(&mut self.0, &Message::ABORT)
         }
     }
     #[inline]
-    pub fn call(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Call>> {
+    pub fn call(&mut self) -> _p::VariantMut<'_, 'p, T, Call> {
+        unsafe { <Call as _p::field::FieldType>::variant(&mut self.0, &Message::CALL) }
+    }
+    #[inline]
+    pub fn r#return(&mut self) -> _p::VariantMut<'_, 'p, T, Return> {
         unsafe {
-            <_p::Struct<
-                Call,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::CALL)
+            <Return as _p::field::FieldType>::variant(&mut self.0, &Message::RETURN)
         }
     }
     #[inline]
-    pub fn r#return(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Return>> {
+    pub fn finish(&mut self) -> _p::VariantMut<'_, 'p, T, Finish> {
         unsafe {
-            <_p::Struct<
-                Return,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::RETURN)
+            <Finish as _p::field::FieldType>::variant(&mut self.0, &Message::FINISH)
         }
     }
     #[inline]
-    pub fn finish(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Finish>> {
+    pub fn resolve(&mut self) -> _p::VariantMut<'_, 'p, T, Resolve> {
         unsafe {
-            <_p::Struct<
-                Finish,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::FINISH)
+            <Resolve as _p::field::FieldType>::variant(&mut self.0, &Message::RESOLVE)
         }
     }
     #[inline]
-    pub fn resolve(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Resolve>> {
+    pub fn release(&mut self) -> _p::VariantMut<'_, 'p, T, Release> {
         unsafe {
-            <_p::Struct<
-                Resolve,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::RESOLVE)
-        }
-    }
-    #[inline]
-    pub fn release(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Release>> {
-        unsafe {
-            <_p::Struct<
-                Release,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::RELEASE)
+            <Release as _p::field::FieldType>::variant(&mut self.0, &Message::RELEASE)
         }
     }
     #[inline]
@@ -448,11 +382,12 @@ impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn bootstrap(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Bootstrap>> {
+    pub fn bootstrap(&mut self) -> _p::VariantMut<'_, 'p, T, Bootstrap> {
         unsafe {
-            <_p::Struct<
-                Bootstrap,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::BOOTSTRAP)
+            <Bootstrap as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Message::BOOTSTRAP,
+            )
         }
     }
     #[inline]
@@ -465,90 +400,59 @@ impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn provide(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Provide>> {
+    pub fn provide(&mut self) -> _p::VariantMut<'_, 'p, T, Provide> {
         unsafe {
-            <_p::Struct<
-                Provide,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::PROVIDE)
+            <Provide as _p::field::FieldType>::variant(&mut self.0, &Message::PROVIDE)
         }
     }
     #[inline]
-    pub fn accept(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Accept>> {
+    pub fn accept(&mut self) -> _p::VariantMut<'_, 'p, T, Accept> {
         unsafe {
-            <_p::Struct<
-                Accept,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::ACCEPT)
+            <Accept as _p::field::FieldType>::variant(&mut self.0, &Message::ACCEPT)
         }
     }
     #[inline]
-    pub fn join(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Join>> {
+    pub fn join(&mut self) -> _p::VariantMut<'_, 'p, T, Join> {
+        unsafe { <Join as _p::field::FieldType>::variant(&mut self.0, &Message::JOIN) }
+    }
+    #[inline]
+    pub fn disembargo(&mut self) -> _p::VariantMut<'_, 'p, T, Disembargo> {
         unsafe {
-            <_p::Struct<
-                Join,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::JOIN)
+            <Disembargo as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Message::DISEMBARGO,
+            )
         }
     }
     #[inline]
-    pub fn disembargo(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Disembargo>> {
+    pub fn into_unimplemented(self) -> _p::VariantOwned<'p, T, Message> {
         unsafe {
-            <_p::Struct<
-                Disembargo,
-            > as _p::field::FieldType>::variant(&mut self.0, &Message::DISEMBARGO)
+            <Message as _p::field::FieldType>::variant(self.0, &Message::UNIMPLEMENTED)
         }
     }
     #[inline]
-    pub fn into_unimplemented(self) -> _p::VariantOwned<'p, T, _p::Struct<Message>> {
-        unsafe {
-            <_p::Struct<
-                Message,
-            > as _p::field::FieldType>::variant(self.0, &Message::UNIMPLEMENTED)
-        }
+    pub fn into_abort(self) -> _p::VariantOwned<'p, T, Exception> {
+        unsafe { <Exception as _p::field::FieldType>::variant(self.0, &Message::ABORT) }
     }
     #[inline]
-    pub fn into_abort(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
-        unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(self.0, &Message::ABORT)
-        }
+    pub fn into_call(self) -> _p::VariantOwned<'p, T, Call> {
+        unsafe { <Call as _p::field::FieldType>::variant(self.0, &Message::CALL) }
     }
     #[inline]
-    pub fn into_call(self) -> _p::VariantOwned<'p, T, _p::Struct<Call>> {
-        unsafe {
-            <_p::Struct<Call> as _p::field::FieldType>::variant(self.0, &Message::CALL)
-        }
+    pub fn into_return(self) -> _p::VariantOwned<'p, T, Return> {
+        unsafe { <Return as _p::field::FieldType>::variant(self.0, &Message::RETURN) }
     }
     #[inline]
-    pub fn into_return(self) -> _p::VariantOwned<'p, T, _p::Struct<Return>> {
-        unsafe {
-            <_p::Struct<
-                Return,
-            > as _p::field::FieldType>::variant(self.0, &Message::RETURN)
-        }
+    pub fn into_finish(self) -> _p::VariantOwned<'p, T, Finish> {
+        unsafe { <Finish as _p::field::FieldType>::variant(self.0, &Message::FINISH) }
     }
     #[inline]
-    pub fn into_finish(self) -> _p::VariantOwned<'p, T, _p::Struct<Finish>> {
-        unsafe {
-            <_p::Struct<
-                Finish,
-            > as _p::field::FieldType>::variant(self.0, &Message::FINISH)
-        }
+    pub fn into_resolve(self) -> _p::VariantOwned<'p, T, Resolve> {
+        unsafe { <Resolve as _p::field::FieldType>::variant(self.0, &Message::RESOLVE) }
     }
     #[inline]
-    pub fn into_resolve(self) -> _p::VariantOwned<'p, T, _p::Struct<Resolve>> {
-        unsafe {
-            <_p::Struct<
-                Resolve,
-            > as _p::field::FieldType>::variant(self.0, &Message::RESOLVE)
-        }
-    }
-    #[inline]
-    pub fn into_release(self) -> _p::VariantOwned<'p, T, _p::Struct<Release>> {
-        unsafe {
-            <_p::Struct<
-                Release,
-            > as _p::field::FieldType>::variant(self.0, &Message::RELEASE)
-        }
+    pub fn into_release(self) -> _p::VariantOwned<'p, T, Release> {
+        unsafe { <Release as _p::field::FieldType>::variant(self.0, &Message::RELEASE) }
     }
     #[inline]
     pub fn into_obsolete_save(self) -> _p::VariantOwned<'p, T, _p::AnyPtr> {
@@ -560,11 +464,9 @@ impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_bootstrap(self) -> _p::VariantOwned<'p, T, _p::Struct<Bootstrap>> {
+    pub fn into_bootstrap(self) -> _p::VariantOwned<'p, T, Bootstrap> {
         unsafe {
-            <_p::Struct<
-                Bootstrap,
-            > as _p::field::FieldType>::variant(self.0, &Message::BOOTSTRAP)
+            <Bootstrap as _p::field::FieldType>::variant(self.0, &Message::BOOTSTRAP)
         }
     }
     #[inline]
@@ -577,33 +479,21 @@ impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_provide(self) -> _p::VariantOwned<'p, T, _p::Struct<Provide>> {
-        unsafe {
-            <_p::Struct<
-                Provide,
-            > as _p::field::FieldType>::variant(self.0, &Message::PROVIDE)
-        }
+    pub fn into_provide(self) -> _p::VariantOwned<'p, T, Provide> {
+        unsafe { <Provide as _p::field::FieldType>::variant(self.0, &Message::PROVIDE) }
     }
     #[inline]
-    pub fn into_accept(self) -> _p::VariantOwned<'p, T, _p::Struct<Accept>> {
-        unsafe {
-            <_p::Struct<
-                Accept,
-            > as _p::field::FieldType>::variant(self.0, &Message::ACCEPT)
-        }
+    pub fn into_accept(self) -> _p::VariantOwned<'p, T, Accept> {
+        unsafe { <Accept as _p::field::FieldType>::variant(self.0, &Message::ACCEPT) }
     }
     #[inline]
-    pub fn into_join(self) -> _p::VariantOwned<'p, T, _p::Struct<Join>> {
-        unsafe {
-            <_p::Struct<Join> as _p::field::FieldType>::variant(self.0, &Message::JOIN)
-        }
+    pub fn into_join(self) -> _p::VariantOwned<'p, T, Join> {
+        unsafe { <Join as _p::field::FieldType>::variant(self.0, &Message::JOIN) }
     }
     #[inline]
-    pub fn into_disembargo(self) -> _p::VariantOwned<'p, T, _p::Struct<Disembargo>> {
+    pub fn into_disembargo(self) -> _p::VariantOwned<'p, T, Disembargo> {
         unsafe {
-            <_p::Struct<
-                Disembargo,
-            > as _p::field::FieldType>::variant(self.0, &Message::DISEMBARGO)
+            <Disembargo as _p::field::FieldType>::variant(self.0, &Message::DISEMBARGO)
         }
     }
     #[inline]
@@ -616,20 +506,20 @@ pub mod message {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Message<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Message<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Unimplemented(_p::ViewOf<T, _p::Struct<super::Message>>),
-        Abort(_p::ViewOf<T, _p::Struct<super::Exception>>),
-        Call(_p::ViewOf<T, _p::Struct<super::Call>>),
-        Return(_p::ViewOf<T, _p::Struct<super::Return>>),
-        Finish(_p::ViewOf<T, _p::Struct<super::Finish>>),
-        Resolve(_p::ViewOf<T, _p::Struct<super::Resolve>>),
-        Release(_p::ViewOf<T, _p::Struct<super::Release>>),
+        Unimplemented(_p::ViewOf<T, super::Message>),
+        Abort(_p::ViewOf<T, super::Exception>),
+        Call(_p::ViewOf<T, super::Call>),
+        Return(_p::ViewOf<T, super::Return>),
+        Finish(_p::ViewOf<T, super::Finish>),
+        Resolve(_p::ViewOf<T, super::Resolve>),
+        Release(_p::ViewOf<T, super::Release>),
         ObsoleteSave(_p::ViewOf<T, _p::AnyPtr>),
-        Bootstrap(_p::ViewOf<T, _p::Struct<super::Bootstrap>>),
+        Bootstrap(_p::ViewOf<T, super::Bootstrap>),
         ObsoleteDelete(_p::ViewOf<T, _p::AnyPtr>),
-        Provide(_p::ViewOf<T, _p::Struct<super::Provide>>),
-        Accept(_p::ViewOf<T, _p::Struct<super::Accept>>),
-        Join(_p::ViewOf<T, _p::Struct<super::Join>>),
-        Disembargo(_p::ViewOf<T, _p::Struct<super::Disembargo>>),
+        Provide(_p::ViewOf<T, super::Provide>),
+        Accept(_p::ViewOf<T, super::Accept>),
+        Join(_p::ViewOf<T, super::Join>),
+        Disembargo(_p::ViewOf<T, super::Disembargo>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -639,9 +529,7 @@ pub mod message {
                 0u16 => {
                     Ok(
                         Which::Unimplemented(
-                            <_p::Struct<
-                                super::Message,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Message as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
                             ),
@@ -651,9 +539,7 @@ pub mod message {
                 1u16 => {
                     Ok(
                         Which::Abort(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ABORT.field,
                             ),
@@ -663,9 +549,7 @@ pub mod message {
                 2u16 => {
                     Ok(
                         Which::Call(
-                            <_p::Struct<
-                                super::Call,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Call as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::CALL.field,
                             ),
@@ -675,9 +559,7 @@ pub mod message {
                 3u16 => {
                     Ok(
                         Which::Return(
-                            <_p::Struct<
-                                super::Return,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Return as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RETURN.field,
                             ),
@@ -687,9 +569,7 @@ pub mod message {
                 4u16 => {
                     Ok(
                         Which::Finish(
-                            <_p::Struct<
-                                super::Finish,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Finish as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::FINISH.field,
                             ),
@@ -699,9 +579,7 @@ pub mod message {
                 5u16 => {
                     Ok(
                         Which::Resolve(
-                            <_p::Struct<
-                                super::Resolve,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Resolve as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RESOLVE.field,
                             ),
@@ -711,9 +589,7 @@ pub mod message {
                 6u16 => {
                     Ok(
                         Which::Release(
-                            <_p::Struct<
-                                super::Release,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Release as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RELEASE.field,
                             ),
@@ -733,9 +609,7 @@ pub mod message {
                 8u16 => {
                     Ok(
                         Which::Bootstrap(
-                            <_p::Struct<
-                                super::Bootstrap,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Bootstrap as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::BOOTSTRAP.field,
                             ),
@@ -755,9 +629,7 @@ pub mod message {
                 10u16 => {
                     Ok(
                         Which::Provide(
-                            <_p::Struct<
-                                super::Provide,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Provide as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::PROVIDE.field,
                             ),
@@ -767,9 +639,7 @@ pub mod message {
                 11u16 => {
                     Ok(
                         Which::Accept(
-                            <_p::Struct<
-                                super::Accept,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Accept as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ACCEPT.field,
                             ),
@@ -779,9 +649,7 @@ pub mod message {
                 12u16 => {
                     Ok(
                         Which::Join(
-                            <_p::Struct<
-                                super::Join,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Join as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::JOIN.field,
                             ),
@@ -791,9 +659,7 @@ pub mod message {
                 13u16 => {
                     Ok(
                         Which::Disembargo(
-                            <_p::Struct<
-                                super::Disembargo,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Disembargo as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::DISEMBARGO.field,
                             ),
@@ -815,9 +681,7 @@ pub mod message {
                 0u16 => {
                     Ok(
                         Which::Unimplemented(
-                            <_p::Struct<
-                                super::Message,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Message as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
                             ),
@@ -827,9 +691,7 @@ pub mod message {
                 1u16 => {
                     Ok(
                         Which::Abort(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ABORT.field,
                             ),
@@ -839,9 +701,7 @@ pub mod message {
                 2u16 => {
                     Ok(
                         Which::Call(
-                            <_p::Struct<
-                                super::Call,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Call as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::CALL.field,
                             ),
@@ -851,9 +711,7 @@ pub mod message {
                 3u16 => {
                     Ok(
                         Which::Return(
-                            <_p::Struct<
-                                super::Return,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Return as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RETURN.field,
                             ),
@@ -863,9 +721,7 @@ pub mod message {
                 4u16 => {
                     Ok(
                         Which::Finish(
-                            <_p::Struct<
-                                super::Finish,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Finish as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::FINISH.field,
                             ),
@@ -875,9 +731,7 @@ pub mod message {
                 5u16 => {
                     Ok(
                         Which::Resolve(
-                            <_p::Struct<
-                                super::Resolve,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Resolve as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RESOLVE.field,
                             ),
@@ -887,9 +741,7 @@ pub mod message {
                 6u16 => {
                     Ok(
                         Which::Release(
-                            <_p::Struct<
-                                super::Release,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Release as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RELEASE.field,
                             ),
@@ -909,9 +761,7 @@ pub mod message {
                 8u16 => {
                     Ok(
                         Which::Bootstrap(
-                            <_p::Struct<
-                                super::Bootstrap,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Bootstrap as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::BOOTSTRAP.field,
                             ),
@@ -931,9 +781,7 @@ pub mod message {
                 10u16 => {
                     Ok(
                         Which::Provide(
-                            <_p::Struct<
-                                super::Provide,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Provide as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::PROVIDE.field,
                             ),
@@ -943,9 +791,7 @@ pub mod message {
                 11u16 => {
                     Ok(
                         Which::Accept(
-                            <_p::Struct<
-                                super::Accept,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Accept as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ACCEPT.field,
                             ),
@@ -955,9 +801,7 @@ pub mod message {
                 12u16 => {
                     Ok(
                         Which::Join(
-                            <_p::Struct<
-                                super::Join,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Join as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::JOIN.field,
                             ),
@@ -967,9 +811,7 @@ pub mod message {
                 13u16 => {
                     Ok(
                         Which::Disembargo(
-                            <_p::Struct<
-                                super::Disembargo,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Disembargo as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::DISEMBARGO.field,
                             ),
@@ -1069,6 +911,9 @@ impl _p::StructView for Bootstrap {
     type Reader<'a, T: _p::rpc::Table> = bootstrap::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = bootstrap::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Bootstrap {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Bootstrap {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -1084,7 +929,7 @@ impl Bootstrap {
         _p::AnyPtr,
     > {
         slot: 0u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> bootstrap::Reader<'p, T> {
@@ -1225,6 +1070,9 @@ impl _p::StructView for Call {
     type Reader<'a, T: _p::rpc::Table> = call::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = call::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Call {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Call {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 3u16,
@@ -1236,11 +1084,9 @@ impl Call {
         slot: 0u32,
         default: 0u32,
     };
-    const TARGET: _p::Descriptor<_p::Struct<MessageTarget>> = _p::Descriptor::<
-        _p::Struct<MessageTarget>,
-    > {
+    const TARGET: _p::Descriptor<MessageTarget> = _p::Descriptor::<MessageTarget> {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
     const INTERFACE_ID: _p::Descriptor<u64> = _p::Descriptor::<u64> {
         slot: 1u32,
@@ -1250,13 +1096,11 @@ impl Call {
         slot: 2u32,
         default: 0u16,
     };
-    const PARAMS: _p::Descriptor<_p::Struct<Payload>> = _p::Descriptor::<
-        _p::Struct<Payload>,
-    > {
+    const PARAMS: _p::Descriptor<Payload> = _p::Descriptor::<Payload> {
         slot: 1u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
-    const SEND_RESULTS_TO: _p::Descriptor<_p::Group<call::SendResultsTo>> = ();
+    const SEND_RESULTS_TO: _p::Descriptor<call::SendResultsTo> = ();
     const ALLOW_THIRD_PARTY_TAIL_CALL: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 128u32,
         default: false,
@@ -1276,11 +1120,9 @@ impl<'p, T: _p::rpc::Table + 'p> call::Reader<'p, T> {
         unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Call::QUESTION_ID) }
     }
     #[inline]
-    pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&self) -> _p::Accessor<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&self.0, &Call::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(&self.0, &Call::TARGET)
         }
     }
     #[inline]
@@ -1292,21 +1134,16 @@ impl<'p, T: _p::rpc::Table + 'p> call::Reader<'p, T> {
         unsafe { <u16 as _p::field::FieldType>::accessor(&self.0, &Call::METHOD_ID) }
     }
     #[inline]
-    pub fn params(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<Payload>> {
-        unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::accessor(&self.0, &Call::PARAMS)
-        }
+    pub fn params(&self) -> _p::Accessor<'_, 'p, T, Payload> {
+        unsafe { <Payload as _p::field::FieldType>::accessor(&self.0, &Call::PARAMS) }
     }
     #[inline]
-    pub fn send_results_to(
-        &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::Group<call::SendResultsTo>> {
+    pub fn send_results_to(&self) -> _p::Accessor<'_, 'p, T, call::SendResultsTo> {
         unsafe {
-            <_p::Group<
-                call::SendResultsTo,
-            > as _p::field::FieldType>::accessor(&self.0, &Call::SEND_RESULTS_TO)
+            <call::SendResultsTo as _p::field::FieldType>::accessor(
+                &self.0,
+                &Call::SEND_RESULTS_TO,
+            )
         }
     }
     #[inline]
@@ -1345,11 +1182,9 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Call::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(&mut self.0, &Call::TARGET)
         }
     }
     #[inline]
@@ -1363,21 +1198,20 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
         unsafe { <u16 as _p::field::FieldType>::accessor(&mut self.0, &Call::METHOD_ID) }
     }
     #[inline]
-    pub fn params(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<Payload>> {
+    pub fn params(&mut self) -> _p::AccessorMut<'_, 'p, T, Payload> {
         unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Call::PARAMS)
+            <Payload as _p::field::FieldType>::accessor(&mut self.0, &Call::PARAMS)
         }
     }
     #[inline]
     pub fn send_results_to(
         &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<call::SendResultsTo>> {
+    ) -> _p::AccessorMut<'_, 'p, T, call::SendResultsTo> {
         unsafe {
-            <_p::Group<
-                call::SendResultsTo,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Call::SEND_RESULTS_TO)
+            <call::SendResultsTo as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Call::SEND_RESULTS_TO,
+            )
         }
     }
     #[inline]
@@ -1408,29 +1242,22 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(self.0, &Call::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(self.0, &Call::TARGET)
         }
     }
     #[inline]
-    pub fn into_params(self) -> _p::AccessorOwned<'p, T, _p::Struct<Payload>> {
-        unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::accessor(self.0, &Call::PARAMS)
-        }
+    pub fn into_params(self) -> _p::AccessorOwned<'p, T, Payload> {
+        unsafe { <Payload as _p::field::FieldType>::accessor(self.0, &Call::PARAMS) }
     }
     #[inline]
-    pub fn into_send_results_to(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::Group<call::SendResultsTo>> {
+    pub fn into_send_results_to(self) -> _p::AccessorOwned<'p, T, call::SendResultsTo> {
         unsafe {
-            <_p::Group<
-                call::SendResultsTo,
-            > as _p::field::FieldType>::accessor(self.0, &Call::SEND_RESULTS_TO)
+            <call::SendResultsTo as _p::field::FieldType>::accessor(
+                self.0,
+                &Call::SEND_RESULTS_TO,
+            )
         }
     }
 }
@@ -1530,7 +1357,10 @@ pub mod call {
         type Reader<'a, T: _p::rpc::Table> = send_results_to::Reader<'a, T>;
         type Builder<'a, T: _p::rpc::Table> = send_results_to::Builder<'a, T>;
     }
-    impl _p::FieldGroup for SendResultsTo {
+    impl _p::ty::TypeKind for SendResultsTo {
+        type Kind = _p::ty::kind::Group<Self>;
+    }
+    impl _p::Group for SendResultsTo {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
             s.set_field_unchecked(3usize, 0);
             <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
@@ -1560,7 +1390,7 @@ pub mod call {
             },
             field: _p::Descriptor::<_p::AnyPtr> {
                 slot: 2u32,
-                default: _p::ptr::PtrReader::null(),
+                default: None,
             },
         };
     }
@@ -1822,6 +1652,9 @@ impl _p::StructView for Return {
     type Reader<'a, T: _p::rpc::Table> = r#return::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = r#return::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Return {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Return {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 2u16,
@@ -1841,28 +1674,26 @@ impl Return {
         slot: 33u32,
         default: false,
     };
-    const RESULTS: _p::VariantDescriptor<_p::Struct<Payload>> = _p::VariantDescriptor::<
-        _p::Struct<Payload>,
-    > {
+    const RESULTS: _p::VariantDescriptor<Payload> = _p::VariantDescriptor::<Payload> {
         variant: _p::VariantInfo {
             slot: 3u32,
             case: 0u16,
         },
-        field: _p::Descriptor::<_p::Struct<Payload>> {
+        field: _p::Descriptor::<Payload> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const EXCEPTION: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
-        _p::Struct<Exception>,
+    const EXCEPTION: _p::VariantDescriptor<Exception> = _p::VariantDescriptor::<
+        Exception,
     > {
         variant: _p::VariantInfo {
             slot: 3u32,
             case: 1u16,
         },
-        field: _p::Descriptor::<_p::Struct<Exception>> {
+        field: _p::Descriptor::<Exception> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
     const CANCELED: _p::VariantDescriptor<()> = _p::VariantDescriptor::<()> {
@@ -1902,7 +1733,7 @@ impl Return {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: _p::ptr::PtrReader::null(),
+            default: None,
         },
     };
 }
@@ -1927,19 +1758,13 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn results(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Payload>> {
-        unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::variant(&self.0, &Return::RESULTS)
-        }
+    pub fn results(&self) -> _p::Variant<'_, 'p, T, Payload> {
+        unsafe { <Payload as _p::field::FieldType>::variant(&self.0, &Return::RESULTS) }
     }
     #[inline]
-    pub fn exception(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
+    pub fn exception(&self) -> _p::Variant<'_, 'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&self.0, &Return::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(&self.0, &Return::EXCEPTION)
         }
     }
     #[inline]
@@ -2004,19 +1829,15 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn results(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Payload>> {
+    pub fn results(&mut self) -> _p::VariantMut<'_, 'p, T, Payload> {
         unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::variant(&mut self.0, &Return::RESULTS)
+            <Payload as _p::field::FieldType>::variant(&mut self.0, &Return::RESULTS)
         }
     }
     #[inline]
-    pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
+    pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&mut self.0, &Return::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(&mut self.0, &Return::EXCEPTION)
         }
     }
     #[inline]
@@ -2051,19 +1872,13 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_results(self) -> _p::VariantOwned<'p, T, _p::Struct<Payload>> {
-        unsafe {
-            <_p::Struct<
-                Payload,
-            > as _p::field::FieldType>::variant(self.0, &Return::RESULTS)
-        }
+    pub fn into_results(self) -> _p::VariantOwned<'p, T, Payload> {
+        unsafe { <Payload as _p::field::FieldType>::variant(self.0, &Return::RESULTS) }
     }
     #[inline]
-    pub fn into_exception(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
+    pub fn into_exception(self) -> _p::VariantOwned<'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(self.0, &Return::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(self.0, &Return::EXCEPTION)
         }
     }
     #[inline]
@@ -2085,8 +1900,8 @@ pub mod r#return {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Return<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Return<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Results(_p::ViewOf<T, _p::Struct<super::Payload>>),
-        Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
+        Results(_p::ViewOf<T, super::Payload>),
+        Exception(_p::ViewOf<T, super::Exception>),
         Canceled(_p::ViewOf<T, ()>),
         ResultsSentElsewhere(_p::ViewOf<T, ()>),
         TakeFromOtherQuestion(_p::ViewOf<T, u32>),
@@ -2100,9 +1915,7 @@ pub mod r#return {
                 0u16 => {
                     Ok(
                         Which::Results(
-                            <_p::Struct<
-                                super::Payload,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Payload as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::RESULTS.field,
                             ),
@@ -2112,9 +1925,7 @@ pub mod r#return {
                 1u16 => {
                     Ok(
                         Which::Exception(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::EXCEPTION.field,
                             ),
@@ -2176,9 +1987,7 @@ pub mod r#return {
                 0u16 => {
                     Ok(
                         Which::Results(
-                            <_p::Struct<
-                                super::Payload,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Payload as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::RESULTS.field,
                             ),
@@ -2188,9 +1997,7 @@ pub mod r#return {
                 1u16 => {
                     Ok(
                         Which::Exception(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::EXCEPTION.field,
                             ),
@@ -2329,6 +2136,9 @@ impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for finish::Builder<'a, T> {
 impl _p::StructView for Finish {
     type Reader<'a, T: _p::rpc::Table> = finish::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = finish::Builder<'a, T>;
+}
+impl _p::ty::TypeKind for Finish {
+    type Kind = _p::ty::kind::Struct<Self>;
 }
 impl _p::ty::Struct for Finish {
     const SIZE: _p::StructSize = _p::StructSize {
@@ -2471,6 +2281,9 @@ impl _p::StructView for Resolve {
     type Reader<'a, T: _p::rpc::Table> = resolve::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = resolve::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Resolve {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Resolve {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -2482,28 +2295,28 @@ impl Resolve {
         slot: 0u32,
         default: 0u32,
     };
-    const CAP: _p::VariantDescriptor<_p::Struct<CapDescriptor>> = _p::VariantDescriptor::<
-        _p::Struct<CapDescriptor>,
+    const CAP: _p::VariantDescriptor<CapDescriptor> = _p::VariantDescriptor::<
+        CapDescriptor,
     > {
         variant: _p::VariantInfo {
             slot: 2u32,
             case: 0u16,
         },
-        field: _p::Descriptor::<_p::Struct<CapDescriptor>> {
+        field: _p::Descriptor::<CapDescriptor> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const EXCEPTION: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
-        _p::Struct<Exception>,
+    const EXCEPTION: _p::VariantDescriptor<Exception> = _p::VariantDescriptor::<
+        Exception,
     > {
         variant: _p::VariantInfo {
             slot: 2u32,
             case: 1u16,
         },
-        field: _p::Descriptor::<_p::Struct<Exception>> {
+        field: _p::Descriptor::<Exception> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
 }
@@ -2513,19 +2326,15 @@ impl<'p, T: _p::rpc::Table + 'p> resolve::Reader<'p, T> {
         unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Resolve::PROMISE_ID) }
     }
     #[inline]
-    pub fn cap(&self) -> _p::Variant<'_, 'p, T, _p::Struct<CapDescriptor>> {
+    pub fn cap(&self) -> _p::Variant<'_, 'p, T, CapDescriptor> {
         unsafe {
-            <_p::Struct<
-                CapDescriptor,
-            > as _p::field::FieldType>::variant(&self.0, &Resolve::CAP)
+            <CapDescriptor as _p::field::FieldType>::variant(&self.0, &Resolve::CAP)
         }
     }
     #[inline]
-    pub fn exception(&self) -> _p::Variant<'_, 'p, T, _p::Struct<Exception>> {
+    pub fn exception(&self) -> _p::Variant<'_, 'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&self.0, &Resolve::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(&self.0, &Resolve::EXCEPTION)
         }
     }
     #[inline]
@@ -2541,35 +2350,30 @@ impl<'p, T: _p::rpc::Table + 'p> resolve::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn cap(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<CapDescriptor>> {
+    pub fn cap(&mut self) -> _p::VariantMut<'_, 'p, T, CapDescriptor> {
         unsafe {
-            <_p::Struct<
-                CapDescriptor,
-            > as _p::field::FieldType>::variant(&mut self.0, &Resolve::CAP)
+            <CapDescriptor as _p::field::FieldType>::variant(&mut self.0, &Resolve::CAP)
         }
     }
     #[inline]
-    pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, _p::Struct<Exception>> {
+    pub fn exception(&mut self) -> _p::VariantMut<'_, 'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(&mut self.0, &Resolve::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(
+                &mut self.0,
+                &Resolve::EXCEPTION,
+            )
         }
     }
     #[inline]
-    pub fn into_cap(self) -> _p::VariantOwned<'p, T, _p::Struct<CapDescriptor>> {
+    pub fn into_cap(self) -> _p::VariantOwned<'p, T, CapDescriptor> {
         unsafe {
-            <_p::Struct<
-                CapDescriptor,
-            > as _p::field::FieldType>::variant(self.0, &Resolve::CAP)
+            <CapDescriptor as _p::field::FieldType>::variant(self.0, &Resolve::CAP)
         }
     }
     #[inline]
-    pub fn into_exception(self) -> _p::VariantOwned<'p, T, _p::Struct<Exception>> {
+    pub fn into_exception(self) -> _p::VariantOwned<'p, T, Exception> {
         unsafe {
-            <_p::Struct<
-                Exception,
-            > as _p::field::FieldType>::variant(self.0, &Resolve::EXCEPTION)
+            <Exception as _p::field::FieldType>::variant(self.0, &Resolve::EXCEPTION)
         }
     }
     #[inline]
@@ -2582,8 +2386,8 @@ pub mod resolve {
     pub type Reader<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
-        Cap(_p::ViewOf<T, _p::Struct<super::CapDescriptor>>),
-        Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
+        Cap(_p::ViewOf<T, super::CapDescriptor>),
+        Exception(_p::ViewOf<T, super::Exception>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -2593,9 +2397,7 @@ pub mod resolve {
                 0u16 => {
                     Ok(
                         Which::Cap(
-                            <_p::Struct<
-                                super::CapDescriptor,
-                            > as _p::field::FieldType>::accessor(
+                            <super::CapDescriptor as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::CAP.field,
                             ),
@@ -2605,9 +2407,7 @@ pub mod resolve {
                 1u16 => {
                     Ok(
                         Which::Exception(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::EXCEPTION.field,
                             ),
@@ -2629,9 +2429,7 @@ pub mod resolve {
                 0u16 => {
                     Ok(
                         Which::Cap(
-                            <_p::Struct<
-                                super::CapDescriptor,
-                            > as _p::field::FieldType>::accessor(
+                            <super::CapDescriptor as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::CAP.field,
                             ),
@@ -2641,9 +2439,7 @@ pub mod resolve {
                 1u16 => {
                     Ok(
                         Which::Exception(
-                            <_p::Struct<
-                                super::Exception,
-                            > as _p::field::FieldType>::accessor(
+                            <super::Exception as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::EXCEPTION.field,
                             ),
@@ -2742,6 +2538,9 @@ impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for release::Builder<'a, T> {
 impl _p::StructView for Release {
     type Reader<'a, T: _p::rpc::Table> = release::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = release::Builder<'a, T>;
+}
+impl _p::ty::TypeKind for Release {
+    type Kind = _p::ty::kind::Struct<Self>;
 }
 impl _p::ty::Struct for Release {
     const SIZE: _p::StructSize = _p::StructSize {
@@ -2879,6 +2678,9 @@ impl _p::StructView for Disembargo {
     type Reader<'a, T: _p::rpc::Table> = disembargo::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = disembargo::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Disembargo {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Disembargo {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -2886,67 +2688,67 @@ impl _p::ty::Struct for Disembargo {
     };
 }
 impl Disembargo {
-    const TARGET: _p::Descriptor<_p::Struct<MessageTarget>> = _p::Descriptor::<
-        _p::Struct<MessageTarget>,
-    > {
+    const TARGET: _p::Descriptor<MessageTarget> = _p::Descriptor::<MessageTarget> {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
-    const CONTEXT: _p::Descriptor<_p::Group<disembargo::Context>> = ();
+    const CONTEXT: _p::Descriptor<disembargo::Context> = ();
 }
 impl<'p, T: _p::rpc::Table + 'p> disembargo::Reader<'p, T> {
     #[inline]
-    pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&self) -> _p::Accessor<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&self.0, &Disembargo::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(
+                &self.0,
+                &Disembargo::TARGET,
+            )
         }
     }
     #[inline]
-    pub fn context(&self) -> _p::Accessor<'_, 'p, T, _p::Group<disembargo::Context>> {
+    pub fn context(&self) -> _p::Accessor<'_, 'p, T, disembargo::Context> {
         unsafe {
-            <_p::Group<
-                disembargo::Context,
-            > as _p::field::FieldType>::accessor(&self.0, &Disembargo::CONTEXT)
+            <disembargo::Context as _p::field::FieldType>::accessor(
+                &self.0,
+                &Disembargo::CONTEXT,
+            )
         }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> disembargo::Builder<'p, T> {
     #[inline]
-    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Disembargo::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Disembargo::TARGET,
+            )
         }
     }
     #[inline]
-    pub fn context(
-        &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Group<disembargo::Context>> {
+    pub fn context(&mut self) -> _p::AccessorMut<'_, 'p, T, disembargo::Context> {
         unsafe {
-            <_p::Group<
-                disembargo::Context,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Disembargo::CONTEXT)
+            <disembargo::Context as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Disembargo::CONTEXT,
+            )
         }
     }
     #[inline]
-    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(self.0, &Disembargo::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(
+                self.0,
+                &Disembargo::TARGET,
+            )
         }
     }
     #[inline]
-    pub fn into_context(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::Group<disembargo::Context>> {
+    pub fn into_context(self) -> _p::AccessorOwned<'p, T, disembargo::Context> {
         unsafe {
-            <_p::Group<
-                disembargo::Context,
-            > as _p::field::FieldType>::accessor(self.0, &Disembargo::CONTEXT)
+            <disembargo::Context as _p::field::FieldType>::accessor(
+                self.0,
+                &Disembargo::CONTEXT,
+            )
         }
     }
 }
@@ -3047,7 +2849,10 @@ pub mod disembargo {
         type Reader<'a, T: _p::rpc::Table> = context::Reader<'a, T>;
         type Builder<'a, T: _p::rpc::Table> = context::Builder<'a, T>;
     }
-    impl _p::FieldGroup for Context {
+    impl _p::ty::TypeKind for Context {
+        type Kind = _p::ty::kind::Group<Self>;
+    }
+    impl _p::Group for Context {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
             s.set_field_unchecked(2usize, 0);
             <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
@@ -3372,6 +3177,9 @@ impl _p::StructView for Provide {
     type Reader<'a, T: _p::rpc::Table> = provide::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = provide::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Provide {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Provide {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -3383,15 +3191,13 @@ impl Provide {
         slot: 0u32,
         default: 0u32,
     };
-    const TARGET: _p::Descriptor<_p::Struct<MessageTarget>> = _p::Descriptor::<
-        _p::Struct<MessageTarget>,
-    > {
+    const TARGET: _p::Descriptor<MessageTarget> = _p::Descriptor::<MessageTarget> {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
     const RECIPIENT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 1u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> provide::Reader<'p, T> {
@@ -3402,11 +3208,9 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&self) -> _p::Accessor<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&self.0, &Provide::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(&self.0, &Provide::TARGET)
         }
     }
     #[inline]
@@ -3424,11 +3228,12 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Provide::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Provide::TARGET,
+            )
         }
     }
     #[inline]
@@ -3441,11 +3246,9 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(self.0, &Provide::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(self.0, &Provide::TARGET)
         }
     }
     #[inline]
@@ -3548,6 +3351,9 @@ impl _p::StructView for Accept {
     type Reader<'a, T: _p::rpc::Table> = accept::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = accept::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Accept {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Accept {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -3561,7 +3367,7 @@ impl Accept {
     };
     const PROVISION: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
     const EMBARGO: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 32u32,
@@ -3706,6 +3512,9 @@ impl _p::StructView for Join {
     type Reader<'a, T: _p::rpc::Table> = join::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = join::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Join {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Join {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -3717,15 +3526,13 @@ impl Join {
         slot: 0u32,
         default: 0u32,
     };
-    const TARGET: _p::Descriptor<_p::Struct<MessageTarget>> = _p::Descriptor::<
-        _p::Struct<MessageTarget>,
-    > {
+    const TARGET: _p::Descriptor<MessageTarget> = _p::Descriptor::<MessageTarget> {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
     const KEY_PART: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 1u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> join::Reader<'p, T> {
@@ -3734,11 +3541,9 @@ impl<'p, T: _p::rpc::Table + 'p> join::Reader<'p, T> {
         unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &Join::QUESTION_ID) }
     }
     #[inline]
-    pub fn target(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&self) -> _p::Accessor<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&self.0, &Join::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(&self.0, &Join::TARGET)
         }
     }
     #[inline]
@@ -3756,11 +3561,9 @@ impl<'p, T: _p::rpc::Table + 'p> join::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<MessageTarget>> {
+    pub fn target(&mut self) -> _p::AccessorMut<'_, 'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Join::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(&mut self.0, &Join::TARGET)
         }
     }
     #[inline]
@@ -3770,11 +3573,9 @@ impl<'p, T: _p::rpc::Table + 'p> join::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_target(self) -> _p::AccessorOwned<'p, T, _p::Struct<MessageTarget>> {
+    pub fn into_target(self) -> _p::AccessorOwned<'p, T, MessageTarget> {
         unsafe {
-            <_p::Struct<
-                MessageTarget,
-            > as _p::field::FieldType>::accessor(self.0, &Join::TARGET)
+            <MessageTarget as _p::field::FieldType>::accessor(self.0, &Join::TARGET)
         }
     }
     #[inline]
@@ -3877,6 +3678,9 @@ impl _p::StructView for MessageTarget {
     type Reader<'a, T: _p::rpc::Table> = message_target::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = message_target::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for MessageTarget {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for MessageTarget {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -3894,16 +3698,16 @@ impl MessageTarget {
             default: 0u32,
         },
     };
-    const PROMISED_ANSWER: _p::VariantDescriptor<_p::Struct<PromisedAnswer>> = _p::VariantDescriptor::<
-        _p::Struct<PromisedAnswer>,
+    const PROMISED_ANSWER: _p::VariantDescriptor<PromisedAnswer> = _p::VariantDescriptor::<
+        PromisedAnswer,
     > {
         variant: _p::VariantInfo {
             slot: 2u32,
             case: 1u16,
         },
-        field: _p::Descriptor::<_p::Struct<PromisedAnswer>> {
+        field: _p::Descriptor::<PromisedAnswer> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
 }
@@ -3915,11 +3719,12 @@ impl<'p, T: _p::rpc::Table + 'p> message_target::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn promised_answer(&self) -> _p::Variant<'_, 'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn promised_answer(&self) -> _p::Variant<'_, 'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(&self.0, &MessageTarget::PROMISED_ANSWER)
+            <PromisedAnswer as _p::field::FieldType>::variant(
+                &self.0,
+                &MessageTarget::PROMISED_ANSWER,
+            )
         }
     }
     #[inline]
@@ -3938,26 +3743,21 @@ impl<'p, T: _p::rpc::Table + 'p> message_target::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn promised_answer(
-        &mut self,
-    ) -> _p::VariantMut<'_, 'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn promised_answer(&mut self) -> _p::VariantMut<'_, 'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(
+            <PromisedAnswer as _p::field::FieldType>::variant(
                 &mut self.0,
                 &MessageTarget::PROMISED_ANSWER,
             )
         }
     }
     #[inline]
-    pub fn into_promised_answer(
-        self,
-    ) -> _p::VariantOwned<'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn into_promised_answer(self) -> _p::VariantOwned<'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(self.0, &MessageTarget::PROMISED_ANSWER)
+            <PromisedAnswer as _p::field::FieldType>::variant(
+                self.0,
+                &MessageTarget::PROMISED_ANSWER,
+            )
         }
     }
     #[inline]
@@ -3977,7 +3777,7 @@ pub mod message_target {
     >;
     pub enum Which<T: _p::Viewable = _p::Family> {
         ImportedCap(_p::ViewOf<T, u32>),
-        PromisedAnswer(_p::ViewOf<T, _p::Struct<super::PromisedAnswer>>),
+        PromisedAnswer(_p::ViewOf<T, super::PromisedAnswer>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -3997,9 +3797,7 @@ pub mod message_target {
                 1u16 => {
                     Ok(
                         Which::PromisedAnswer(
-                            <_p::Struct<
-                                super::PromisedAnswer,
-                            > as _p::field::FieldType>::accessor(
+                            <super::PromisedAnswer as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
                             ),
@@ -4031,9 +3829,7 @@ pub mod message_target {
                 1u16 => {
                     Ok(
                         Which::PromisedAnswer(
-                            <_p::Struct<
-                                super::PromisedAnswer,
-                            > as _p::field::FieldType>::accessor(
+                            <super::PromisedAnswer as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
                             ),
@@ -4133,6 +3929,9 @@ impl _p::StructView for Payload {
     type Reader<'a, T: _p::rpc::Table> = payload::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = payload::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Payload {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Payload {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 0u16,
@@ -4142,15 +3941,13 @@ impl _p::ty::Struct for Payload {
 impl Payload {
     const CONTENT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
-    const CAP_TABLE: _p::Descriptor<_p::List<_p::Struct<CapDescriptor>>> = _p::Descriptor::<
-        _p::List<_p::Struct<CapDescriptor>>,
+    const CAP_TABLE: _p::Descriptor<_p::List<CapDescriptor>> = _p::Descriptor::<
+        _p::List<CapDescriptor>,
     > {
         slot: 1u32,
-        default: _p::ListReader::empty(
-            _p::ElementSize::size_of::<_p::Struct<CapDescriptor>>(),
-        ),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> payload::Reader<'p, T> {
@@ -4161,12 +3958,10 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn cap_table(
-        &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<CapDescriptor>>> {
+    pub fn cap_table(&self) -> _p::Accessor<'_, 'p, T, _p::List<CapDescriptor>> {
         unsafe {
             <_p::List<
-                _p::Struct<CapDescriptor>,
+                CapDescriptor,
             > as _p::field::FieldType>::accessor(&self.0, &Payload::CAP_TABLE)
         }
     }
@@ -4182,12 +3977,10 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn cap_table(
-        &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Struct<CapDescriptor>>> {
+    pub fn cap_table(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<CapDescriptor>> {
         unsafe {
             <_p::List<
-                _p::Struct<CapDescriptor>,
+                CapDescriptor,
             > as _p::field::FieldType>::accessor(&mut self.0, &Payload::CAP_TABLE)
         }
     }
@@ -4198,12 +3991,10 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_cap_table(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<CapDescriptor>>> {
+    pub fn into_cap_table(self) -> _p::AccessorOwned<'p, T, _p::List<CapDescriptor>> {
         unsafe {
             <_p::List<
-                _p::Struct<CapDescriptor>,
+                CapDescriptor,
             > as _p::field::FieldType>::accessor(self.0, &Payload::CAP_TABLE)
         }
     }
@@ -4301,6 +4092,9 @@ impl _p::StructView for CapDescriptor {
     type Reader<'a, T: _p::rpc::Table> = cap_descriptor::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = cap_descriptor::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for CapDescriptor {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for CapDescriptor {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -4349,28 +4143,28 @@ impl CapDescriptor {
             default: 0u32,
         },
     };
-    const RECEIVER_ANSWER: _p::VariantDescriptor<_p::Struct<PromisedAnswer>> = _p::VariantDescriptor::<
-        _p::Struct<PromisedAnswer>,
+    const RECEIVER_ANSWER: _p::VariantDescriptor<PromisedAnswer> = _p::VariantDescriptor::<
+        PromisedAnswer,
     > {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 4u16,
         },
-        field: _p::Descriptor::<_p::Struct<PromisedAnswer>> {
+        field: _p::Descriptor::<PromisedAnswer> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
-    const THIRD_PARTY_HOSTED: _p::VariantDescriptor<
-        _p::Struct<ThirdPartyCapDescriptor>,
-    > = _p::VariantDescriptor::<_p::Struct<ThirdPartyCapDescriptor>> {
+    const THIRD_PARTY_HOSTED: _p::VariantDescriptor<ThirdPartyCapDescriptor> = _p::VariantDescriptor::<
+        ThirdPartyCapDescriptor,
+    > {
         variant: _p::VariantInfo {
             slot: 0u32,
             case: 5u16,
         },
-        field: _p::Descriptor::<_p::Struct<ThirdPartyCapDescriptor>> {
+        field: _p::Descriptor::<ThirdPartyCapDescriptor> {
             slot: 0u32,
-            default: _p::StructReader::empty(),
+            default: None,
         },
     };
 }
@@ -4413,21 +4207,18 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn receiver_answer(&self) -> _p::Variant<'_, 'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn receiver_answer(&self) -> _p::Variant<'_, 'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(&self.0, &CapDescriptor::RECEIVER_ANSWER)
+            <PromisedAnswer as _p::field::FieldType>::variant(
+                &self.0,
+                &CapDescriptor::RECEIVER_ANSWER,
+            )
         }
     }
     #[inline]
-    pub fn third_party_hosted(
-        &self,
-    ) -> _p::Variant<'_, 'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
+    pub fn third_party_hosted(&self) -> _p::Variant<'_, 'p, T, ThirdPartyCapDescriptor> {
         unsafe {
-            <_p::Struct<
-                ThirdPartyCapDescriptor,
-            > as _p::field::FieldType>::variant(
+            <ThirdPartyCapDescriptor as _p::field::FieldType>::variant(
                 &self.0,
                 &CapDescriptor::THIRD_PARTY_HOSTED,
             )
@@ -4482,13 +4273,9 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn receiver_answer(
-        &mut self,
-    ) -> _p::VariantMut<'_, 'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn receiver_answer(&mut self) -> _p::VariantMut<'_, 'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(
+            <PromisedAnswer as _p::field::FieldType>::variant(
                 &mut self.0,
                 &CapDescriptor::RECEIVER_ANSWER,
             )
@@ -4497,34 +4284,29 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
     #[inline]
     pub fn third_party_hosted(
         &mut self,
-    ) -> _p::VariantMut<'_, 'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
+    ) -> _p::VariantMut<'_, 'p, T, ThirdPartyCapDescriptor> {
         unsafe {
-            <_p::Struct<
-                ThirdPartyCapDescriptor,
-            > as _p::field::FieldType>::variant(
+            <ThirdPartyCapDescriptor as _p::field::FieldType>::variant(
                 &mut self.0,
                 &CapDescriptor::THIRD_PARTY_HOSTED,
             )
         }
     }
     #[inline]
-    pub fn into_receiver_answer(
-        self,
-    ) -> _p::VariantOwned<'p, T, _p::Struct<PromisedAnswer>> {
+    pub fn into_receiver_answer(self) -> _p::VariantOwned<'p, T, PromisedAnswer> {
         unsafe {
-            <_p::Struct<
-                PromisedAnswer,
-            > as _p::field::FieldType>::variant(self.0, &CapDescriptor::RECEIVER_ANSWER)
+            <PromisedAnswer as _p::field::FieldType>::variant(
+                self.0,
+                &CapDescriptor::RECEIVER_ANSWER,
+            )
         }
     }
     #[inline]
     pub fn into_third_party_hosted(
         self,
-    ) -> _p::VariantOwned<'p, T, _p::Struct<ThirdPartyCapDescriptor>> {
+    ) -> _p::VariantOwned<'p, T, ThirdPartyCapDescriptor> {
         unsafe {
-            <_p::Struct<
-                ThirdPartyCapDescriptor,
-            > as _p::field::FieldType>::variant(
+            <ThirdPartyCapDescriptor as _p::field::FieldType>::variant(
                 self.0,
                 &CapDescriptor::THIRD_PARTY_HOSTED,
             )
@@ -4550,8 +4332,8 @@ pub mod cap_descriptor {
         SenderHosted(_p::ViewOf<T, u32>),
         SenderPromise(_p::ViewOf<T, u32>),
         ReceiverHosted(_p::ViewOf<T, u32>),
-        ReceiverAnswer(_p::ViewOf<T, _p::Struct<super::PromisedAnswer>>),
-        ThirdPartyHosted(_p::ViewOf<T, _p::Struct<super::ThirdPartyCapDescriptor>>),
+        ReceiverAnswer(_p::ViewOf<T, super::PromisedAnswer>),
+        ThirdPartyHosted(_p::ViewOf<T, super::ThirdPartyCapDescriptor>),
     }
     impl<'b, 'p: 'b, T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which {
         type View = Which<&'b Reader<'p, T>>;
@@ -4601,9 +4383,7 @@ pub mod cap_descriptor {
                 4u16 => {
                     Ok(
                         Which::ReceiverAnswer(
-                            <_p::Struct<
-                                super::PromisedAnswer,
-                            > as _p::field::FieldType>::accessor(
+                            <super::PromisedAnswer as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
                             ),
@@ -4613,9 +4393,7 @@ pub mod cap_descriptor {
                 5u16 => {
                     Ok(
                         Which::ThirdPartyHosted(
-                            <_p::Struct<
-                                super::ThirdPartyCapDescriptor,
-                            > as _p::field::FieldType>::accessor(
+                            <super::ThirdPartyCapDescriptor as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
                             ),
@@ -4677,9 +4455,7 @@ pub mod cap_descriptor {
                 4u16 => {
                     Ok(
                         Which::ReceiverAnswer(
-                            <_p::Struct<
-                                super::PromisedAnswer,
-                            > as _p::field::FieldType>::accessor(
+                            <super::PromisedAnswer as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
                             ),
@@ -4689,9 +4465,7 @@ pub mod cap_descriptor {
                 5u16 => {
                     Ok(
                         Which::ThirdPartyHosted(
-                            <_p::Struct<
-                                super::ThirdPartyCapDescriptor,
-                            > as _p::field::FieldType>::accessor(
+                            <super::ThirdPartyCapDescriptor as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
                             ),
@@ -4791,6 +4565,9 @@ impl _p::StructView for PromisedAnswer {
     type Reader<'a, T: _p::rpc::Table> = promised_answer::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = promised_answer::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for PromisedAnswer {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for PromisedAnswer {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -4802,13 +4579,11 @@ impl PromisedAnswer {
         slot: 0u32,
         default: 0u32,
     };
-    const TRANSFORM: _p::Descriptor<_p::List<_p::Struct<promised_answer::Op>>> = _p::Descriptor::<
-        _p::List<_p::Struct<promised_answer::Op>>,
+    const TRANSFORM: _p::Descriptor<_p::List<promised_answer::Op>> = _p::Descriptor::<
+        _p::List<promised_answer::Op>,
     > {
         slot: 0u32,
-        default: _p::ListReader::empty(
-            _p::ElementSize::size_of::<_p::Struct<promised_answer::Op>>(),
-        ),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> promised_answer::Reader<'p, T> {
@@ -4822,12 +4597,10 @@ impl<'p, T: _p::rpc::Table + 'p> promised_answer::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn transform(
-        &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
+    pub fn transform(&self) -> _p::Accessor<'_, 'p, T, _p::List<promised_answer::Op>> {
         unsafe {
             <_p::List<
-                _p::Struct<promised_answer::Op>,
+                promised_answer::Op,
             > as _p::field::FieldType>::accessor(&self.0, &PromisedAnswer::TRANSFORM)
         }
     }
@@ -4845,20 +4618,20 @@ impl<'p, T: _p::rpc::Table + 'p> promised_answer::Builder<'p, T> {
     #[inline]
     pub fn transform(
         &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
+    ) -> _p::AccessorMut<'_, 'p, T, _p::List<promised_answer::Op>> {
         unsafe {
             <_p::List<
-                _p::Struct<promised_answer::Op>,
+                promised_answer::Op,
             > as _p::field::FieldType>::accessor(&mut self.0, &PromisedAnswer::TRANSFORM)
         }
     }
     #[inline]
     pub fn into_transform(
         self,
-    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<promised_answer::Op>>> {
+    ) -> _p::AccessorOwned<'p, T, _p::List<promised_answer::Op>> {
         unsafe {
             <_p::List<
-                _p::Struct<promised_answer::Op>,
+                promised_answer::Op,
             > as _p::field::FieldType>::accessor(self.0, &PromisedAnswer::TRANSFORM)
         }
     }
@@ -4961,6 +4734,9 @@ pub mod promised_answer {
     impl _p::StructView for Op {
         type Reader<'a, T: _p::rpc::Table> = op::Reader<'a, T>;
         type Builder<'a, T: _p::rpc::Table> = op::Builder<'a, T>;
+    }
+    impl _p::ty::TypeKind for Op {
+        type Kind = _p::ty::kind::Struct<Self>;
     }
     impl _p::ty::Struct for Op {
         const SIZE: _p::StructSize = _p::StructSize {
@@ -5196,6 +4972,9 @@ impl _p::StructView for ThirdPartyCapDescriptor {
     type Reader<'a, T: _p::rpc::Table> = third_party_cap_descriptor::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = third_party_cap_descriptor::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for ThirdPartyCapDescriptor {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for ThirdPartyCapDescriptor {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -5205,7 +4984,7 @@ impl _p::ty::Struct for ThirdPartyCapDescriptor {
 impl ThirdPartyCapDescriptor {
     const ID: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: _p::ptr::PtrReader::null(),
+        default: None,
     };
     const VINE_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -5358,6 +5137,9 @@ impl _p::StructView for Exception {
     type Reader<'a, T: _p::rpc::Table> = exception::Reader<'a, T>;
     type Builder<'a, T: _p::rpc::Table> = exception::Builder<'a, T>;
 }
+impl _p::ty::TypeKind for Exception {
+    type Kind = _p::ty::kind::Struct<Self>;
+}
 impl _p::ty::Struct for Exception {
     const SIZE: _p::StructSize = _p::StructSize {
         data: 1u16,
@@ -5367,7 +5149,7 @@ impl _p::ty::Struct for Exception {
 impl Exception {
     const REASON: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
-        default: _p::text::Reader::empty(),
+        default: None,
     };
     const OBSOLETE_IS_CALLERS_FAULT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 0u32,
@@ -5377,15 +5159,13 @@ impl Exception {
         slot: 1u32,
         default: 0u16,
     };
-    const TYPE: _p::Descriptor<_p::Enum<exception::Type>> = _p::Descriptor::<
-        _p::Enum<exception::Type>,
-    > {
+    const TYPE: _p::Descriptor<exception::Type> = _p::Descriptor::<exception::Type> {
         slot: 2u32,
         default: exception::Type::Failed,
     };
     const TRACE: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 1u32,
-        default: _p::text::Reader::empty(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {
@@ -5414,11 +5194,12 @@ impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn r#type(&self) -> _p::Accessor<'_, 'p, T, _p::Enum<exception::Type>> {
+    pub fn r#type(&self) -> _p::Accessor<'_, 'p, T, exception::Type> {
         unsafe {
-            <_p::Enum<
-                exception::Type,
-            > as _p::field::FieldType>::accessor(&self.0, &Exception::TYPE)
+            <exception::Type as _p::field::FieldType>::accessor(
+                &self.0,
+                &Exception::TYPE,
+            )
         }
     }
     #[inline]
@@ -5454,11 +5235,12 @@ impl<'p, T: _p::rpc::Table + 'p> exception::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn r#type(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Enum<exception::Type>> {
+    pub fn r#type(&mut self) -> _p::AccessorMut<'_, 'p, T, exception::Type> {
         unsafe {
-            <_p::Enum<
-                exception::Type,
-            > as _p::field::FieldType>::accessor(&mut self.0, &Exception::TYPE)
+            <exception::Type as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &Exception::TYPE,
+            )
         }
     }
     #[inline]
@@ -5512,6 +5294,9 @@ pub mod exception {
         fn from(value: Type) -> Self {
             value as u16
         }
+    }
+    impl _p::ty::TypeKind for Type {
+        type Kind = _p::ty::kind::Enum<Self>;
     }
     impl _p::ty::Enum for Type {}
 }
