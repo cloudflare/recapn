@@ -24,6 +24,7 @@ fn copy_and_advance_slices<'a, 'b, T: Copy>(
     }
 }
 
+#[derive(Debug)]
 pub struct PackResult {
     pub completed: bool,
     pub bytes_written: usize,
@@ -87,6 +88,7 @@ fn split_at_filter(input: &[Word], func: impl FnMut(&Word) -> bool) -> (&[Word],
 }
 
 /// A packing primitive that implements the Cap'n Proto packing algorithm.
+#[derive(Debug)]
 pub struct Packer<'b> {
     input: &'b [Word],
     active_copy: Option<&'b [u8]>,
@@ -205,6 +207,7 @@ impl<'b> Packer<'b> {
 }
 
 /// The result of calling `unpack()`.
+#[derive(Debug)]
 pub struct UnpackResult {
     /// The number of bytes read from the input. This may be less than the
     /// length of the input slice.
