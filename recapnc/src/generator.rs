@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
+use std::ptr::NonNull;
 
 use anyhow::{Result, Context, ensure};
 use proc_macro2::TokenStream;
 use quote::quote;
 use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
-use recapn::alloc::{self, AllocLen, SegmentOffset, Word};
-use recapn::ReaderOf;
+use recapn::alloc::{self, AllocLen, Segment, SegmentOffset, Word};
+use recapn::{any, ReaderOf};
 use recapn::any::{AnyList, AnyStruct};
 use recapn::ptr::{ElementSize, StructSize, UnwrapErrors};
 use syn::PathSegment;
@@ -613,25 +614,11 @@ impl<'a> GeneratorContext<'a> {
                 let element_size_quote = quote!(_p::ElementSize::size_of::<#element_type_quote>());
                 match default_value {
                     Some(list) if list.len() != 0 => {
-                        let size = list.total_size().context("failed to calculate size of list default")?;
-                        assert_eq!(size.caps, 0, "default value contains caps!");
-                        assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
-
-                        let size = AllocLen::new(size.words as u32 + 1).unwrap();
-                        let mut space = alloc::DynSpace::new(size);
-                        let alloc = alloc::Scratch::with_dyn_space(&mut space, alloc::Never);
-
-                        let mut message = recapn::message::Message::new(alloc);
-                        let mut builder = message.builder();
-                        builder.by_ref().into_root().try_set_any_list(&list, UnwrapErrors).unwrap();
-    
-                        let result = builder.segments().first();
-                        assert_eq!(result.len(), size.get(), "written list value doesn't match size of original");
-
+                        let result = list_to_slice(&list);
                         // Remove the root pointer since we're going to create a direct pointer
                         // to the data itself which must be allocated immediately after it.
-                        let words = words_lit(result.as_words().split_first().unwrap().1);
-                        let len = list.as_ref().len().get();
+                        let words = words_lit(result.split_first().unwrap().1);
+                        let len = list.len();
                         let element_size = list.as_ref().element_size();
 
                         assert_eq!(element_size, self.type_element_size(&element_type)?);
@@ -660,24 +647,10 @@ impl<'a> GeneratorContext<'a> {
                     .and_then(|v| v.ptr().try_read_option_as::<AnyStruct>().ok().flatten());
                 match any {
                     Some(value) if !value.as_ref().size().is_empty() => {
-                        let size = value.total_size().context("failed to calculate size of struct default")?;
-                        assert_eq!(size.caps, 0, "default value contains caps!");
-                        assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
-
-                        let size = AllocLen::new(size.words as u32 + 1).unwrap();
-                        let mut space = alloc::DynSpace::new(size);
-                        let alloc = alloc::Scratch::with_dyn_space(&mut space, alloc::Never);
-
-                        let mut message = recapn::message::Message::new(alloc);
-                        let mut builder = message.builder();
-                        builder.by_ref().into_root().try_set_any_struct(&value, UnwrapErrors).unwrap();
-    
-                        let result = builder.segments().first();
-                        assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
-
+                        let result = struct_to_slice(&value);
                         // Remove the root pointer since we're going to create a direct pointer
                         // to the data itself which must be allocated immediately after it.
-                        let words = words_lit(result.as_words().split_first().unwrap().1);
+                        let words = words_lit(result.split_first().unwrap().1);
                         let StructSize { data, ptrs } = value.as_ref().size();
                         let size = quote!(_p::StructSize { data: #data, ptrs: #ptrs });
 
@@ -691,20 +664,42 @@ impl<'a> GeneratorContext<'a> {
             }
             TypeKind::AnyPointer(kind) => {
                 let ptr = value.and_then(|v| v.any_pointer().field())
-                    .filter(|p| !p.is_null());
+                    .map(|p| p.ptr()).filter(|p| !p.is_null());
                 match kind.which()? {
-                    AnyPtrKind::Unconstrained(unconstrained) => match (unconstrained.which()?, ptr) {
-                        (ConstraintKind::AnyKind(_), None) => {
-                            quote!(_p::ptr::PtrReader::null())
+                    AnyPtrKind::Unconstrained(unconstrained) => match unconstrained.which()? {
+                        ConstraintKind::AnyKind(_) => if let Some(ptr) = ptr {
+                            let slice = ptr_to_slice(&ptr);
+                            let words = words_lit(&slice);
+
+                            quote!(_p::PtrReader::slice_unchecked(#words))
+                        } else {
+                            quote!(_p::PtrReader::null())
                         }
-                        (ConstraintKind::Struct(_), None) => {
-                            quote!(_p::ptr::StructReader::empty())
+                        ConstraintKind::Struct(_) => if let Some(ptr) = ptr {
+                            let reader = ptr.try_read_as::<AnyStruct>()
+                                .expect("struct pointer value is not struct!");
+                            let slice = struct_to_slice(&reader);
+                            let words = words_lit(slice.split_first().unwrap().1);
+                            let StructSize { data, ptrs } = reader.as_ref().size();
+                            let size = quote!(_p::StructSize { data: #data, ptrs: #ptrs });
+
+                            quote!(_p::StructReader::slice_unchecked(#words, #size))
+                        } else {
+                            quote!(_p::StructReader::empty())
                         }
-                        (ConstraintKind::List(_), None) => {
-                            quote!(_p::ptr::ListReader::empty())
+                        ConstraintKind::List(_) => if let Some(ptr) = ptr {
+                            let reader = ptr.try_read_as::<AnyList>()
+                                .expect("list pointer value is not list!");
+                            let slice = list_to_slice(&reader);
+                            let words = words_lit(slice.split_first().unwrap().1);
+                            let len = reader.len();
+                            let size_quote = element_size_to_tokens(reader.element_size());
+
+                            quote!(_p::ListReader::slice_unchecked(#words, #len, #size_quote))
+                        } else {
+                            quote!(_p::ListReader::empty())
                         }
-                        (ConstraintKind::Capability(_), None) => quote!(()),
-                        _ => todo!("generate default values for 'unconstrained' ptr types")
+                        ConstraintKind::Capability(_) => quote!(()),
                     },
                     AnyPtrKind::Parameter(_) => todo!("generate default values for generic types"),
                     _ => unreachable!(),
@@ -760,5 +755,88 @@ fn words_lit(words: &[Word]) -> TokenStream {
         quote!(Word([#b0, #b1, #b2, #b3, #b4, #b5, #b6, #b7]))
     });
 
-    quote!(&[#(#words)*])
+    quote!(&[#(#words),*])
+}
+
+fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
+    let size = p.target_size().expect("failed to calculate size of struct default");
+    assert_eq!(size.caps, 0, "default value contains caps!");
+    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
+
+    let size = AllocLen::new(size.words as u32 + 1).unwrap();
+    let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
+    let segment = Segment {
+        data: NonNull::new(space.as_mut_ptr()).unwrap(),
+        len: size.into(),
+    };
+    let alloc = unsafe { alloc::Scratch::with_segment(segment, alloc::Never) };
+
+    let mut message = recapn::message::Message::new(alloc);
+    let mut builder = message.builder();
+    builder.by_ref().into_root().try_set(p, false, UnwrapErrors).unwrap();
+
+    let result = builder.segments().first();
+    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+
+    space
+}
+
+fn struct_to_slice(s: &any::StructReader) -> Box<[Word]> {
+    let size = s.total_size().expect("failed to calculate size of struct");
+    assert_eq!(size.caps, 0, "struct contains caps!");
+    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "struct is too large to fit in a single segment!");
+
+    let size = AllocLen::new(size.words as u32 + 1).unwrap();
+    let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
+    let segment = Segment {
+        data: NonNull::new(space.as_mut_ptr()).unwrap(),
+        len: size.into(),
+    };
+    let alloc = unsafe { alloc::Scratch::with_segment(segment, alloc::Never) };
+
+    let mut message = recapn::message::Message::new(alloc);
+    let mut builder = message.builder();
+    builder.by_ref().into_root().try_set_any_struct(s, UnwrapErrors).unwrap();
+
+    let result = builder.segments().first();
+    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+
+    space
+}
+
+fn list_to_slice(l: &any::ListReader) -> Box<[Word]> {
+    let size = l.total_size().expect("failed to calculate size of list value");
+    assert_eq!(size.caps, 0, "list contains caps!");
+    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "list is too large to fit in a single segment!");
+
+    let size = AllocLen::new(size.words as u32 + 1).unwrap();
+    let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
+    let segment = Segment {
+        data: NonNull::new(space.as_mut_ptr()).unwrap(),
+        len: size.into(),
+    };
+    let alloc = unsafe { alloc::Scratch::with_segment(segment, alloc::Never) };
+
+    let mut message = recapn::message::Message::new(alloc);
+    let mut builder = message.builder();
+    builder.by_ref().into_root().try_set_any_list(l, UnwrapErrors).unwrap();
+
+    let result = builder.segments().first();
+    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+
+    space
+}
+
+fn element_size_to_tokens(s: ElementSize) -> TokenStream {
+    match s {
+        ElementSize::Void => quote!(_p::ElementSize::Void),
+        ElementSize::Bit => quote!(_p::ElementSize::Bit),
+        ElementSize::Byte => quote!(_p::ElementSize::Byte),
+        ElementSize::TwoBytes => quote!(_p::ElementSize::TwoBytes),
+        ElementSize::FourBytes => quote!(_p::ElementSize::FourBytes),
+        ElementSize::EightBytes => quote!(_p::ElementSize::EightBytes),
+        ElementSize::Pointer => quote!(_p::ElementSize::Pointer),
+        ElementSize::InlineComposite(StructSize { data, ptrs })
+            => quote!(_p::ElementSize::InlineComposite(_p::StructSize { data: #data, ptrs: #ptrs })),
+    }
 }

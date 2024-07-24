@@ -1983,7 +1983,15 @@ fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Re
                     let nesting_limit = nesting_limit.checked_sub(1)
                         .ok_or_else(|| Error::from(ErrorKind::NestingLimitExceeded))?;
     
-                    total_inline_composites_targets_size(&reader, start, element_count, size, nesting_limit)?
+                    let mut composites = total_inline_composites_targets_size(
+                        &reader,
+                        start,
+                        element_count,
+                        size,
+                        nesting_limit,
+                    )?;
+                    composites.words += 1;
+                    composites
                 }
                 ElementSize::Pointer => {
                     let nesting_limit = nesting_limit.checked_sub(1)
@@ -2082,6 +2090,10 @@ impl<'a> PtrReader<'a, Empty> {
             table: Empty,
             nesting_limit: u32::MAX,
         }
+    }
+
+    pub const unsafe fn slice_unchecked(slice: &'a [Word]) -> Self {
+        Self::new_unchecked(NonNull::new_unchecked(slice.as_ptr().cast_mut()))
     }
 
     pub fn root(
@@ -5827,16 +5839,15 @@ where
             }
             TypedContent::List(ListContent {
                 ptr: src_ptr, element_size, element_count,
-            }) => {
-                let (dst, total_size, builder) = builder
-                    .alloc_list(dst, element_size, element_count)
-                    .expect("attempted to allocate a value that was too large but was somehow valid to read");
-
-                if total_size.get() == 0 {
-                    return Ok(())
+            }) => match builder.alloc_list(dst, element_size, element_count) {
+                Ok((dst, total_size, builder)) => {
+                    if total_size.get() == 0 {
+                        return Ok(())
+                    }
+    
+                    self.copy_list(src_ptr, &reader, dst, &builder, element_size, element_count)
                 }
-
-                self.copy_list(src_ptr, &reader, dst, &builder, element_size, element_count)
+                Err(err) => self.handle_err(err)
             }
             TypedContent::Capability(_) if self.canonical =>
                 self.handle_err(Error::from(ErrorKind::CapabilityNotAllowed)),
