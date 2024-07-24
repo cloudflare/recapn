@@ -19,3 +19,13 @@ path = "fuzz_targets/unpacking.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "read-all-types"
+path = "fuzz_targets/read-all-types.rs"
+test = false
+doc = false
+bench = false
+
+[build-dependencies]
+recapnc = { path = "../recapnc" }
