@@ -394,6 +394,16 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructReader<'b, 'p,
     pub unsafe fn get_unchecked(&self) -> G::Reader<'p, T> {
         ty::StructReader::from_ptr(self.repr.clone())
     }
+
+    pub fn get_or_default(&self) -> G::Reader<'p, T> {
+        match self.get() {
+            Some(r) => r,
+            None => {
+                let ptr = ptr::StructReader::empty().imbue_from(self.repr);
+                ty::StructReader::from_ptr(ptr)
+            }
+        }
+    }
 }
 
 impl<'b, 'p, T: Table, U> VoidVariant<U, StructBuilder<'b, 'p, T>> {

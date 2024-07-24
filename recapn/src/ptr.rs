@@ -2391,6 +2391,11 @@ impl<'a> StructReader<'a, Empty> {
             ptrs_len: size.ptrs,
         }
     }
+
+    pub const unsafe fn slice_unchecked(slice: &'a [Word], size: StructSize) -> Self {
+        let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
+        Self::new_unchecked(ptr, size)
+    }
 }
 
 impl<'a, T: Table> StructReader<'a, T> {
@@ -2624,7 +2629,7 @@ impl<T: Table> Clone for ListReader<'_, T> {
     }
 }
 
-impl ListReader<'_, Empty> {
+impl<'a> ListReader<'a, Empty> {
     /// Creates an empty list of the specific element size.
     pub const fn empty(element_size: ElementSize) -> Self {
         unsafe { Self::new_unchecked(NonNull::dangling(), ElementCount::ZERO, element_size) }
@@ -2646,6 +2651,15 @@ impl ListReader<'_, Empty> {
             nesting_limit: u32::MAX,
             element_size,
         }
+    }
+
+    pub const unsafe fn slice_unchecked(
+        slice: &'a [Word],
+        element_count: u32,
+        element_size: ElementSize,
+    ) -> Self {
+        let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
+        Self::new_unchecked(ptr, u29::new(element_count).unwrap(), element_size)
     }
 }
 
@@ -2678,7 +2692,11 @@ impl<'a, T: Table> ListReader<'a, T> {
     #[inline]
     pub fn total_size(&self) -> Result<MessageSize> {
         let len = self.element_count;
-        let word_count = self.element_size.total_words(len) as u64;
+        let mut word_count = self.element_size.total_words(len) as u64;
+        if self.element_size.is_inline_composite() {
+            // Add a word for the tag pointer.
+            word_count += 1;
+        }
         let list_size = MessageSize { words: word_count, caps: 0 };
 
         match self.element_size {
@@ -2986,7 +3004,7 @@ impl<'a> ObjectBuilder<'a> {
         let segment_start = self.start().as_segment_ptr();
         let segment_end = self.end();
 
-        segment_start <= start && start <= end && end < segment_end
+        segment_start <= start && start <= end && end <= segment_end
     }
 
     #[inline]

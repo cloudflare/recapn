@@ -7,7 +7,7 @@ use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
 use recapn::alloc::{self, AllocLen, SegmentOffset, Word};
 use recapn::ReaderOf;
 use recapn::any::{AnyList, AnyStruct};
-use recapn::ptr::{StructSize, UnwrapErrors};
+use recapn::ptr::{ElementSize, StructSize, UnwrapErrors};
 use syn::PathSegment;
 use syn::punctuated::Punctuated;
 
@@ -606,10 +606,12 @@ impl<'a> GeneratorContext<'a> {
                 }
             }
             TypeKind::List(list) => {
-                let element_type = self.resolve_type(scope, &list.element_type().get(), required_imports)?;
-                let any = value.and_then(|v| v.list().field())
+                let element_type = list.element_type().get();
+                let element_type_quote = self.resolve_type(scope, &element_type, required_imports)?;
+                let default_value = value.and_then(|v| v.list().field())
                     .map(|v| v.ptr().read_as::<AnyList>());
-                match any {
+                let element_size_quote = quote!(_p::ElementSize::size_of::<#element_type_quote>());
+                match default_value {
                     Some(list) if list.len() != 0 => {
                         let size = list.total_size().context("failed to calculate size of list default")?;
                         assert_eq!(size.caps, 0, "default value contains caps!");
@@ -628,13 +630,15 @@ impl<'a> GeneratorContext<'a> {
 
                         // Remove the root pointer since we're going to create a direct pointer
                         // to the data itself which must be allocated immediately after it.
-                        let words = result.as_words().split_first().unwrap().1;
-                        let len = list.as_ref().len();
+                        let words = words_lit(result.as_words().split_first().unwrap().1);
+                        let len = list.as_ref().len().get();
                         let element_size = list.as_ref().element_size();
 
-                        todo!()
+                        assert_eq!(element_size, self.type_element_size(&element_type)?);
+
+                        quote!(_p::ListReader::slice_unchecked(#words, #len, #element_size_quote))
                     }
-                    _ => quote!(_p::ListReader::empty(_p::ElementSize::size_of::<#element_type>())),
+                    _ => quote!(_p::ListReader::empty(#element_size_quote)),
                 }
             }
             TypeKind::Enum(info) => {
@@ -727,6 +731,26 @@ impl<'a> GeneratorContext<'a> {
             ident: info.ident.clone(),
             const_type: self.resolve_type(&info.scope, &type_info, required_imports)?,
             value: self.generate_value(&info.scope, &type_info, node.value().get_option().as_ref(), required_imports)?,
+        })
+    }
+
+    fn type_element_size(&self, ty: &ReaderOf<Type>) -> Result<ElementSize> {
+        use ElementSize::*;
+        Ok(match ty.which()? {
+            TypeKind::Void(_) => Void,
+            TypeKind::Bool(_) => Bit,
+            TypeKind::Int8(_) | TypeKind::Uint8(_) => Byte,
+            TypeKind::Int16(_) | TypeKind::Uint16(_) | TypeKind::Enum(_) => TwoBytes,
+            TypeKind::Int32(_) | TypeKind::Uint32(_) | TypeKind::Float32(_) => FourBytes,
+            TypeKind::Int64(_) | TypeKind::Uint64(_) | TypeKind::Float64(_) => EightBytes,
+            TypeKind::Text(_) | TypeKind::Data(_) | TypeKind::List(_) | TypeKind::Interface(_) | TypeKind::AnyPointer(_) => Pointer,
+            TypeKind::Struct(s) => {
+                let s = self.nodes[&s.type_id()].node.r#struct().get_or_default();
+                InlineComposite(StructSize {
+                    data: s.data_word_count(),
+                    ptrs: s.pointer_count(),
+                })
+            },
         })
     }
 }
