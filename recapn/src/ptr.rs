@@ -1,7 +1,7 @@
 //! Manually manage Cap'n Proto data through raw readers and builders
 
 use crate::alloc::{
-    Segment, SegmentRef, SegmentPtr, SegmentOffset, SignedSegmentOffset, AllocLen, Word
+    AllocLen, Segment, SegmentLen, SegmentOffset, SegmentPtr, SegmentRef, SignedSegmentOffset, Word
 };
 use crate::arena::{SegmentId, SegmentWithId, ReadArena, BuildArena, ArenaSegment};
 use crate::internal::Sealed;
@@ -1527,10 +1527,19 @@ impl<'a> SegmentReader<'a> {
         }
     }
 
-    /// Gets the start of the segment as a SegmentRef
+    /// Gets the start of the segment as a SegmentRef. If the segment is empty, this returns None.
     #[inline]
-    pub fn start(&self) -> SegmentRef<'a> {
-        unsafe { SegmentRef::new_unchecked(self.segment.data) }
+    pub fn start(&self) -> Option<SegmentRef<'a>> {
+        if self.segment.len == SegmentLen::ZERO {
+            return None
+        }
+
+        unsafe { Some(SegmentRef::new_unchecked(self.segment.data)) }
+    }
+
+    #[inline]
+    pub fn start_ptr(&self) -> SegmentPtr<'a> {
+        SegmentPtr::new(self.segment.data.as_ptr())
     }
 
     /// A pointer to just beyond the end of the segment.
@@ -1546,7 +1555,7 @@ impl<'a> SegmentReader<'a> {
 
     #[inline]
     fn contains(&self, ptr: SegmentPtr<'a>) -> bool {
-        let start = self.start().as_segment_ptr();
+        let start = self.start_ptr();
         let end = self.end();
 
         start <= ptr && ptr < end
@@ -1589,7 +1598,7 @@ impl<'a> SegmentReader<'a> {
         offset: SegmentOffset,
         len: ObjectLen,
     ) -> Option<SegmentRef<'a>> {
-        let start = self.start().offset(offset);
+        let start = self.start_ptr().offset(offset);
         self.try_get_section(start, len)
     }
 
@@ -2103,7 +2112,7 @@ impl<'a> PtrReader<'a, Empty> {
     ) -> Option<Self> {
         let root = SegmentReader::from_source(arena, 0)?;
         Some(Self {
-            ptr: root.start(),
+            ptr: root.start()?,
             reader: ObjectReader {
                 segment: Some(root),
                 limiter,
