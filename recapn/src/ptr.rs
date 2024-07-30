@@ -2256,7 +2256,9 @@ impl<'a, T: Table> PtrReader<'a, T> {
             }
         }?;
 
-        Ok(BlobReader::new(ptr.as_inner().cast(), element_count))
+        Ok(unsafe {
+            BlobReader::new_unchecked(ptr.as_inner().cast(), element_count)
+        })
     }
 
     #[inline]
@@ -2915,32 +2917,43 @@ impl<'a, T: Table> Capable for ListReader<'a, T> {
 
 #[derive(Clone, Copy)]
 pub struct BlobReader<'a> {
-    a: PhantomData<&'a [u8]>,
-    ptr: NonNull<u8>,
-    len: ElementCount,
+    slice: &'a [u8],
 }
 
 impl<'a> BlobReader<'a> {
-    pub(crate) const fn new(ptr: NonNull<u8>, len: ElementCount) -> Self {
-        Self { a: PhantomData, ptr, len }
+    #[inline]
+    pub(crate) const fn new(slice: &'a [u8]) -> Option<Self> {
+        if slice.len() < ElementCount::MAX_VALUE as usize {
+            Some(Self { slice })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) const unsafe fn new_unchecked(ptr: NonNull<u8>, len: ElementCount) -> Self {
+        Self {
+            slice: std::slice::from_raw_parts(ptr.as_ptr(), len.get() as usize),
+        }
     }
 
     pub const fn empty() -> Self {
-        Self::new(NonNull::dangling(), ElementCount::ZERO)
+        Self { slice: &[] }
     }
 
     pub const fn data(&self) -> NonNull<u8> {
-        self.ptr
+        unsafe {
+            NonNull::new_unchecked(self.slice.as_ptr().cast_mut())
+        }
     }
 
     pub const fn len(&self) -> ElementCount {
-        self.len
+        unsafe {
+            ElementCount::new_unchecked(self.slice.len() as _)
+        }
     }
 
     pub const fn as_slice(&self) -> &'a [u8] {
-        unsafe {
-            core::slice::from_raw_parts(self.ptr.as_ptr().cast_const(), self.len.get() as usize)
-        }
+        self.slice
     }
 }
 
@@ -5268,18 +5281,19 @@ impl BlobBuilder<'_> {
 
     #[inline]
     pub const fn as_reader(&self) -> BlobReader {
-        BlobReader::new(self.ptr, self.len)
+        unsafe {
+            BlobReader::new_unchecked(self.ptr, self.len)
+        }
     }
 
     #[inline]
     pub(crate) fn copy_from(&mut self, other: BlobReader) {
-        assert_eq!(self.len, other.len);
+        assert_eq!(self.len, other.len());
 
         let dst = self.ptr.as_ptr();
-        let src = other.ptr.as_ptr().cast_const();
-        let len = other.len.get() as usize;
+        let src = other.as_slice();
         unsafe {
-            ptr::copy_nonoverlapping(src, dst, len)
+            ptr::copy_nonoverlapping(src.as_ptr(), dst, src.len())
         }
     }
 
