@@ -2,6 +2,7 @@
 
 use core::cmp;
 use core::fmt;
+use core::hint::unreachable_unchecked;
 use core::num::NonZeroU32;
 
 /// A simple macro to implement cmp traits using the inner type gotten through a get() function
@@ -57,20 +58,36 @@ impl NonZeroU29 {
     #[inline]
     pub const fn new(n: u32) -> Option<Self> {
         if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
+            match NonZeroU32::new(n) {
+                Some(n) => Some(Self(n)),
+                None => None,
+            }
         } else {
             None
         }
     }
 
     #[inline]
+    #[track_caller]
     pub const unsafe fn new_unchecked(n: u32) -> Self {
-        Self(NonZeroU32::new_unchecked(n))
+        match Self::new(n) {
+            Some(n) => n,
+            _ => {
+                // actually checked with debug_assertions on
+                unreachable_unchecked()
+            }
+        }
     }
 
     #[inline]
     pub const fn get(self) -> u32 {
-        self.0.get()
+        let val = self.0.get();
+        if val >= Self::MIN_VALUE && val <= Self::MAX_VALUE {
+            val
+        } else {
+            // hint for the optimizer
+            unsafe { unreachable_unchecked() }
+        }
     }
 }
 
@@ -93,20 +110,28 @@ impl u29 {
     #[inline]
     pub const fn new(n: u32) -> Option<Self> {
         if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
+            Some(Self(n))
         } else {
             None
         }
     }
 
     #[inline]
+    #[track_caller]
     pub const unsafe fn new_unchecked(n: u32) -> Self {
-        Self(n)
+        match Self::new(n) {
+            Some(n) => n,
+            _ => unreachable_unchecked(),
+        }
     }
 
     #[inline]
     pub const fn get(self) -> u32 {
-        self.0
+        if self.0 >= Self::MIN_VALUE && self.0 <= Self::MAX_VALUE {
+            self.0
+        } else {
+            unsafe { unreachable_unchecked() }
+        }
     }
 }
 
@@ -163,20 +188,28 @@ impl i30 {
     #[inline]
     pub const fn new(n: i32) -> Option<Self> {
         if n >= Self::MIN_VALUE && n <= Self::MAX_VALUE {
-            Some(unsafe { Self::new_unchecked(n) })
+            Some(Self(n))
         } else {
             None
         }
     }
 
     #[inline]
+    #[track_caller]
     pub const unsafe fn new_unchecked(n: i32) -> Self {
-        Self(n)
+        match Self::new(n) {
+            Some(n) => n,
+            _ => unreachable_unchecked(),
+        }
     }
 
     #[inline]
     pub const fn get(self) -> i32 {
-        self.0
+        if self.0 >= Self::MIN_VALUE && self.0 <= Self::MAX_VALUE {
+            self.0
+        } else {
+            unsafe { unreachable_unchecked() }
+        }
     }
 }
 
