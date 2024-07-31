@@ -64,7 +64,7 @@ fn take_first_mut<'a, T>(src: &mut &'a mut [T]) -> &'a mut T {
 #[inline]
 #[track_caller]
 fn take_at_mut<'a, T>(src: &mut &'a mut [T], idx: usize) -> &'a mut [T] {
-    assert!(src.len() > idx);
+    assert!(src.len() >= idx);
     let old = mem::take(src);
     let (first, second) = old.split_at_mut(idx);
     *src = second;
