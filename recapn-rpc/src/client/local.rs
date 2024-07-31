@@ -145,7 +145,8 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
 /// ```
 /// 
 /// A struct and trait could be generated like so
-/// ```
+///
+/// ```ignore
 /// // Server
 /// pub trait Foo {
 ///     type BarFuture: Future<Output = Result<()>> + 'static;
@@ -183,6 +184,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
 ///         }
 ///     }
 /// }
+/// ```
 pub trait Dispatch {
     fn dispatch(&mut self, request: DispatchRequest) -> DispatchResponse;
 }

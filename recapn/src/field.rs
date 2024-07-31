@@ -9,26 +9,26 @@
 //! greater flexibility. For example, these returned accessors can stored locally which lets us do
 //! things like:
 //!
-//! ```
+//! ```ignore
 //! let foo = ty.foo_mut();
 //! foo.set(foo.get() + 1);
 //! ```
 //!
 //! Alternatively, we could implement traits over the accessor, letting users use arithmetic ops
 //!
-//! ```
+//! ```ignore
 //! ty.foo_mut() += 1;
 //! ```
 //!
 //! Or directly turn a list accessor into an iterator without calling another accessor function
 //!
-//! ```
+//! ```ignore
 //! for i in ty.bar() {}
 //! ```
 //!
 //! while still letting the user be strict on validation
 //!
-//! ```
+//! ```ignore
 //! for i in ty.bar().try_get()? {}
 //! ```
 //!
@@ -182,6 +182,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 /// AccessableMut type.
 ///
 /// ```
+/// # use recapn::prelude::gen::*;
 /// pub enum Which<T: Viewable> {
 ///     Foo(ViewOf<T, u32>),
 ///     Bar(ViewOf<T, u64>),
@@ -191,7 +192,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 /// The trait Viewable effectively serves as a type selector. If T is a &'a impl Accessable, we
 /// get a new effective definition of
 ///
-/// ```
+/// ```ignore
 /// pub enum Which<'a, T: Accessable> {
 ///     Foo(Accessor<'a, T, u32>),
 ///     Bar(Accessor<'a, T, u64>),
@@ -209,7 +210,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 ///
 /// But it also works the other way. If T is a &'a mut impl AccessableMut, we get a definition of
 ///
-/// ```
+/// ```ignore
 /// pub enum Which<'a, T: AccessableMut> {
 ///     Foo(AccessorMut<'a, T, u32>),
 ///     Bar(AccessorMut<'a, T, u64>),
@@ -218,7 +219,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 ///
 /// which evaluates to
 ///
-/// ```
+/// ```ignore
 /// pub enum Which<'a, T: AccessableMut> {
 ///     Foo(Field<'a, u32, &'a mut T>),
 ///     Bar(Field<'a, u64, &'a mut T>),
