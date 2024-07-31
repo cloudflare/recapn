@@ -31,31 +31,30 @@ pub struct PackResult {
 }
 
 #[inline]
+#[track_caller]
 fn take_first<'a, T>(src: &mut &'a [T]) -> &'a T {
-    let old = mem::take(src);
-    let (first, remainder) = old.split_first().unwrap();
-    *src = remainder;
-    first
+    try_take_first(src).unwrap()
 }
 
 #[inline]
 fn try_take_first<'a, T>(src: &mut &'a [T]) -> Option<&'a T> {
-    let old = mem::take(src);
-    let (first, remainder) = old.split_first()?;
+    let (first, remainder) = src.split_first()?;
     *src = remainder;
     Some(first)
 }
 
 #[inline]
+#[track_caller]
 fn take_at<'a, T>(src: &mut &'a [T], idx: usize) -> &'a [T] {
-    let old = mem::take(src);
-    let (first, second) = old.split_at(idx);
+    let (first, second) = src.split_at(idx);
     *src = second;
     first
 }
 
 #[inline]
+#[track_caller]
 fn take_first_mut<'a, T>(src: &mut &'a mut [T]) -> &'a mut T {
+    assert!(!src.is_empty()); // checks the condition before modifying the environment
     let old = mem::take(src);
     let (first, remainder) = old.split_first_mut().unwrap();
     *src = remainder;
@@ -63,7 +62,9 @@ fn take_first_mut<'a, T>(src: &mut &'a mut [T]) -> &'a mut T {
 }
 
 #[inline]
+#[track_caller]
 fn take_at_mut<'a, T>(src: &mut &'a mut [T], idx: usize) -> &'a mut [T] {
+    assert!(src.len() > idx);
     let old = mem::take(src);
     let (first, second) = old.split_at_mut(idx);
     *src = second;
