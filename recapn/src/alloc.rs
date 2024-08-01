@@ -117,24 +117,32 @@ impl Segment {
         self.len.get() as usize * 8
     }
 
+    /// Does not limit the lifetime of the slice.
+    /// You must ensure there is no mutable/exclusive access to the same slice.
     #[inline]
-    pub unsafe fn as_slice<'a>(&self) -> &'a [Word] {
+    pub unsafe fn as_slice_unchecked<'unsafe_unchecked>(&self) -> &'unsafe_unchecked [Word] {
         core::slice::from_raw_parts(self.data.as_ptr() as *const _, self.len.get() as usize)
     }
 
+    /// Does not limit the lifetime of the slice.
+    /// You must ensure the slice is not aliased with any other access.
     #[inline]
-    pub unsafe fn as_mut_slice<'a>(&mut self) -> &'a mut [Word] {
+    pub unsafe fn as_mut_slice_unchecked<'unsafe_unchecked>(&mut self) -> &'unsafe_unchecked mut [Word] {
         core::slice::from_raw_parts_mut(self.data.as_ptr() as *mut _, self.len.get() as usize)
     }
 
+    /// Does not limit the lifetime of the slice.
+    /// You must ensure there is no mutable/exclusive access to the same slice.
     #[inline]
-    pub unsafe fn as_bytes<'a>(&self) -> &'a [u8] {
-        Word::slice_to_bytes(self.as_slice())
+    pub unsafe fn as_bytes_unchecked<'unsafe_unchecked>(&self) -> &'unsafe_unchecked [u8] {
+        Word::slice_to_bytes(self.as_slice_unchecked())
     }
 
+    /// Does not limit the lifetime of the slice.
+    /// You must ensure the slice is not aliased with any other access.
     #[inline]
-    pub unsafe fn as_mut_bytes<'a>(&mut self) -> &'a mut [u8] {
-        Word::slice_to_bytes_mut(self.as_mut_slice())
+    pub unsafe fn as_mut_bytes_unchecked<'unsafe_unchecked>(&mut self) -> &'unsafe_unchecked mut [u8] {
+        Word::slice_to_bytes_mut(self.as_mut_slice_unchecked())
     }
 }
 
@@ -582,7 +590,7 @@ mod tests {
     fn global_alloc() {
         let mut alloc = Global;
         alloc!(alloc, 5, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 5]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 5]);
         });
     }
 
@@ -590,10 +598,10 @@ mod tests {
     fn fixed_alloc() {
         let mut fixed = Fixed::new(AllocLen::new(5).unwrap(), Global);
         alloc!(fixed, 1, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 5]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 5]);
         });
         alloc!(fixed, 7, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 7]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 7]);
         });
     }
 
@@ -601,20 +609,20 @@ mod tests {
     fn growing_alloc() {
         let mut growing = Growing::new(AllocLen::ONE, Global);
         alloc!(growing, 1, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 1]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 1]);
         });
         // next one will be 2
         alloc!(growing, 1, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 2]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 2]);
         });
         // next one would be 4, but we pass in 5, and since the requested segment
         // is bigger, that's what it will use
         alloc!(growing, 5, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 5]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 5]);
         });
         // next one would be 9
         alloc!(growing, 1, |segment: Segment| {
-            assert_eq!(segment.as_slice(), &[Word::NULL; 9]);
+            assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 9]);
         });
     }
 
@@ -626,12 +634,12 @@ mod tests {
             let mut scratch = Scratch::with_space(&mut static_space, Global);
             alloc!(scratch, 1, |mut segment: Segment| {
                 addr = segment.data.as_ptr() as usize;
-                assert_eq!(segment.as_slice(), &[Word::NULL; 5]);
-                segment.as_mut_bytes().fill(255);
+                assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 5]);
+                segment.as_mut_bytes_unchecked().fill(255);
             });
             // next one won't use scratch space
             alloc!(scratch, 1, |segment: Segment| {
-                assert_eq!(segment.as_slice(), &[Word::NULL; 1]);
+                assert_eq!(segment.as_slice_unchecked(), &[Word::NULL; 1]);
             });
         }
         assert_eq!(&static_space as *const _ as usize, addr);
