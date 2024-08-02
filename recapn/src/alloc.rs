@@ -107,7 +107,7 @@ pub struct Segment {
 impl Segment {
     #[inline]
     pub const fn to_ptr_range(&self) -> Range<*const Word> {
-        let start = self.data.as_ptr() as *const Word;
+        let start = self.data.as_ptr().cast_const();
         let end = start.wrapping_add(self.len.get() as usize);
         start..end
     }
@@ -121,14 +121,14 @@ impl Segment {
     /// You must ensure there is no mutable/exclusive access to the same slice.
     #[inline]
     pub unsafe fn as_slice_unchecked<'unsafe_unchecked>(&self) -> &'unsafe_unchecked [Word] {
-        core::slice::from_raw_parts(self.data.as_ptr() as *const _, self.len.get() as usize)
+        core::slice::from_raw_parts(self.data.as_ptr().cast_const(), self.len.get() as usize)
     }
 
     /// Does not limit the lifetime of the slice.
     /// You must ensure the slice is not aliased with any other access.
     #[inline]
     pub unsafe fn as_mut_slice_unchecked<'unsafe_unchecked>(&mut self) -> &'unsafe_unchecked mut [Word] {
-        core::slice::from_raw_parts_mut(self.data.as_ptr() as *mut _, self.len.get() as usize)
+        core::slice::from_raw_parts_mut(self.data.as_ptr().cast(), self.len.get() as usize)
     }
 
     /// Does not limit the lifetime of the slice.
