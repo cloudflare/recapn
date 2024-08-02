@@ -18,12 +18,9 @@ pub(crate) mod internal {
     pub trait CapPtrReader: Clone {
         type Table: Table;
         type Cap;
-
-        fn read_cap(&self, index: u32) -> Result<Self::Cap>;
     }
 
     pub trait CapPtrBuilder: CapPtrReader {
-        fn set_cap(&self, cap: Self::Cap) -> Result<Option<u32>>;
         fn clear_cap(&self, index: u32) -> Result<()>;
         fn as_reader(&self) -> <Self::Table as Table>::Reader;
     }
@@ -35,16 +32,9 @@ pub(crate) mod internal {
     impl CapPtrReader for Empty {
         type Table = Empty;
         type Cap = Infallible;
-
-        fn read_cap(&self, _: u32) -> Result<Infallible> {
-            Err(ErrorKind::CapabilityNotAllowed.into())
-        }
     }
 
     impl CapPtrBuilder for Empty {
-        fn set_cap(&self, cap: Infallible) -> Result<Option<u32>> {
-            match cap {}
-        }
         fn clear_cap(&self, _: u32) -> Result<()> {
             Err(ErrorKind::CapabilityNotAllowed.into())
         }
@@ -89,17 +79,9 @@ pub(crate) mod internal {
     impl<T: CapTableReader> CapPtrReader for T {
         type Table = T::System;
         type Cap = <T::System as CapSystem>::Cap;
-
-        fn read_cap(&self, index: u32) -> Result<Self::Cap> {
-            self.extract_cap(index)
-                .ok_or(ErrorKind::InvalidCapabilityPointer(index).into())
-        }
     }
 
     impl<T: CapTableBuilder> CapPtrBuilder for T {
-        fn set_cap(&self, cap: Self::Cap) -> Result<Option<u32>> {
-            Ok(self.inject_cap(cap))
-        }
         fn clear_cap(&self, index: u32) -> Result<()> {
             self.drop_cap(index);
             Ok(())

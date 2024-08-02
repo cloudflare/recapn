@@ -852,11 +852,6 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    fn into_raw_build_ptr(self) -> Option<ptr::PtrBuilder<'b, T>> {
-        self.is_set().then(|| unsafe { self.repr.ptr_field_mut_unchecked(self.descriptor.slot as u16) })
-    }
-
-    #[inline]
     pub fn init_field(self) -> PtrFieldBuilder<'b, 'p, T, V> {
         if !self.is_set() {
             let &VariantInfo { slot, case } = self.variant;

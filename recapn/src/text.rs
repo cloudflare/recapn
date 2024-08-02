@@ -53,10 +53,6 @@ impl<'a> Reader<'a> {
         Self::from_slice(EMPTY_SLICE)
     }
 
-    pub(crate) const fn new_unchecked(blob: ptr::Reader<'a>) -> Self {
-        Self(blob)
-    }
-
     /// Interprets a given blob reader as text. This requires that the blob has at least one byte
     /// and that the last byte is empty.
     #[inline]
