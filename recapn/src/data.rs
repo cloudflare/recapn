@@ -59,16 +59,7 @@ impl<'a> Reader<'a> {
     /// If the slice is too large to be in a message, this function panics.
     #[inline]
     pub const fn from_slice(slice: &'a [u8]) -> Self {
-        let len = slice.len();
-        if len > ElementCount::MAX_VALUE as usize {
-            panic!("slice is too large to be contained within a cap'n proto message")
-        }
-
-        let count = ElementCount::new(len as u32).unwrap();
-        unsafe {
-            let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
-            Self(ptr::Reader::new(ptr, count))
-        }
+        Self(ptr::Reader::new(slice).expect("slice is too large to be contained within a cap'n proto message"))
     }
 
     #[inline]
@@ -83,9 +74,7 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub const fn as_slice(&self) -> &'a [u8] {
-        let data = self.0.data().as_ptr().cast_const();
-        let len = self.len() as usize;
-        unsafe { core::slice::from_raw_parts(data, len) }
+        self.0.as_slice()
     }
 }
 
@@ -164,7 +153,9 @@ impl<'a> Builder<'a> {
 
     #[inline]
     pub fn as_reader<'b>(&'b self) -> Reader<'b> {
-        Data(ptr::Reader::new(self.0.data(), self.0.len()))
+        Data(unsafe {
+            ptr::Reader::new_unchecked(self.0.data(), self.0.len())
+        })
     }
 
     #[inline]

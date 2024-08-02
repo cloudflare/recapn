@@ -72,13 +72,15 @@ impl<'a> Reader<'a> {
     #[inline]
     pub const fn from_slice(s: &'a [u8]) -> Self {
         match s {
-            [.., 0] if s.len() <= ByteCount::MAX_VALUE as usize => {
-                let ptr = unsafe { NonNull::new_unchecked(s.as_ptr().cast_mut()) };
-                let len = ElementCount::new(s.len() as u32).unwrap();
-                Self(ptr::Reader::new(ptr, len))
+            [.., 0] => {
+                match ptr::Reader::new(s) {
+                    Some(r) => Some(Self(r)),
+                    None => None,
+                }
             },
-            _ => panic!("attempted to make invalid text blob from slice"),
+            _ => None,
         }
+        .expect("attempted to make invalid text blob from slice")
     }
 
     pub const fn byte_count(&self) -> ByteCount {
@@ -99,14 +101,19 @@ impl<'a> Reader<'a> {
     /// Returns the bytes of the text field without the null terminator
     #[inline]
     pub const fn as_bytes(&self) -> &'a [u8] {
-        let (_, remainder) = self.as_bytes_with_nul().split_last().unwrap();
-        remainder
+        match self.as_bytes_with_nul().split_last() {
+            Some((_, remainder)) => remainder,
+            _ => {
+                debug_assert!(false, "this shouldn't happen, it's to avoid panic code in release");
+                EMPTY_SLICE
+            },
+        }
     }
 
     /// Returns the bytes of the text field with the null terminator
     #[inline]
     pub const fn as_bytes_with_nul(&self) -> &'a [u8] {
-        unsafe { slice::from_raw_parts(self.0.data().as_ptr().cast_const(), self.len() as usize) }
+        self.0.as_slice()
     }
 
     #[inline]
