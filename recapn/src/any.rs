@@ -92,10 +92,6 @@ impl<T> IntoFamily for AnyPtr<T> {
     type Family = AnyPtr;
 }
 
-impl ty::Value for AnyPtr {
-    type Default = ptr::PtrReader<'static, Empty>;
-}
-
 impl ty::ListValue for AnyPtr {
     const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
 }
@@ -583,10 +579,6 @@ impl<T> IntoFamily for AnyStruct<T> {
     type Family = AnyStruct;
 }
 
-impl ty::Value for AnyStruct {
-    type Default = ptr::StructReader<'static, Empty>;
-}
-
 impl ty::DynListValue for AnyStruct {
     const PTR_ELEMENT_SIZE: crate::ptr::PtrElementSize = crate::ptr::PtrElementSize::InlineComposite;
 }
@@ -900,9 +892,6 @@ impl<T> IntoFamily for AnyList<T> {
     type Family = AnyList;
 }
 
-impl ty::Value for AnyList {
-    type Default = ptr::ListReader<'static, Empty>;
-}
 impl ty::ListValue for AnyList {
     const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
 }

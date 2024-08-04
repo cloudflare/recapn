@@ -179,17 +179,17 @@ impl TestAllTypes {
     };
     const TEXT_FIELD: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
-        default: _p::text::Reader::empty(),
+        default: None,
     };
     const DATA_FIELD: _p::Descriptor<_p::Data> = _p::Descriptor::<_p::Data> {
         slot: 1u32,
-        default: _p::data::Reader::empty(),
+        default: None,
     };
     const STRUCT_FIELD: _p::Descriptor<_p::Struct<TestAllTypes>> = _p::Descriptor::<
         _p::Struct<TestAllTypes>,
     > {
         slot: 2u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
     const ENUM_FIELD: _p::Descriptor<_p::Enum<TestEnum>> = _p::Descriptor::<
         _p::Enum<TestEnum>,
@@ -200,81 +200,79 @@ impl TestAllTypes {
     const INTERFACE_FIELD: _p::Descriptor<()> = ();
     const VOID_LIST: _p::Descriptor<_p::List<()>> = _p::Descriptor::<_p::List<()>> {
         slot: 3u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<()>()),
+        default: None,
     };
     const BOOL_LIST: _p::Descriptor<_p::List<bool>> = _p::Descriptor::<_p::List<bool>> {
         slot: 4u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<bool>()),
+        default: None,
     };
     const INT8_LIST: _p::Descriptor<_p::List<i8>> = _p::Descriptor::<_p::List<i8>> {
         slot: 5u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<i8>()),
+        default: None,
     };
     const INT16_LIST: _p::Descriptor<_p::List<i16>> = _p::Descriptor::<_p::List<i16>> {
         slot: 6u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<i16>()),
+        default: None,
     };
     const INT32_LIST: _p::Descriptor<_p::List<i32>> = _p::Descriptor::<_p::List<i32>> {
         slot: 7u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<i32>()),
+        default: None,
     };
     const INT64_LIST: _p::Descriptor<_p::List<i64>> = _p::Descriptor::<_p::List<i64>> {
         slot: 8u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<i64>()),
+        default: None,
     };
     const U_INT8_LIST: _p::Descriptor<_p::List<u8>> = _p::Descriptor::<_p::List<u8>> {
         slot: 9u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<u8>()),
+        default: None,
     };
     const U_INT16_LIST: _p::Descriptor<_p::List<u16>> = _p::Descriptor::<_p::List<u16>> {
         slot: 10u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<u16>()),
+        default: None,
     };
     const U_INT32_LIST: _p::Descriptor<_p::List<u32>> = _p::Descriptor::<_p::List<u32>> {
         slot: 11u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<u32>()),
+        default: None,
     };
     const U_INT64_LIST: _p::Descriptor<_p::List<u64>> = _p::Descriptor::<_p::List<u64>> {
         slot: 12u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<u64>()),
+        default: None,
     };
     const FLOAT32_LIST: _p::Descriptor<_p::List<f32>> = _p::Descriptor::<_p::List<f32>> {
         slot: 13u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<f32>()),
+        default: None,
     };
     const FLOAT64_LIST: _p::Descriptor<_p::List<f64>> = _p::Descriptor::<_p::List<f64>> {
         slot: 14u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<f64>()),
+        default: None,
     };
     const TEXT_LIST: _p::Descriptor<_p::List<_p::Text>> = _p::Descriptor::<
         _p::List<_p::Text>,
     > {
         slot: 15u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<_p::Text>()),
+        default: None,
     };
     const DATA_LIST: _p::Descriptor<_p::List<_p::Data>> = _p::Descriptor::<
         _p::List<_p::Data>,
     > {
         slot: 16u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<_p::Data>()),
+        default: None,
     };
     const STRUCT_LIST: _p::Descriptor<_p::List<_p::Struct<TestAllTypes>>> = _p::Descriptor::<
         _p::List<_p::Struct<TestAllTypes>>,
     > {
         slot: 17u32,
-        default: _p::ListReader::empty(
-            _p::ElementSize::size_of::<_p::Struct<TestAllTypes>>(),
-        ),
+        default: None,
     };
     const ENUM_LIST: _p::Descriptor<_p::List<_p::Enum<TestEnum>>> = _p::Descriptor::<
         _p::List<_p::Enum<TestEnum>>,
     > {
         slot: 18u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<_p::Enum<TestEnum>>()),
+        default: None,
     };
     const INTERFACE_LIST: _p::Descriptor<_p::List<()>> = _p::Descriptor::<_p::List<()>> {
         slot: 19u32,
-        default: _p::ListReader::empty(_p::ElementSize::size_of::<()>()),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> test_all_types::Reader<'p, T> {

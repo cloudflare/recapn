@@ -100,7 +100,7 @@ impl TestImport {
         _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
     > {
         slot: 0u32,
-        default: _p::StructReader::empty(),
+        default: None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> test_import::Reader<'p, T> {

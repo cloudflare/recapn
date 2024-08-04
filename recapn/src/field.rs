@@ -37,7 +37,7 @@
 //! lifetimes respectively. So `&'b ptr::StructReader<'p, T>` could be extended to
 //! `&'borrow ptr::StructReader<'pointer, T>`.
 
-use core::convert::TryFrom;
+use core::convert::{TryFrom, Infallible as Never};
 use core::marker::PhantomData;
 use core::str::Utf8Error;
 
@@ -272,9 +272,24 @@ pub type VariantMut<'b, 'p, T, V> = <V as FieldType>::VariantAccessor<StructBuil
 
 pub type VariantOwned<'p, T, V> = <V as FieldType>::VariantAccessor<ptr::StructBuilder<'p, T>>;
 
+/// A trait used to specify that a type is used to represent a Cap'n Proto value.
+pub trait Value: 'static {
+    type Default;
+}
+
+/// A trait used to specify that a type is backed by a pointer field. This enables generic pointers
+/// in generated code.
+pub trait PtrValue: 'static {
+    type Default;
+}
+
+impl<T: PtrValue> Value for T {
+    type Default = Option<<T as PtrValue>::Default>;
+}
+
 /// Describes a value in a "slot" in a struct. This does not include groups or void, which don't
 /// have an associated default value or slot.
-pub struct FieldInfo<V: ty::Value> {
+pub struct FieldInfo<V: Value> {
     pub slot: u32,
     pub default: V::Default,
 }
@@ -304,7 +319,7 @@ pub struct Struct<S: ty::Struct> {
 }
 
 impl<S: ty::Struct> Sealed for Struct<S> {}
-impl<S: ty::Struct> ty::Value for Struct<S> {
+impl<S: ty::Struct> PtrValue for Struct<S> {
     type Default = ptr::StructReader<'static>;
 }
 impl<S: ty::Struct> ListValue for Struct<S> {
@@ -339,9 +354,9 @@ pub struct Capability<C: ty::Capability> {
 }
 
 impl<C: ty::Capability> Sealed for Capability<C> {}
-impl<C: ty::Capability> ty::Value for Capability<C> {
+impl<C: ty::Capability> PtrValue for Capability<C> {
     /// Capabilities don't have defaults
-    type Default = ();
+    type Default = Never;
 }
 impl<C: ty::Capability> ListValue for Capability<C> {
     const ELEMENT_SIZE: ElementSize = ElementSize::Pointer;
@@ -353,7 +368,7 @@ pub struct Enum<E: ty::Enum> {
 }
 
 impl<E: ty::Enum> Sealed for Enum<E> {}
-impl<E: ty::Enum> ty::Value for Enum<E> {
+impl<E: ty::Enum> Value for Enum<E> {
     type Default = E;
 }
 impl<E: ty::Enum> ListValue for Enum<E> {
@@ -454,7 +469,7 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p
     }
 }
 
-pub struct DataField<D: ty::Value, Repr> {
+pub struct DataField<D: Value, Repr> {
     descriptor: &'static FieldInfo<D>,
     repr: Repr,
 }
@@ -471,7 +486,7 @@ impl<'b, 'p, T: Table, D: Data> DataField<D, StructBuilder<'b, 'p, T>> {
     }
 }
 
-pub struct DataVariant<D: ty::Value, Repr> {
+pub struct DataVariant<D: Value, Repr> {
     descriptor: &'static FieldInfo<D>,
     variant: &'static VariantInfo,
     repr: Repr,
@@ -641,7 +656,7 @@ impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructBuilder<'b, 'p, T
     }
 }
 
-pub struct PtrField<V: ty::Value, Repr> {
+pub struct PtrField<V: PtrValue, Repr> {
     descriptor: &'static FieldInfo<V>,
     repr: Repr,
 }
@@ -650,7 +665,7 @@ pub type PtrFieldReader<'b, 'p, T, V> = PtrField<V, StructReader<'b, 'p, T>>;
 pub type PtrFieldBuilder<'b, 'p, T, V> = PtrField<V, StructBuilder<'b, 'p, T>>;
 pub type PtrFieldOwner<'p, T, V> = PtrField<V, OwnedStructBuilder<'p, T>>;
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrFieldReader<'b, 'p, T, V> {
+impl<'b, 'p, T: Table, V: PtrValue> PtrFieldReader<'b, 'p, T, V> {
     #[inline]
     fn raw_ptr(&self) -> ptr::PtrReader<'p, T> {
         self.repr.ptr_field(self.descriptor.slot as u16)
@@ -667,7 +682,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrFieldReader<'b, 'p, T, V> {
     }
 }
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrFieldBuilder<'b, 'p, T, V> {
+impl<'b, 'p, T: Table, V: PtrValue> PtrFieldBuilder<'b, 'p, T, V> {
     /// Create a new field builder "by reference". This allows a field builder to be reused
     /// as many builder functions consume the builder.
     #[inline]
@@ -725,7 +740,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrFieldBuilder<'b, 'p, T, V> {
     }
 }
 
-impl<'p, T: Table, V: ty::Value> PtrFieldOwner<'p, T, V> {
+impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
     /// Create a new field builder "by reference". This allows a field builder to be reused
     /// as many builder functions consume the builder.
     #[inline]
@@ -784,7 +799,7 @@ impl<'p, T: Table, V: ty::Value> PtrFieldOwner<'p, T, V> {
 }
 
 /// A base type for accessing union variant fields.
-pub struct PtrVariant<V: ty::Value, Repr> {
+pub struct PtrVariant<V: PtrValue, Repr> {
     descriptor: &'static FieldInfo<V>,
     variant: &'static VariantInfo,
     repr: Repr,
@@ -794,7 +809,7 @@ pub type PtrVariantReader<'b, 'p, T, V> = PtrVariant<V, StructReader<'b, 'p, T>>
 pub type PtrVariantBuilder<'b, 'p, T, V> = PtrVariant<V, StructBuilder<'b, 'p, T>>;
 pub type PtrVariantOwner<'p, T, V> = PtrVariant<V, OwnedStructBuilder<'p, T>>;
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrVariantReader<'b, 'p, T, V> {
+impl<'b, 'p, T: Table, V: PtrValue> PtrVariantReader<'b, 'p, T, V> {
     /// Returns a bool indicating whether or not this field is set in the union
     #[inline]
     pub fn is_set(&self) -> bool {
@@ -803,8 +818,12 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantReader<'b, 'p, T, V> {
     }
 
     #[inline]
-    fn raw_ptr(&self) -> Option<ptr::PtrReader<'b, T>> {
-        self.is_set().then(|| self.repr.ptr_field(self.descriptor.slot as u16))
+    fn raw_ptr_or_null(&self) -> ptr::PtrReader<'b, T> {
+        if self.is_set() {
+            self.repr.ptr_field(self.descriptor.slot as u16)
+        } else {
+            ptr::PtrReader::null().imbue_from(self.repr)
+        }
     }
 
     #[inline]
@@ -822,7 +841,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantReader<'b, 'p, T, V> {
     }
 }
 
-impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
+impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
     /// Returns a bool indicating whether or not this field is set in the union
     #[inline]
     pub fn is_set(&self) -> bool {
@@ -907,7 +926,7 @@ impl<'b, 'p, T: Table, V: ty::Value> PtrVariantBuilder<'b, 'p, T, V> {
     }
 }
 
-impl<'p, T: Table, V: ty::Value> PtrVariantOwner<'p, T, V> {
+impl<'p, T: Table, V: PtrValue> PtrVariantOwner<'p, T, V> {
     /// Returns a bool indicating whether or not this field is set in the union
     #[inline]
     pub fn is_set(&self) -> bool {
@@ -942,6 +961,10 @@ macro_rules! field_type_items {
 
 // impls for list
 
+impl<V: 'static> PtrValue for List<V> {
+    type Default = ptr::ListReader<'static>;
+}
+
 impl<V: 'static> FieldType for List<V> {
     field_type_items!{}
 }
@@ -952,10 +975,14 @@ where
 {
     #[inline]
     fn default(&self) -> list::Reader<'static, V, T> {
-        let default = &self.descriptor.default;
-        assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
+        match &self.descriptor.default {
+            Some(default) => {
+                debug_assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
 
-        List::new(default.clone().imbue_from(self.repr))
+                List::new(default.clone().imbue_from(self.repr))
+            }
+            None => List::empty().imbue_from(self.repr)
+        }
     }
 
     #[inline]
@@ -1017,10 +1044,14 @@ where
 impl<'b, 'p, T: Table, V: ty::DynListValue> PtrVariantReader<'b, 'p, T, List<V>> {
     #[inline]
     fn default(&self) -> list::Reader<'static, V, T> {
-        let default = &self.descriptor.default;
-        assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
+        match &self.descriptor.default {
+            Some(default) => {
+                debug_assert!(default.element_size().upgradable_to(V::PTR_ELEMENT_SIZE));
 
-        List::new(default.clone().imbue_from(self.repr))
+                List::new(default.clone().imbue_from(self.repr))
+            }
+            None => List::empty().imbue_from(self.repr)
+        }
     }
 
     #[inline]
@@ -1060,9 +1091,14 @@ impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
         match self.into_raw_build_ptr().to_list_mut(Some(V::ELEMENT_SIZE)) {
             Ok(ptr) => List::new(ptr),
             Err((_, ptr)) => {
-                assert_eq!(default.element_size(), V::ELEMENT_SIZE);
-                let mut new_list = ptr.init_list(V::ELEMENT_SIZE, default.len());
-                new_list.try_copy_from(default, UnwrapErrors).unwrap();
+                let new_list = if let Some(default) = default {
+                    debug_assert_eq!(default.element_size(), V::ELEMENT_SIZE);
+                    let mut new_list = ptr.init_list(V::ELEMENT_SIZE, default.len());
+                    new_list.try_copy_from(default, UnwrapErrors).unwrap();
+                    new_list
+                } else {
+                    ptr.init_list(V::ELEMENT_SIZE, ElementCount::ZERO)
+                };
                 List::new(new_list)
             }
         }
@@ -1124,7 +1160,7 @@ impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
             .to_list_mut(expected_size.map(ElementSize::InlineComposite))
         {
             Ok(ptr) => ptr,
-            Err((_, ptr)) => {
+            Err((_, ptr)) => if let Some(default) = default {
                 let default_size = default.element_size();
                 let size = match expected_size {
                     Some(e) => {
@@ -1137,6 +1173,9 @@ impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
                 let mut builder = ptr.init_list(size, default.len());
                 builder.try_copy_from(default, UnwrapErrors).unwrap();
                 builder
+            } else {
+                let s = ElementSize::InlineComposite(expected_size.unwrap_or(StructSize::EMPTY));
+                ptr.init_list(s, ElementCount::ZERO)
             }
         };
         List::new(ptr)
@@ -1165,7 +1204,7 @@ impl<S: ty::Struct> FieldType for Struct<S> {
 impl<S: ty::Struct, Repr> PtrField<Struct<S>, Repr> {
     #[inline]
     fn default_ptr(&self) -> ptr::StructReader<'static> {
-        self.descriptor.default.clone()
+        self.descriptor.default.clone().unwrap_or_else(ptr::StructReader::empty)
     }
 
     /// Returns the default value of the field
@@ -1229,7 +1268,9 @@ where
             Ok(ptr) => ptr,
             Err((_, ptr)) => {
                 let mut builder = ptr.init_struct(S::SIZE);
-                builder.copy_with_caveats(default, false);
+                if let Some(default) = default {
+                    builder.copy_with_caveats(default, false);
+                }
                 builder
             }
         };
@@ -1275,21 +1316,39 @@ where
     }
 }
 
+impl<S: ty::Struct, Repr> PtrVariant<Struct<S>, Repr> {
+    #[inline]
+    fn default_ptr(&self) -> ptr::StructReader<'static> {
+        self.descriptor.default.clone().unwrap_or_else(ptr::StructReader::empty)
+    }
+
+    /// Returns the default value of the field
+    #[inline]
+    pub fn default(&self) -> S::Reader<'static, Empty> {
+        ty::StructReader::from_ptr(self.default_ptr())
+    }
+}
+
 impl<'b, 'p: 'b, T: Table + 'p, S> PtrVariantReader<'b, 'p, T, Struct<S>>
 where
     S: ty::Struct,
 {
     #[inline]
-    fn default(&self) -> S::Reader<'b, T> {
-        self.descriptor.default.clone().imbue_from(self.repr).into()
+    fn default_imbued_ptr(&self) -> ptr::StructReader<'static, T> {
+        self.descriptor
+            .default
+            .clone()
+            .unwrap_or_else(ptr::StructReader::empty)
+            .imbue_from(self.repr)
     }
 
     #[inline]
     pub fn get_or_default(&self) -> S::Reader<'b, T> {
-        self.try_get_option()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| self.default())
+        let ptr = match self.raw_ptr_or_null().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            _ => self.default_imbued_ptr(),
+        };
+        ty::StructReader::from_ptr(ptr)
     }
 
     #[inline]
@@ -1299,8 +1358,12 @@ where
 
     #[inline]
     pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
-        self.try_get_option()
-            .map(|op| op.unwrap_or_else(|| self.default()))
+        let ptr = match self.raw_ptr_or_null().to_struct() {
+            Ok(Some(ptr)) => ptr,
+            Ok(None) => self.default_imbued_ptr(),
+            Err(err) => return Err(err),
+        };
+        Ok(ty::StructReader::from_ptr(ptr))
     }
 
     #[inline]
@@ -1353,6 +1416,10 @@ where
     }
 }
 
+impl PtrValue for text::Text {
+    type Default = text::Reader<'static>;
+}
+
 impl FieldType for text::Text {
     field_type_items!{}
 }
@@ -1361,7 +1428,7 @@ impl<Repr> PtrField<text::Text, Repr> {
     /// Returns the default value of the field
     #[inline]
     pub fn default(&self) -> text::Reader<'static> {
-        self.descriptor.default
+        self.descriptor.default.unwrap_or_else(text::Reader::empty)
     }
 }
 
@@ -1412,7 +1479,7 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, text::Text> {
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> text::Builder<'b> {
-        let default = self.descriptor.default;
+        let default = self.descriptor.default.unwrap_or_else(text::Reader::empty);
         let blob = match self.into_raw_build_ptr().to_blob_mut() {
             Ok(b) => b,
             Err((_, ptr)) => ptr.set_blob(default.into()),
@@ -1475,6 +1542,10 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, text::Text> {
 
 }
 
+impl PtrValue for data::Data {
+    type Default = data::Reader<'static>;
+}
+
 impl FieldType for data::Data {
     field_type_items!{}
 }
@@ -1483,7 +1554,7 @@ impl<Repr> PtrField<data::Data, Repr> {
     /// Returns the default value of the field
     #[inline]
     pub fn default(&self) -> data::Reader<'static> {
-        self.descriptor.default.clone().into()
+        self.descriptor.default.unwrap_or_else(data::Reader::empty)
     }
 }
 
@@ -1519,7 +1590,7 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, data::Data> {
     /// existing value, the default is set instead.
     #[inline]
     pub fn get(self) -> data::Builder<'b> {
-        let default = self.descriptor.default;
+        let default = self.descriptor.default.unwrap_or_else(data::Reader::empty);
         match self.into_raw_build_ptr().to_blob_mut() {
             Ok(data) => data,
             Err((_, ptr)) => ptr.set_blob(default.into()),
@@ -1570,6 +1641,10 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, data::Data> {
     // TODO accessors
 }
 
+impl PtrValue for AnyPtr {
+    type Default = ptr::PtrReader<'static, Empty>;
+}
+
 impl FieldType for AnyPtr {
     field_type_items!();
 }
@@ -1582,6 +1657,10 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, AnyPtr> {
     // TODO accessors
 }
 
+impl PtrValue for AnyStruct {
+    type Default = ptr::StructReader<'static, Empty>;
+}
+
 impl FieldType for AnyStruct {
     field_type_items!{}
 }
@@ -1590,7 +1669,7 @@ impl<Repr> PtrField<AnyStruct, Repr> {
     /// Returns the default value of the field
     #[inline]
     fn default_ptr(&self) -> ptr::StructReader<'static> {
-        self.descriptor.default.clone()
+        self.descriptor.default.clone().unwrap_or_else(ptr::StructReader::empty)
     }
 
     /// Returns the default value of the field
@@ -1644,6 +1723,10 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrVariantBuilder<'b, 'p, T, AnyStruct> {
     // TODO accessors
 }
 
+impl PtrValue for AnyList {
+    type Default = ptr::ListReader<'static, Empty>;
+}
+
 impl FieldType for AnyList {
     field_type_items!{}
 }
@@ -1652,7 +1735,10 @@ impl<Repr> PtrField<AnyList, Repr> {
     /// Returns the default value of the field
     #[inline]
     fn default_ptr(&self) -> ptr::ListReader<'static> {
-        self.descriptor.default.clone()
+        self.descriptor
+            .default
+            .clone()
+            .unwrap_or_else(|| ptr::ListReader::empty(ElementSize::Void))
     }
 
     /// Returns the default value of the field

@@ -590,7 +590,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::text::Reader::from_slice(#bytes))
                     }
-                    _ => quote!(_p::text::Reader::empty()),
+                    _ => quote!(None),
                 }
             }
             TypeKind::Data(()) => {
@@ -603,7 +603,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::data::Reader::from_slice(#bytes))
                     }
-                    _ => quote!(_p::data::Reader::empty()),
+                    _ => quote!(None),
                 }
             }
             TypeKind::List(list) => {
@@ -625,7 +625,7 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::ListReader::slice_unchecked(#words, #len, #element_size_quote))
                     }
-                    _ => quote!(_p::ListReader::empty(#element_size_quote)),
+                    _ => quote!(None),
                 }
             }
             TypeKind::Enum(info) => {
@@ -656,12 +656,10 @@ impl<'a> GeneratorContext<'a> {
 
                         quote!(_p::StructReader::slice_unchecked(#words, #size))
                     }
-                    _ => quote!(_p::StructReader::empty()),
+                    _ => quote!(None),
                 }
             }
-            TypeKind::Interface(_) => {
-                unimplemented!("cannot generate values for Capability fields")
-            }
+            TypeKind::Interface(_) => quote!(None),
             TypeKind::AnyPointer(kind) => {
                 let ptr = value.and_then(|v| v.any_pointer().field())
                     .map(|p| p.ptr()).filter(|p| !p.is_null());
@@ -673,7 +671,7 @@ impl<'a> GeneratorContext<'a> {
 
                             quote!(_p::PtrReader::slice_unchecked(#words))
                         } else {
-                            quote!(_p::PtrReader::null())
+                            quote!(None)
                         }
                         ConstraintKind::Struct(_) => if let Some(ptr) = ptr {
                             let reader = ptr.try_read_as::<AnyStruct>()
@@ -685,7 +683,7 @@ impl<'a> GeneratorContext<'a> {
 
                             quote!(_p::StructReader::slice_unchecked(#words, #size))
                         } else {
-                            quote!(_p::StructReader::empty())
+                            quote!(None)
                         }
                         ConstraintKind::List(_) => if let Some(ptr) = ptr {
                             let reader = ptr.try_read_as::<AnyList>()
@@ -697,9 +695,9 @@ impl<'a> GeneratorContext<'a> {
 
                             quote!(_p::ListReader::slice_unchecked(#words, #len, #size_quote))
                         } else {
-                            quote!(_p::ListReader::empty())
+                            quote!(None)
                         }
-                        ConstraintKind::Capability(_) => quote!(()),
+                        ConstraintKind::Capability(_) => quote!(None),
                     },
                     AnyPtrKind::Parameter(_) => todo!("generate default values for generic types"),
                     _ => unreachable!(),

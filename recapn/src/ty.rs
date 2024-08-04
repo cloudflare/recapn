@@ -200,11 +200,6 @@ impl<'a, S: Struct, T: Table> ReadPtr<any::PtrReader<'a, T>> for field::Struct<S
     }
 }
 
-/// A trait used to specify that a type is used to represent a Cap'n Proto value.
-pub trait Value: Sealed + 'static {
-    type Default;
-}
-
 /// A type representing a fixed size Cap'n Proto value that can be stored in a list.
 ///
 /// Note not every type that be stored in a list will implement this trait. Dynamically
@@ -214,7 +209,7 @@ pub trait ListValue: DynListValue {
     const ELEMENT_SIZE: ElementSize;
 }
 
-pub trait DynListValue: Value {
+pub trait DynListValue: 'static {
     const PTR_ELEMENT_SIZE: ptr::PtrElementSize;
 }
 impl<T: ListValue> DynListValue for T {
@@ -241,7 +236,7 @@ pub type Float64 = f64;
 macro_rules! impl_value {
     ($ty:ty, $size:ident) => {
         impl Sealed for $ty {}
-        impl Value for $ty {
+        impl field::Value for $ty {
             type Default = Self;
         }
         impl ListValue for $ty {
@@ -263,9 +258,6 @@ impl_value!(Int64, EightBytes);
 impl_value!(Float32, FourBytes);
 impl_value!(Float64, EightBytes);
 
-impl<V: 'static> Value for List<V> {
-    type Default = ptr::ListReader<'static>;
-}
 impl<V: 'static> ListValue for List<V> {
     const ELEMENT_SIZE: list::ElementSize = list::ElementSize::Pointer;
 }

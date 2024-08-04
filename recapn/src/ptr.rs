@@ -4,6 +4,7 @@ use crate::alloc::{
     AllocLen, Segment, SegmentLen, SegmentOffset, SegmentPtr, SegmentRef, SignedSegmentOffset, Word
 };
 use crate::arena::{SegmentId, SegmentWithId, ReadArena, BuildArena, ArenaSegment};
+use crate::field;
 use crate::internal::Sealed;
 use crate::message::ReadLimiter;
 use crate::num::u29;
@@ -25,7 +26,7 @@ pub use crate::data::ptr::{Reader as DataReader, Builder as DataBuilder};
 pub use crate::text::ptr::{Reader as TextReader, Builder as TextBuilder};
 
 /// A field type that can be found in the data section of a struct.
-pub trait Data: ty::Value<Default = Self> + ty::ListValue + Default + Copy + Sealed + 'static {
+pub trait Data: field::Value<Default = Self> + ty::ListValue + Default + Copy + Sealed + 'static {
     unsafe fn read(ptr: *const u8, len: u32, slot: usize, default: Self) -> Self;
     unsafe fn read_unchecked(ptr: *const u8, slot: usize, default: Self) -> Self;
 
