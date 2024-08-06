@@ -312,7 +312,9 @@ impl<'a> GeneratorContext<'a> {
                 }))
             },
             NodeKind::File(()) => unreachable!(),
-            NodeKind::Interface(_) => todo!("generate interface info"),
+            NodeKind::Interface(_) => {
+                // todo: generate interface info
+            },
             NodeKind::Annotation(_) => {}, // ignored
         }
 
@@ -326,12 +328,13 @@ impl<'a> GeneratorContext<'a> {
         } = &self.nodes[&id] else { anyhow::bail!("expected file node") };
 
         let mut required_imports = HashSet::new();
+        let mut file = GeneratedFile { items: Vec::new(), ident: mod_ident.clone() };
 
-        let items = node.nested_nodes()
-            .into_iter()
-            .map(|nested| self.generate_item(nested.id(), &mut required_imports))
-            .collect::<Result<_>>()?;
-        let file = GeneratedFile { items, ident: mod_ident.clone() };
+        for nested in node.nested_nodes() {
+            if let Some(item) = self.generate_item(nested.id(), &mut required_imports)? {
+                file.items.push(item);
+            }
+        }
 
         let imports = required_imports.iter().map(|id| {
             let NodeContext {
@@ -350,23 +353,30 @@ impl<'a> GeneratorContext<'a> {
         Ok((file, root_mod))
     }
 
-    fn generate_item(&self, id: u64, required_imports: &mut HashSet<u64>) -> Result<GeneratedItem> {
+    fn generate_item(&self, id: u64, required_imports: &mut HashSet<u64>) -> Result<Option<GeneratedItem>> {
         let NodeContext { node, info } = &self.nodes[&id];
-        match (node.which()?, info) {
+        let item = match (node.which()?, info) {
             (NodeKind::Struct(s), Some(NodeInfo::Struct(info))) => {
-                Ok(GeneratedItem::Struct(self.generate_struct(node, &s, info, required_imports)?))
+                GeneratedItem::Struct(self.generate_struct(node, &s, info, required_imports)?)
             },
             (NodeKind::Enum(_), Some(NodeInfo::Enum(info))) => {
-                Ok(GeneratedItem::Enum(self.generate_enum(info)?))
+                GeneratedItem::Enum(self.generate_enum(info)?)
             },
             (NodeKind::Const(c), Some(NodeInfo::Const(info))) => {
-                Ok(GeneratedItem::Const(self.generate_const(&c, info, required_imports)?))
+                GeneratedItem::Const(self.generate_const(&c, info, required_imports)?)
             }
-            (NodeKind::Interface(_), None) => todo!(),
-            (NodeKind::Annotation(_), None) => todo!(),
-            (NodeKind::File(()), None) => unimplemented!("found nested file node inside a file"),
+            (NodeKind::Interface(_), _) => {
+                // todo: generate interface items
+                return Ok(None)
+            },
+            (NodeKind::Annotation(_), _) => {
+                // todo: generate annotation items
+                return Ok(None)
+            },
+            (NodeKind::File(()), _) => unreachable!("found nested file node inside a file"),
             _ => anyhow::bail!("missing node info"),
-        }
+        };
+        Ok(Some(item))
     }
 
     fn generate_struct(&self, node: &ReaderOf<Node>, struct_group: &ReaderOf<Struct>, info: &StructInfo, required_imports: &mut HashSet<u64>) -> Result<GeneratedStruct> {
@@ -415,15 +425,17 @@ impl<'a> GeneratorContext<'a> {
 
         let mut nested_items = Vec::new();
         for nested in node.nested_nodes() {
-            let item = self.generate_item(nested.id(), required_imports)?;
-            nested_items.push(item);
+            if let Some(item) = self.generate_item(nested.id(), required_imports)? {
+                nested_items.push(item);
+            }
         }
 
         if let Some(node) = node.r#struct().get() {
             for field in node.fields() {
                 if let Some(group) = field.group().get() {
-                    let item = self.generate_item(group.type_id(), required_imports)?;
-                    nested_items.push(item);
+                    if let Some(item) = self.generate_item(group.type_id(), required_imports)? {
+                        nested_items.push(item);
+                    }
                 }
             }
         }
@@ -528,7 +540,7 @@ impl<'a> GeneratorContext<'a> {
                 let type_name = self.resolve_type_name(scope, s.type_id(), required_imports)?;
                 syn::parse_quote!(_p::Struct<#type_name>)
             },
-            TypeKind::Interface(_) => todo!("resolve interface types"),
+            TypeKind::Interface(_) => syn::parse_quote!(_p::AnyPtr), // TODO
             TypeKind::AnyPointer(ptr) => match ptr.which()? {
                 AnyPtrKind::Unconstrained(unconstrained) => match unconstrained.which()? {
                     ConstraintKind::AnyKind(()) => syn::parse_quote!(_p::AnyPtr),
@@ -536,9 +548,7 @@ impl<'a> GeneratorContext<'a> {
                     ConstraintKind::List(()) => syn::parse_quote!(_p::AnyList),
                     ConstraintKind::Capability(()) => syn::parse_quote!(_p::AnyPtr), // TODO
                 },
-                AnyPtrKind::Parameter(_) => {
-                    todo!("resolve generic types")
-                },
+                AnyPtrKind::Parameter(_) => syn::parse_quote!(_p::AnyPtr), // TODO
                 AnyPtrKind::ImplicitMethodParameter(_) => todo!(),
             }
         }))
@@ -699,7 +709,7 @@ impl<'a> GeneratorContext<'a> {
                         }
                         ConstraintKind::Capability(_) => quote!(None),
                     },
-                    AnyPtrKind::Parameter(_) => todo!("generate default values for generic types"),
+                    AnyPtrKind::Parameter(_) => quote!(None),
                     _ => unreachable!(),
                 }
             }
