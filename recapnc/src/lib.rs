@@ -413,7 +413,12 @@ pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl
             .context("parsing generated file")?;
         let printable = prettyplease::unparse(&parsed);
 
-        fs::write(out.join(Path::new(&root.path)), printable)?;
+        let out_path = out.join(Path::new(&root.path));
+        if let Some(parent) = out_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&out_path, printable)
+            .with_context(|| format!("failed to write to path: {}", out_path.display()))?;
 
         root_mod.files.push(root);
     }
