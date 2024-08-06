@@ -147,7 +147,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_import::Builder<'p, T> {
     }
 }
 pub mod test_import {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestImport<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestImport<
         _p::StructBuilder<'a, T>,

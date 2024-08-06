@@ -1,6 +1,7 @@
 #![allow(unused, unsafe_code)]
 use recapn::prelude::gen as _p;
 use super::{__file, __imports};
+#[repr(u16)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum TestEnum {
     #[default]
@@ -16,7 +17,7 @@ pub enum TestEnum {
 impl core::convert::TryFrom<u16> for TestEnum {
     type Error = _p::NotInSchema;
     #[inline]
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> Result<Self, _p::NotInSchema> {
         match value {
             0u16 => Ok(Self::Foo),
             1u16 => Ok(Self::Bar),
@@ -1030,7 +1031,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     }
 }
 pub mod test_all_types {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestAllTypes<
         _p::StructReader<'a, T>,
     >;

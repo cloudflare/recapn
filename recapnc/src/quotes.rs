@@ -360,7 +360,7 @@ to_tokens!(GeneratedStruct |self| {
         }
 
         pub mod #modname {
-            use super::{__file, _p};
+            use super::{__file, __imports, _p};
 
             pub type Reader<'a, T = _p::rpc::Empty> = super::#name<_p::StructReader<'a, T>>;
             pub type Builder<'a, T = _p::rpc::Empty> = super::#name<_p::StructBuilder<'a, T>>;
@@ -619,6 +619,7 @@ to_tokens!(GeneratedEnum |self| {
     });
 
     quote! {
+        #[repr(u16)]
         #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
         pub enum #name {
             #[default]
@@ -629,7 +630,7 @@ to_tokens!(GeneratedEnum |self| {
             type Error = _p::NotInSchema;
 
             #[inline]
-            fn try_from(value: u16) -> Result<Self, Self::Error> {
+            fn try_from(value: u16) -> Result<Self, _p::NotInSchema> {
                 match value {
                     #(#enum_matches,)*
                     value => Err(_p::NotInSchema(value))

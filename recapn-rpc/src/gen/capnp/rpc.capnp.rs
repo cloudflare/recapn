@@ -612,7 +612,7 @@ impl<'p, T: _p::rpc::Table + 'p> message::Builder<'p, T> {
     }
 }
 pub mod message {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Message<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Message<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
@@ -1131,7 +1131,7 @@ impl<'p, T: _p::rpc::Table + 'p> bootstrap::Builder<'p, T> {
     }
 }
 pub mod bootstrap {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Bootstrap<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Bootstrap<
         _p::StructBuilder<'a, T>,
@@ -1435,7 +1435,7 @@ impl<'p, T: _p::rpc::Table + 'p> call::Builder<'p, T> {
     }
 }
 pub mod call {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Call<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Call<_p::StructBuilder<'a, T>>;
     #[derive(Clone)]
@@ -1636,7 +1636,7 @@ pub mod call {
         }
     }
     pub mod send_results_to {
-        use super::{__file, _p};
+        use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::SendResultsTo<
             _p::StructReader<'a, T>,
         >;
@@ -2081,7 +2081,7 @@ impl<'p, T: _p::rpc::Table + 'p> r#return::Builder<'p, T> {
     }
 }
 pub mod r#return {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Return<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Return<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
@@ -2379,7 +2379,7 @@ impl<'p, T: _p::rpc::Table + 'p> finish::Builder<'p, T> {
     }
 }
 pub mod finish {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Finish<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Finish<_p::StructBuilder<'a, T>>;
 }
@@ -2578,7 +2578,7 @@ impl<'p, T: _p::rpc::Table + 'p> resolve::Builder<'p, T> {
     }
 }
 pub mod resolve {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructBuilder<'a, T>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
@@ -2787,7 +2787,7 @@ impl<'p, T: _p::rpc::Table + 'p> release::Builder<'p, T> {
     }
 }
 pub mod release {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Release<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Release<_p::StructBuilder<'a, T>>;
 }
@@ -2951,7 +2951,7 @@ impl<'p, T: _p::rpc::Table + 'p> disembargo::Builder<'p, T> {
     }
 }
 pub mod disembargo {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Disembargo<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Disembargo<
         _p::StructBuilder<'a, T>,
@@ -3165,7 +3165,7 @@ pub mod disembargo {
         }
     }
     pub mod context {
-        use super::{__file, _p};
+        use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Context<
             _p::StructReader<'a, T>,
         >;
@@ -3456,7 +3456,7 @@ impl<'p, T: _p::rpc::Table + 'p> provide::Builder<'p, T> {
     }
 }
 pub mod provide {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Provide<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Provide<_p::StructBuilder<'a, T>>;
 }
@@ -3614,7 +3614,7 @@ impl<'p, T: _p::rpc::Table + 'p> accept::Builder<'p, T> {
     }
 }
 pub mod accept {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Accept<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Accept<_p::StructBuilder<'a, T>>;
 }
@@ -3785,7 +3785,7 @@ impl<'p, T: _p::rpc::Table + 'p> join::Builder<'p, T> {
     }
 }
 pub mod join {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Join<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Join<_p::StructBuilder<'a, T>>;
 }
@@ -3968,7 +3968,7 @@ impl<'p, T: _p::rpc::Table + 'p> message_target::Builder<'p, T> {
     }
 }
 pub mod message_target {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::MessageTarget<
         _p::StructReader<'a, T>,
     >;
@@ -4207,7 +4207,7 @@ impl<'p, T: _p::rpc::Table + 'p> payload::Builder<'p, T> {
     }
 }
 pub mod payload {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Payload<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Payload<_p::StructBuilder<'a, T>>;
 }
@@ -4536,7 +4536,7 @@ impl<'p, T: _p::rpc::Table + 'p> cap_descriptor::Builder<'p, T> {
     }
 }
 pub mod cap_descriptor {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::CapDescriptor<
         _p::StructReader<'a, T>,
     >;
@@ -4860,7 +4860,7 @@ impl<'p, T: _p::rpc::Table + 'p> promised_answer::Builder<'p, T> {
     }
 }
 pub mod promised_answer {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::PromisedAnswer<
         _p::StructReader<'a, T>,
     >;
@@ -5021,7 +5021,7 @@ pub mod promised_answer {
         }
     }
     pub mod op {
-        use super::{__file, _p};
+        use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Op<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Op<_p::StructBuilder<'a, T>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
@@ -5258,7 +5258,7 @@ impl<'p, T: _p::rpc::Table + 'p> third_party_cap_descriptor::Builder<'p, T> {
     }
 }
 pub mod third_party_cap_descriptor {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::ThirdPartyCapDescriptor<
         _p::StructReader<'a, T>,
     >;
@@ -5477,11 +5477,12 @@ impl<'p, T: _p::rpc::Table + 'p> exception::Builder<'p, T> {
     }
 }
 pub mod exception {
-    use super::{__file, _p};
+    use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Exception<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Exception<
         _p::StructBuilder<'a, T>,
     >;
+    #[repr(u16)]
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
     pub enum Type {
         #[default]
@@ -5493,7 +5494,7 @@ pub mod exception {
     impl core::convert::TryFrom<u16> for Type {
         type Error = _p::NotInSchema;
         #[inline]
-        fn try_from(value: u16) -> Result<Self, Self::Error> {
+        fn try_from(value: u16) -> Result<Self, _p::NotInSchema> {
             match value {
                 0u16 => Ok(Self::Failed),
                 1u16 => Ok(Self::Overloaded),
