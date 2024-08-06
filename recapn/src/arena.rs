@@ -48,10 +48,10 @@ unsafe impl<'a, T: ReadArena + ?Sized> ReadArena for &'a T {
 #[cfg(feature = "alloc")]
 unsafe impl<T: ReadArena + ?Sized> ReadArena for Box<T> {
     fn segment(&self, id: SegmentId) -> Option<Segment> {
-        T::segment(&*self, id)
+        T::segment(self, id)
     }
     fn size_in_words(&self) -> usize {
-        T::size_in_words(&*self)
+        T::size_in_words(self)
     }
 }
 
@@ -238,20 +238,20 @@ pub(crate) mod growing {
                     // Transmute the implied lifetime attached to the obj dyn ReadArena.
                     // This is safe since our caller will add back in the lifetime and
                     // make an equivalent type.
-                    core::mem::transmute(obj)
+                    core::mem::transmute::<*const dyn ReadArena, *const dyn ReadArena>(obj)
                 },
                 try_root_and_build: |ptr| unsafe {
                     let this = &*ptr.cast::<Self>();
                     let root = this.root()?;
                     let obj: *const dyn BuildArena = this;
-                    let arena = core::mem::transmute(obj);
+                    let arena = core::mem::transmute::<*const dyn BuildArena, *const dyn BuildArena>(obj);
                     Some((root, arena))
                 },
                 root_and_build: |ptr| unsafe {
                     let this = &*ptr.cast::<Self>();
                     let root = this.alloc_root();
                     let obj: *const dyn BuildArena = this;
-                    let arena = core::mem::transmute(obj);
+                    let arena = core::mem::transmute::<*const dyn BuildArena, *const dyn BuildArena>(obj);
                     (root, arena)
                 },
                 clear: |ptr| unsafe {

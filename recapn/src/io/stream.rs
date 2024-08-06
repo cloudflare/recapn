@@ -66,10 +66,10 @@ pub fn write_table(segments: &MessageSegments, slice: &mut [Word]) {
     let (count, lens) = WireValue::<u32>::from_word_slice_mut(slice)
         .split_first_mut()
         .unwrap();
-    count.set((segments.len() - 1) as u32);
+    count.set(segments.len() - 1);
 
-    lens.into_iter()
-        .zip(segments.clone().into_iter())
+    lens.iter_mut()
+        .zip(segments.clone())
         .for_each(|(len_value, segment)| len_value.set(segment.len()));
 }
 
@@ -200,7 +200,7 @@ pub struct StreamTableRef {
 }
 
 impl StreamTableRef {
-    fn new<'a>(slice: &'a [WireValue<u32>]) -> &'a Self {
+    fn new(slice: &[WireValue<u32>]) -> &Self {
         assert!(!slice.is_empty());
 
         unsafe { &*(slice as *const [WireValue<u32>] as *const StreamTableRef) }
@@ -212,7 +212,7 @@ impl StreamTableRef {
     /// If the table cannot be fully read, this returns Err with a usize that indicates how many
     /// more words need to be read to make progress.
     #[inline]
-    pub fn try_read<'a>(slice: &'a [Word]) -> Result<(&'a Self, &'a [Word]), TableReadError> {
+    pub fn try_read(slice: &[Word]) -> Result<(&Self, &[Word]), TableReadError> {
         let (count, table) = WireValue::<u32>::from_word_slice(slice)
             .split_first()
             .ok_or(TableReadError::Empty)?;

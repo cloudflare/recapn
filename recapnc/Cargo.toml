@@ -14,3 +14,7 @@ anyhow = "1.0"
 unicode-ident = "1.0"
 heck = "0.4"
 prettyplease = "0.2"
+
+[lints]
+workspace = true
+

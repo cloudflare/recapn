@@ -13,7 +13,7 @@ async fn wait_and_resolve(future: impl Future<Output = Client>, mut receiver: mp
         client = future => {
             if let Err(r) = receiver.forward_to(&client.sender) {
                 // Woops, it resolved into itself. Resolve it to an error instead
-                r.close(Error::failed("attempted to resolve client into itself"))
+                r.close(Error::failed("attempted to resolve client into itself"));
             }
         },
     }
@@ -33,7 +33,7 @@ where
     client
 }
 
-/// Spawns a !Send future on the current LocalSet and returns a new client that queues up
+/// Spawns a !Send future on the current `LocalSet` and returns a new client that queues up
 /// calls until it resolves, then forwards them to the new client.
 pub(super) fn spawn_local<F>(future: F) -> mpsc::Sender<RpcClient>
 where

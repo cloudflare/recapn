@@ -6,29 +6,27 @@ use recapn::any::AnyPtr;
 use recapn::arena::ReadArena;
 use recapn::orphan::Orphan;
 use recapn::rpc::Capable;
-use recapn::{any, list, message, BuilderOf, NotInSchema, ReaderOf};
-use recapn::field::{Struct, Enum};
-use recapn::message::{BuilderParts, Message, ReaderOptions};
-use recapn::ptr::{ElementCount, ElementSize, ObjectLen, ReturnErrors};
+use recapn::{list, message, BuilderOf, NotInSchema, ReaderOf};
+use recapn::field::Struct;
+use recapn::message::{BuilderParts, ReaderOptions};
+use recapn::ptr::{ElementSize, ReturnErrors};
 use tokio::select;
 use tokio::sync::oneshot;
 use tokio::sync::mpsc as tokio_mpsc;
-use tokio::sync::mpsc::error::SendError;
 
 use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BinaryHeap};
-use std::convert::{TryFrom, Infallible as Never};
+use std::convert::TryFrom;
 use std::mem::replace;
 use std::sync::Arc;
 use std::fmt::Write;
-use crate::sync::mpsc::MostResolved;
 use crate::sync::request::{PipelineResolver, RequestUsage, ResponseReceiverFactory};
 use crate::sync::{mpsc, request};
 use crate::table::{CapTable, Table};
 use crate::{Error, PipelineOp, ErrorKind};
-use crate::client::{Client, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget, RpcCall, RpcClient, RpcResponse, RpcResults, SetPipeline};
+use crate::client::{Client, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget, RpcClient, RpcResults, SetPipeline};
 use crate::gen::capnp_rpc_capnp as rpc_capnp;
 use rpc_capnp::CapDescriptor;
 use rpc_capnp::promised_answer::Op;
@@ -98,11 +96,11 @@ impl<T> ExportTable<T> {
     }
 
     pub fn get(&self, id: u32) -> Option<&T> {
-        self.slots.get(id as usize).map(Option::as_ref).flatten()
+        self.slots.get(id as usize).and_then(Option::as_ref)
     }
 
     pub fn get_mut(&mut self, id: u32) -> Option<&mut T> {
-        self.slots.get_mut(id as usize).map(Option::as_mut).flatten()
+        self.slots.get_mut(id as usize).and_then(Option::as_mut)
     }
 
     pub fn push(&mut self, value: T) -> (u32, &mut T) {
@@ -122,7 +120,7 @@ impl<T> ExportTable<T> {
     }
 
     pub fn remove(&mut self, id: u32) -> Option<T> {
-        let result = self.slots.get_mut(id as usize).map(Option::take).flatten();
+        let result = self.slots.get_mut(id as usize).and_then(Option::take);
         if result.is_some() {
             self.free_slots.push(Reverse(id));
         }
@@ -201,11 +199,11 @@ impl<T> FreeVec<T> {
     }
 
     pub fn get(&self, idx: usize) -> Option<&T> {
-        self.slots.get(idx).map(Option::as_ref).flatten()
+        self.slots.get(idx).and_then(Option::as_ref)
     }
 
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
-        self.slots.get_mut(idx).map(Option::as_mut).flatten()
+        self.slots.get_mut(idx).and_then(Option::as_mut)
     }
 
     pub fn push(&mut self, value: T) -> (usize, &mut T) {
@@ -217,7 +215,7 @@ impl<T> FreeVec<T> {
                 len
             }
         };
-        let s = &mut self.slots[slot as usize];
+        let s = &mut self.slots[slot];
         debug_assert!(s.is_none());
         let v = s.insert(value);
         (slot, v)
@@ -232,7 +230,7 @@ impl<T> FreeVec<T> {
     }
 
     pub fn remove(&mut self, idx: usize) -> Option<T> {
-        let result = self.slots.get_mut(idx as usize).map(Option::take).flatten();
+        let result = self.slots.get_mut(idx).and_then(Option::take);
         if result.is_some() {
             self.free_slots.push(Reverse(idx));
         }
@@ -251,6 +249,7 @@ impl<T> FreeVec<T> {
 /// a boxed message with any allocator.
 pub trait MessageFactory {
     /// Creates a new message.
+    #[allow(clippy::wrong_self_convention)] // object safety
     fn new(&self) -> LocalMessage;
 
     /// Creates a new message, with the given estimated size.
@@ -395,6 +394,7 @@ pub(crate) type EventSender = tokio_mpsc::UnboundedSender<ConnectionEvent>;
 type EventReceiver = tokio_mpsc::UnboundedReceiver<ConnectionEvent>;
 
 #[non_exhaustive]
+#[derive(Default)]
 pub struct ConnectionOptions {
     /// Controls whether pipeline optimization hints are used. If this is true
     /// the other party must also use pipeline hints as well.
@@ -404,14 +404,6 @@ pub struct ConnectionOptions {
     pub reader_options: ReaderOptions,
 }
 
-impl Default for ConnectionOptions {
-    fn default() -> Self {
-        Self {
-            use_pipeline_hints: false,
-            reader_options: ReaderOptions::default(),
-        }
-    }
-}
 
 pub struct Connection<T: ?Sized> {
     exports: ExportTable<Export>,

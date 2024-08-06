@@ -7,3 +7,18 @@ members = [
     "fuzz",
 ]
 resolver = "2"
+
+[workspace.lints.clippy]
+collapsible_if = "allow"
+enum_glob_use = "allow"
+len_without_is_empty = "allow"
+module_inception = "allow"
+new_without_default = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"
+unnecessary_lazy_evaluations = "allow" # https://github.com/rust-lang/rust-clippy/issues/13226
+missing_transmute_annotations = "warn"
+multiple_bound_locations = "warn"
+needless_lifetimes = "warn"
+extra_unused_lifetimes = "deny"
+mut_from_ref = "deny"

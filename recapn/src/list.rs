@@ -348,14 +348,14 @@ impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
     type View = ();
 
     #[inline]
-    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View { () }
+    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View {  }
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for () {
     type View = ();
 
     #[inline]
-    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View { () }
+    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View {  }
 }
 
 impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for V {

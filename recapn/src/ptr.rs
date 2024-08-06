@@ -182,13 +182,13 @@ macro_rules! wire_value_type {
             }
 
             #[inline]
-            pub fn from_word_slice<'a>(words: &'a [Word]) -> &'a [Self] {
+            pub fn from_word_slice(words: &[Word]) -> &[Self] {
                 let (_, values, _) = unsafe { words.align_to() };
                 values
             }
 
             #[inline]
-            pub fn from_word_slice_mut<'a>(words: &'a mut [Word]) -> &'a mut [Self] {
+            pub fn from_word_slice_mut(words: &mut [Word]) -> &mut [Self] {
                 let (_, values, _) = unsafe { words.align_to_mut() };
                 values
             }
@@ -1660,7 +1660,7 @@ impl<'a> ObjectReader<'a> {
             .segment
             .as_ref()
             .and_then(|r| r.segment(segment))
-            .ok_or_else(|| ErrorKind::MissingSegment(segment))?;
+            .ok_or(ErrorKind::MissingSegment(segment))?;
 
         let ptr = reader
             .try_get_section_offset(offset, len)
@@ -1867,10 +1867,8 @@ impl<'a> ObjectReader<'a> {
             }
 
             let element_count = list_ptr.element_count();
-            if element_size == ElementSize::Void {
-                if self.try_amplified_read(element_count.get() as u64) {
-                    return Err(ErrorKind::ReadLimitExceeded.into());
-                }
+            if element_size == ElementSize::Void && self.try_amplified_read(element_count.get() as u64) {
+                return Err(ErrorKind::ReadLimitExceeded.into());
             }
 
             let element_bits = element_size.bits();
@@ -2021,7 +2019,7 @@ fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Re
 fn total_struct_size(reader: &ObjectReader, content: StructContent, nesting_limit: u32) -> Result<MessageSize> {
     let struct_size = MessageSize { words: content.size.total() as u64, caps: 0 };
     let ptrs_total_size = total_ptrs_size(
-        &reader, content.ptrs_start(), content.size.ptrs.into(), nesting_limit)?;
+        reader, content.ptrs_start(), content.size.ptrs.into(), nesting_limit)?;
 
     Ok(struct_size + ptrs_total_size)
 }
@@ -2141,7 +2139,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         }
 
         let nesting_limit = self.nesting_limit.checked_sub(1)
-            .ok_or_else(|| ErrorKind::NestingLimitExceeded)?;
+            .ok_or(ErrorKind::NestingLimitExceeded)?;
 
         target_size(&self.reader, self.ptr, nesting_limit)
     }
@@ -2267,7 +2265,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         let ptr = self.ptr();
 
         if ptr.is_null() {
-            return Ok(None);
+            Ok(None)
         } else {
             let i = ptr.try_cap_ptr()?.capability_index();
             Ok(Some(i))
@@ -2643,12 +2641,12 @@ pub struct ListReader<'a, T: Table = Empty> {
 impl<T: Table> Clone for ListReader<'_, T> {
     fn clone(&self) -> Self {
         Self {
-            ptr: self.ptr.clone(),
+            ptr: self.ptr,
             reader: self.reader.clone(),
             table: self.table.clone(),
-            element_count: self.element_count.clone(),
-            nesting_limit: self.nesting_limit.clone(),
-            element_size: self.element_size.clone(),
+            element_count: self.element_count,
+            nesting_limit: self.nesting_limit,
+            element_size: self.element_size,
         }
     }
 }
@@ -3000,7 +2998,7 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn as_reader<'b>(&'b self) -> ObjectReader<'b> {
+    pub fn as_reader(&self) -> ObjectReader<'_> {
         ObjectReader {
             segment: Some(SegmentReader {
                 segment: self.segment.segment_with_id(),
@@ -3044,7 +3042,7 @@ impl<'a> ObjectBuilder<'a> {
 
     #[inline]
     pub fn at_offset(&self, offset: SegmentOffset) -> SegmentRef<'a> {
-        let r = self.start().offset(offset.into());
+        let r = self.start().offset(offset);
         debug_assert!(self.contains(r));
         unsafe { r.as_ref_unchecked() }
     }
@@ -3057,7 +3055,7 @@ impl<'a> ObjectBuilder<'a> {
 
     #[inline]
     pub fn end(&self) -> SegmentPtr<'a> {
-        self.start().offset(self.segment.used_len().into())
+        self.start().offset(self.segment.used_len())
     }
 
     #[inline]
@@ -3294,7 +3292,7 @@ impl<'a> ObjectBuilder<'a> {
             // larger than a segment
             let len_with_pad = AllocLen::new(size.total() + 1).unwrap();
             let (pad, object_segment) = self.alloc_in_arena(len_with_pad)
-                .ok_or_else(|| ErrorKind::AllocFailed(len_with_pad))?;
+                .ok_or(ErrorKind::AllocFailed(len_with_pad))?;
             let start = unsafe { pad.offset(1u16.into()).as_ref_unchecked() };
 
             // our pad is the actual pointer to the content
@@ -3318,7 +3316,7 @@ impl<'a> ObjectBuilder<'a> {
             return Ok((object, self.clone()));
         };
 
-        let (start, segment) = self.alloc(len).ok_or_else(|| ErrorKind::AllocFailed(len))?;
+        let (start, segment) = self.alloc(len).ok_or(ErrorKind::AllocFailed(len))?;
         Ok((OrphanObject::Struct { location: start, size }, segment))
     }
 
@@ -3395,7 +3393,7 @@ impl<'a> ObjectBuilder<'a> {
             // somewhere else with a far landing pad
 
             let (pad, segment) = self.alloc_in_arena(len_with_landing_pad)
-                .ok_or_else(|| ErrorKind::AllocFailed(len_with_landing_pad))?;
+                .ok_or(ErrorKind::AllocFailed(len_with_landing_pad))?;
             let start = unsafe { pad.offset(1u16.into()).as_ref_unchecked() };
             let offset_to_pad = segment.offset_from_start(pad.into());
 
@@ -3486,7 +3484,7 @@ impl<'a> ObjectBuilder<'a> {
         }
 
         let len = AllocLen::new(total_size).ok_or(ErrorKind::AllocTooLarge)?;
-        let (alloc_start, segment) = self.alloc(len).ok_or_else(|| ErrorKind::AllocFailed(len))?;
+        let (alloc_start, segment) = self.alloc(len).ok_or(ErrorKind::AllocFailed(len))?;
         if let ElementSize::InlineComposite(size) = element_size {
             segment.set_ptr(
                 alloc_start,
@@ -3662,7 +3660,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn as_reader<'b>(&'b self) -> PtrReader<'b, T> {
+    pub fn as_reader(&self) -> PtrReader<'_, T> {
         PtrReader {
             ptr: self.ptr,
             reader: self.builder.as_reader(),
@@ -3681,7 +3679,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
 
     /// Borrows the pointer, rather than consuming it.
     #[inline]
-    pub fn by_ref<'b>(&'b mut self) -> PtrBuilder<'b, T> {
+    pub fn by_ref(&mut self) -> PtrBuilder<'_, T> {
         unsafe { self.clone() }
     }
 
@@ -4018,7 +4016,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 this.builder,
                 this.ptr,
                 this.table.clone(),
-                expected_element_size.unwrap_or(ElementSize::Void).into(),
+                expected_element_size.unwrap_or(ElementSize::Void),
             ),
         }
     }
@@ -4310,7 +4308,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn adopt<'b>(&mut self, orphan: OrphanBuilder<'b, T>) {
+    pub fn adopt(&mut self, orphan: OrphanBuilder<'_, T>) {
         assert!(orphan.builder.is_same_message(&self.builder));
 
         self.try_adopt(orphan).map_err(|(err, _)| err).expect("failed to adopt orphan")
@@ -4542,7 +4540,7 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn as_reader<'b>(&'b self) -> StructReader<'b, T> {
+    pub fn as_reader(&self) -> StructReader<'_, T> {
         StructReader {
             reader: self.builder.as_reader(),
             data_start: self.data(),
@@ -4596,7 +4594,7 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn by_ref<'b>(&'b mut self) -> StructBuilder<'b, T> {
+    pub fn by_ref(&mut self) -> StructBuilder<'_, T> {
         unsafe { self.clone() }
     }
 
@@ -4683,7 +4681,7 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn ptr_section<'b>(&'b self) -> ListReader<'b, T> {
+    pub fn ptr_section(&self) -> ListReader<'_, T> {
         ListReader {
             reader: self.builder.as_reader(),
             ptr: self.ptrs_start,
@@ -4695,7 +4693,7 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn ptr_section_mut<'b>(&'b mut self) -> ListBuilder<'b, T> {
+    pub fn ptr_section_mut(&mut self) -> ListBuilder<'_, T> {
         ListBuilder {
             builder: self.builder.clone(),
             ptr: self.ptrs_start,
@@ -4706,12 +4704,12 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn ptr_field<'b>(&'b self, slot: u16) -> Option<PtrReader<'b, T>> {
+    pub fn ptr_field(&self, slot: u16) -> Option<PtrReader<'_, T>> {
         (slot < self.ptrs_len).then(move || unsafe { self.ptr_field_unchecked(slot) })
     }
 
     #[inline]
-    pub unsafe fn ptr_field_unchecked<'b>(&'b self, slot: u16) -> PtrReader<'b, T> {
+    pub unsafe fn ptr_field_unchecked(&self, slot: u16) -> PtrReader<'_, T> {
         PtrReader {
             ptr: self.ptrs_start.offset(slot.into()).as_ref_unchecked(),
             reader: self.builder.as_reader(),
@@ -4721,12 +4719,12 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn ptr_field_mut<'b>(&'b mut self, slot: u16) -> Option<PtrBuilder<'b, T>> {
+    pub fn ptr_field_mut(&mut self, slot: u16) -> Option<PtrBuilder<'_, T>> {
         (slot < self.ptrs_len).then(move || unsafe { self.ptr_field_mut_unchecked(slot) })
     }
 
     #[inline]
-    pub unsafe fn ptr_field_mut_unchecked<'b>(&'b mut self, slot: u16) -> PtrBuilder<'b, T> {
+    pub unsafe fn ptr_field_mut_unchecked(&mut self, slot: u16) -> PtrBuilder<'_, T> {
         PtrBuilder {
             ptr: self.ptrs_start.offset(slot.into()).as_ref_unchecked(),
             builder: self.builder.clone(),
@@ -4852,7 +4850,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn by_ref<'b>(&'b mut self) -> ListBuilder<'b, T> {
+    pub fn by_ref(&mut self) -> ListBuilder<'_, T> {
         unsafe { self.clone() }
     }
 
@@ -5104,7 +5102,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
     /// * The index must be within bounds
     /// * This must be a pointer list or an inline composite with atleast one pointer element
     #[inline]
-    pub unsafe fn ptr_unchecked<'b>(&'b self, index: u32) -> PtrReader<'b, T> {
+    pub unsafe fn ptr_unchecked(&self, index: u32) -> PtrReader<'_, T> {
         debug_assert!(index < self.element_count.get(), "index out of bounds");
         debug_assert!({
             let is_inline_composite_with_ptr = matches!(
@@ -5132,7 +5130,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
         }
     }
     #[inline]
-    pub unsafe fn ptr_mut_unchecked<'b>(&'b mut self, index: u32) -> PtrBuilder<'b, T> {
+    pub unsafe fn ptr_mut_unchecked(&mut self, index: u32) -> PtrBuilder<'_, T> {
         debug_assert!(index < self.element_count.get(), "index out of bounds");
         debug_assert!({
             let is_inline_composite_with_ptr = matches!(
@@ -5166,7 +5164,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
     /// * The index must be within bounds
     /// * This must be an inline composite list
     #[inline]
-    pub unsafe fn struct_unchecked<'b>(&'b self, index: u32) -> StructReader<'b, T> {
+    pub unsafe fn struct_unchecked(&self, index: u32) -> StructReader<'_, T> {
         debug_assert!(index < self.element_count.get(), "index out of bounds");
         debug_assert!(
             self.element_size != ElementSize::Bit,
@@ -5192,7 +5190,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
         }
     }
     #[inline]
-    pub unsafe fn struct_mut_unchecked<'b>(&'b mut self, index: u32) -> StructBuilder<'b, T> {
+    pub unsafe fn struct_mut_unchecked(&mut self, index: u32) -> StructBuilder<'_, T> {
         debug_assert!(index < self.element_count.get(), "index out of bounds");
         debug_assert!(
             self.element_size.is_inline_composite(),
@@ -5906,7 +5904,7 @@ where
             // The list is made up entirely of pointers, so we can copy the whole thing as a
             // big pointer section.
             let len = SegmentOffset::new(size.total_words(len)).unwrap();
-            return self.copy_ptr_section(src, &reader, dst, &builder, len)
+            return self.copy_ptr_section(src, reader, dst, builder, len)
         }
 
         if size.is_data() {
@@ -5964,7 +5962,7 @@ where
             // The list is made up entirely of single pointer elements, so we can copy the whole
             // thing as a big pointer section.
             let len = SegmentOffset::new(src_size.total_words(len)).unwrap();
-            return self.copy_ptr_section(src, &reader, dst, &builder, len)
+            return self.copy_ptr_section(src, reader, dst, builder, len)
         }
 
         // This is rarer but might be worth doing separately

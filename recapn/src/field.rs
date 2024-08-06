@@ -121,7 +121,7 @@ use ptr::StructBuilder as OwnedStructBuilder;
 
 /// Describes a group of fields. This is primarily used for clearing unions and groups of fields within a struct.
 pub trait FieldGroup: ty::StructView {
-    unsafe fn clear<'b, 'p, T: Table>(a: StructBuilder<'b, 'p, T>);
+    unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>);
 }
 
 /// Describes a type that can be a field in a Cap'n Proto struct type.
@@ -137,14 +137,14 @@ pub trait FieldType: Sized + 'static {
     type VariantAccessor<A: Accessable>;
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A>;
 
-    unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor);
+    unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>, descriptor: &'static Self::Descriptor);
 }
 
 impl FieldType for () {
     type Descriptor = ();
     type Accessor<A: Accessable> = ();
     #[inline]
-    unsafe fn accessor<A: Accessable>(_: A, _: &'static Self::Descriptor) -> Self::Accessor<A> { () }
+    unsafe fn accessor<A: Accessable>(_: A, _: &'static Self::Descriptor) -> Self::Accessor<A> {  }
     type VariantAccessor<A: Accessable> = VoidVariant<Self, A>;
     #[inline]
     unsafe fn variant<A: Accessable>(a: A, descriptor: &'static VariantDescriptor<Self>) -> Self::VariantAccessor<A> {
@@ -152,7 +152,7 @@ impl FieldType for () {
     }
 
     #[inline]
-    unsafe fn clear<'b, 'p, T: Table>(_: StructBuilder<'b, 'p, T>, _: &'static Self::Descriptor) {}
+    unsafe fn clear<T: Table>(_: StructBuilder<'_, '_, T>, _: &'static Self::Descriptor) {}
 }
 
 impl<D: Data> FieldType for D {
@@ -168,7 +168,7 @@ impl<D: Data> FieldType for D {
         DataVariant { repr: a, descriptor: &descriptor.field, variant: &descriptor.variant }
     }
     #[inline]
-    unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor) {
+    unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>, descriptor: &'static Self::Descriptor) {
         a.set_field_with_default_unchecked(descriptor.slot as usize, descriptor.default, descriptor.default)
     }
 }
@@ -344,7 +344,7 @@ impl<G: FieldGroup> FieldType for Group<G> {
         VoidVariant { t: PhantomData, variant: &descriptor.variant, repr: a }
     }
     #[inline]
-    unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, _: &'static Self::Descriptor) {
+    unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>, _: &'static Self::Descriptor) {
         G::clear(a)
     }
 }
@@ -564,7 +564,7 @@ impl<E: ty::Enum> FieldType for Enum<E> {
     }
 
     #[inline]
-    unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor) {
+    unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>, descriptor: &'static Self::Descriptor) {
         a.set_field_unchecked::<u16>(descriptor.slot as usize, 0);
     }
 }
@@ -744,7 +744,7 @@ impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
     /// Create a new field builder "by reference". This allows a field builder to be reused
     /// as many builder functions consume the builder.
     #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrFieldOwner<'c, T, V> {
+    pub fn by_ref(&mut self) -> PtrFieldOwner<'_, T, V> {
         PtrField {
             descriptor: self.descriptor,
             repr: self.repr.by_ref(),
@@ -828,7 +828,7 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantReader<'b, 'p, T, V> {
 
     #[inline]
     pub fn field(&self) -> Option<PtrFieldReader<'b, 'p, T, V>> {
-        self.is_set().then(|| PtrField { descriptor: self.descriptor, repr: self.repr })
+        self.is_set().then_some(PtrField { descriptor: self.descriptor, repr: self.repr })
     }
 
     #[inline]
@@ -884,7 +884,7 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
 
     #[inline]
     pub fn field(self) -> Option<PtrFieldBuilder<'b, 'p, T, V>> {
-        self.is_set().then(|| PtrField { descriptor: self.descriptor, repr: self.repr })
+        self.is_set().then_some(PtrField { descriptor: self.descriptor, repr: self.repr })
     }
 
     #[inline]
@@ -953,7 +953,7 @@ macro_rules! field_type_items {
         }
 
         #[inline]
-        unsafe fn clear<'a, 'b, T: Table>(a: StructBuilder<'b, 'a, T>, descriptor: &'static Self::Descriptor) {
+        unsafe fn clear<T: Table>(a: StructBuilder<'_, '_, T>, descriptor: &'static Self::Descriptor) {
             a.ptr_field_mut_unchecked(descriptor.slot as u16).clear();
         }
     };

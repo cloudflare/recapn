@@ -2,16 +2,14 @@ use crate::sync::{request, mpsc};
 use crate::sync::request::{PipelineResolver, ResponseReceiverFactory};
 use crate::table::{Table, CapTable};
 use crate::{connection, Result, Error, PipelineOp};
-use std::borrow::Cow;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use recapn::{ReaderOf, ty};
-use recapn::alloc::{Alloc, Global, Growing};
+use recapn::alloc::Alloc;
 use recapn::arena::ReadArena;
-use recapn::any::{AnyStruct, self};
+use recapn::any::{self};
 use recapn::message::{self, Message};
-use recapn::rpc::Capable;
 
 mod local;
 mod queue;

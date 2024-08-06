@@ -623,7 +623,7 @@ impl<'a> GeneratorContext<'a> {
                     .map(|v| v.ptr().read_as::<AnyList>());
                 let element_size_quote = quote!(_p::ElementSize::size_of::<#element_type_quote>());
                 match default_value {
-                    Some(list) if list.len() != 0 => {
+                    Some(list) if !list.is_empty() => {
                         let result = list_to_slice(&list);
                         // Remove the root pointer since we're going to create a direct pointer
                         // to the data itself which must be allocated immediately after it.

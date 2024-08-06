@@ -636,7 +636,7 @@ impl Unpacker {
                     let word = take_first_mut(dst);
                     let word_bytes = Word::slice_to_bytes_mut(slice::from_mut(word));
 
-                    let mut i = input_to_read.into_iter();
+                    let mut i = input_to_read.iter();
                     for word_byte in word_bytes.iter_mut() {
                         if (tag & 1) != 0 {
                             *word_byte = *i.next().unwrap();
@@ -664,7 +664,7 @@ impl Unpacker {
             Some(IncompleteState::NeedUncompressedCount) => 1,
             Some(IncompleteState::WritingNulls(_)) => 0, // Not sure what else to put here?
             Some(IncompleteState::WritingUncompressed { remaining, partial }) => {
-                let remaining_word_bytes = remaining as usize * 8;
+                let remaining_word_bytes = remaining * 8;
                 let partial = partial.map(|p| p.needed_bytes()).unwrap_or(0);
                 remaining_word_bytes + partial
             }
@@ -702,7 +702,7 @@ mod tests {
         {
             let mut words = vec![Word::NULL; unpacked.len()].into_boxed_slice();
             let mut stream = PackedStream::new(packed);
-            stream.read_exact(&mut *words).expect("expected to read packed data");
+            stream.read_exact(&mut words).expect("expected to read packed data");
             stream.finish().expect("expected end of stream");
     
             assert_eq!(unpacked, &*words);
@@ -713,7 +713,7 @@ mod tests {
             let mut words = vec![Word::NULL; unpacked.len()].into_boxed_slice();
             let reader = BufReader::with_capacity(size, packed);
             let mut stream = PackedStream::new(reader);
-            stream.read_exact(&mut *words).expect("expected to read packed data");
+            stream.read_exact(&mut words).expect("expected to read packed data");
             stream.finish().expect("expected end of stream");
     
             assert_eq!(unpacked, &*words);

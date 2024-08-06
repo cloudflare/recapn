@@ -9,4 +9,6 @@ default = ["std"]
 alloc = []
 std = ["alloc"]
 
-[dependencies]
+[lints]
+workspace = true
+
