@@ -9,8 +9,8 @@ use crate::ptr::WireValue;
 
 #[cfg(feature = "alloc")]
 use rustalloc::{
-    vec,
     borrow::{Borrow, ToOwned},
+    vec,
     vec::Vec,
 };
 
@@ -38,12 +38,10 @@ pub const fn max_table_size_from_len(len: usize) -> u32 {
         return MAX_TABLE;
     };
 
-    let Some(r) = r.checked_sub(1) else {
-        return 0
-    };
+    let Some(r) = r.checked_sub(1) else { return 0 };
 
     if r > MAX_TABLE as usize {
-        return MAX_TABLE
+        return MAX_TABLE;
     }
 
     r as u32
@@ -99,7 +97,9 @@ impl Table {
     #[inline]
     pub fn resize_to(&mut self, len: usize) {
         match self {
-            Table::Inline { len: current_len, .. } if len <= Self::INLINE_TABLE_SIZE => {
+            Table::Inline {
+                len: current_len, ..
+            } if len <= Self::INLINE_TABLE_SIZE => {
                 let current = *current_len as usize;
                 if current < len {
                     *current_len = len as u8;
@@ -107,7 +107,7 @@ impl Table {
             }
             Table::Inline { .. } => {
                 *self = Table::Heap(vec![Word::NULL; len]);
-            } 
+            }
             Table::Heap(vec) => {
                 if vec.len() < len {
                     vec.resize(len, Word::NULL);
@@ -145,7 +145,9 @@ impl StreamTable {
     /// Creates a new stream table of one empty segment.
     #[inline]
     pub const fn new() -> Self {
-        Self { table: Table::new(), }
+        Self {
+            table: Table::new(),
+        }
     }
 
     #[inline]
@@ -225,8 +227,9 @@ impl StreamTableRef {
 
         let Some(remainder) = slice.get(end_of_table..) else {
             return Err(TableReadError::Incomplete {
-                count, required: end_of_table - slice.len()
-            })
+                count,
+                required: end_of_table - slice.len(),
+            });
         };
 
         let table = &table[..(count as usize)];

@@ -4,37 +4,42 @@ use fnv::FnvHashMap;
 use recapn::alloc::AllocLen;
 use recapn::any::AnyPtr;
 use recapn::arena::ReadArena;
+use recapn::field::{Enum, Struct};
+use recapn::message::{BuilderParts, Message, ReaderOptions};
 use recapn::orphan::Orphan;
+use recapn::ptr::{ElementCount, ElementSize, ObjectLen, ReturnErrors};
 use recapn::rpc::Capable;
 use recapn::{any, list, message, BuilderOf, NotInSchema, ReaderOf};
-use recapn::field::{Struct, Enum};
-use recapn::message::{BuilderParts, Message, ReaderOptions};
-use recapn::ptr::{ElementCount, ElementSize, ObjectLen, ReturnErrors};
 use tokio::select;
-use tokio::sync::oneshot;
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::oneshot;
 
-use std::borrow::Cow;
-use std::cmp::Reverse;
-use std::collections::btree_map::Entry;
-use std::collections::{BTreeMap, BinaryHeap};
-use std::convert::{TryFrom, Infallible as Never};
-use std::mem::replace;
-use std::sync::Arc;
-use std::fmt::Write;
+use crate::client::{
+    Client, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget,
+    RpcCall, RpcClient, RpcResponse, RpcResults, SetPipeline,
+};
+use crate::gen::capnp_rpc_capnp as rpc_capnp;
 use crate::sync::mpsc::MostResolved;
 use crate::sync::request::{PipelineResolver, RequestUsage, ResponseReceiverFactory};
 use crate::sync::{mpsc, request};
 use crate::table::{CapTable, Table};
-use crate::{Error, PipelineOp, ErrorKind};
-use crate::client::{Client, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget, RpcCall, RpcClient, RpcResponse, RpcResults, SetPipeline};
-use crate::gen::capnp_rpc_capnp as rpc_capnp;
-use rpc_capnp::CapDescriptor;
+use crate::{Error, ErrorKind, PipelineOp};
 use rpc_capnp::promised_answer::Op;
+use rpc_capnp::CapDescriptor;
+use std::borrow::Cow;
+use std::cmp::Reverse;
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BinaryHeap};
+use std::convert::{Infallible as Never, TryFrom};
+use std::fmt::Write;
+use std::mem::replace;
+use std::sync::Arc;
 
 const MAX_OPS: usize = ElementSize::size_of::<Struct<Op>>().max_elements().get() as usize;
-const MAX_CAPS: usize = ElementSize::size_of::<Struct<CapDescriptor>>().max_elements().get() as usize;
+const MAX_CAPS: usize = ElementSize::size_of::<Struct<CapDescriptor>>()
+    .max_elements()
+    .get() as usize;
 
 type RpcSender = mpsc::Sender<RpcClient>;
 type RpcReceiver = mpsc::Receiver<RpcClient>;
@@ -50,7 +55,7 @@ fn exception_to_error(ex: &ReaderOf<rpc_capnp::Exception>) -> Error {
         Err(NotInSchema(num)) => {
             let _ = write!(msg, "(unknown exception type '{num}') ");
             ErrorKind::Failed
-        },
+        }
     };
 
     match ex.reason().try_get_option() {
@@ -71,15 +76,18 @@ fn exception_to_error(ex: &ReaderOf<rpc_capnp::Exception>) -> Error {
 
 type OpsList<'a> = list::StructListReader<'a, rpc_capnp::promised_answer::Op>;
 fn to_pipeline_ops(list: OpsList) -> Result<Vec<PipelineOp>, Error> {
-    list.into_iter().filter_map(|op| {
-        use rpc_capnp::promised_answer::op::Which;
-        match op.which() {
-            Ok(Which::Noop(())) => None, // does nothing
-            Ok(Which::GetPointerField(field)) => Some(Ok(PipelineOp::PtrField(field))),
-            Err(NotInSchema(variant)) =>
-                Some(Err(Error::failed(format!("Unsupported pipeline op: {variant}")))),
-        }
-    }).collect()
+    list.into_iter()
+        .filter_map(|op| {
+            use rpc_capnp::promised_answer::op::Which;
+            match op.which() {
+                Ok(Which::Noop(())) => None, // does nothing
+                Ok(Which::GetPointerField(field)) => Some(Ok(PipelineOp::PtrField(field))),
+                Err(NotInSchema(variant)) => Some(Err(Error::failed(format!(
+                    "Unsupported pipeline op: {variant}"
+                )))),
+            }
+        })
+        .collect()
 }
 
 pub(crate) type QuestionId = u32;
@@ -94,7 +102,10 @@ struct ExportTable<T> {
 
 impl<T> ExportTable<T> {
     pub fn new() -> Self {
-        Self { slots: Vec::new(), free_slots: BinaryHeap::new() }
+        Self {
+            slots: Vec::new(),
+            free_slots: BinaryHeap::new(),
+        }
     }
 
     pub fn get(&self, id: u32) -> Option<&T> {
@@ -102,7 +113,10 @@ impl<T> ExportTable<T> {
     }
 
     pub fn get_mut(&mut self, id: u32) -> Option<&mut T> {
-        self.slots.get_mut(id as usize).map(Option::as_mut).flatten()
+        self.slots
+            .get_mut(id as usize)
+            .map(Option::as_mut)
+            .flatten()
     }
 
     pub fn push(&mut self, value: T) -> (u32, &mut T) {
@@ -171,7 +185,7 @@ impl<T> ImportTable<T> {
             if slot.is_none() {
                 *slot = Some(value);
             } else {
-                return Err(value)
+                return Err(value);
             }
         } else {
             match self.high.entry(id) {
@@ -197,7 +211,10 @@ struct FreeVec<T> {
 
 impl<T> FreeVec<T> {
     pub fn new() -> Self {
-        Self { slots: Vec::new(), free_slots: BinaryHeap::new() }
+        Self {
+            slots: Vec::new(),
+            free_slots: BinaryHeap::new(),
+        }
     }
 
     pub fn get(&self, idx: usize) -> Option<&T> {
@@ -245,7 +262,7 @@ impl<T> FreeVec<T> {
 }
 
 /// A source of messages for the RPC system.
-/// 
+///
 /// Since messages can be created anywhere, we don't assume outbound messages have
 /// a defined allocator or take any specific form. Instead, a message outbound consumes
 /// a boxed message with any allocator.
@@ -254,9 +271,11 @@ pub trait MessageFactory {
     fn new(&self) -> LocalMessage;
 
     /// Creates a new message, with the given estimated size.
-    /// 
+    ///
     /// By default, this just calls `new()`
-    fn new_estimated(&self, _: AllocLen) -> LocalMessage { self.new() }
+    fn new_estimated(&self, _: AllocLen) -> LocalMessage {
+        self.new()
+    }
 }
 
 pub(crate) struct ConnectionId(EventSender);
@@ -299,10 +318,19 @@ pub(crate) struct QuestionPipeline {
 }
 
 impl PipelineResolver<RpcClient> for QuestionPipeline {
-    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+        channel: mpsc::Receiver<RpcClient>,
+    ) {
         todo!()
     }
-    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+    ) -> mpsc::Sender<RpcClient> {
         let (sender, channel) = mpsc::channel(RpcClient::RemotePipeline);
         self.resolve(recv, key, channel);
         sender
@@ -334,7 +362,7 @@ enum Question {
     /// close the connection.
     Incomplete,
     /// A highly simplified question for a bootstrap request.
-    /// 
+    ///
     /// Since we know this is for a bootstrap request, we know
     /// that outgoing pipelined requests must take a specific form
     /// and target the bootstrap capability stored for the connection.
@@ -361,7 +389,7 @@ enum Question {
 
 enum Answer {
     /// A highly simplified answer for a bootstrap request.
-    /// 
+    ///
     /// Since we know this is for a bootstrap request, we know
     /// that incoming pipelined requests must take a specific form
     /// and target the bootstrap capability stored for the connection.
@@ -383,7 +411,7 @@ enum Answer {
 pub(crate) enum ConnectionEvent {
     /// Used to indicate that a question isn't needed anymore because
     /// all the pipeline builders and response receivers were dropped.
-    /// 
+    ///
     /// This may not immediately mark the question as finished remotely.
     /// If any pipelines are still active the question will stay up.
     QuestionFinished(QuestionId),
@@ -469,7 +497,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     /// Returns a client for interacting with the bootstrap capability of the connection.
     pub fn bootstrap(&mut self) -> Client {
         if let Some(err) = &self.disconnect {
-            return Client::broken(err.clone())
+            return Client::broken(err.clone());
         }
 
         let (resolver, resolve_receiver) = oneshot::channel();
@@ -499,7 +527,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     /// Gets the number of Words involved in incoming active calls being processed by this
     /// connection.
-    /// 
+    ///
     /// This can be used to implement a control flow limit on the connection to avoid being
     /// overwhelmed by requests from the other party.
     pub fn call_words_in_flight(&self) -> usize {
@@ -508,15 +536,15 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     /// Handles an internal event or outgoing message, then returns. If an error is
     /// returned, the connection has closed.
-    /// 
+    ///
     /// This can be ran in a loop alongside whatever code is necessary to handle incoming
     /// messages.
-    /// 
+    ///
     /// Since this handles one set of events, it can also be used alongside `call_words_in_flight`
     /// to implement a control flow limit. When the limit is exceeded after a call to
     /// `handle_message`, the connection loop can run `handle_events` until the limit is no longer
     /// exceeded.
-    /// 
+    ///
     /// This function is cancel safe. If `handle_events` is used as the future in a tokio::select!
     /// statement and some other branch completes first, it is guaranteed that no messages
     /// were received and dropped.
@@ -541,12 +569,8 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     fn handle_cap_message(&mut self, msg: CapMessage) -> Result<(), Error> {
         match msg.event {
             CapEvent::Call(call) => self.send_call(msg.target, call),
-            CapEvent::Disembargo { inbound, outbound } => {
-
-            }
-            CapEvent::Finished => {
-
-            }
+            CapEvent::Disembargo { inbound, outbound } => {}
+            CapEvent::Finished => {}
         }
         Ok(())
     }
@@ -554,13 +578,15 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     fn send_call(&mut self, target: CapTarget, req: request::Request<RpcClient>) {
         // If the request is already canceled just drop it
         if req.is_finished() {
-            return
+            return;
         }
 
         // Set up our piplining hints.
         let usage = req.usage();
-        let no_promise_pipelining = usage == RequestUsage::Response && self.options.use_pipeline_hints;
-        let only_promise_pipelining = usage == RequestUsage::Pipeline && self.options.use_pipeline_hints;
+        let no_promise_pipelining =
+            usage == RequestUsage::Response && self.options.use_pipeline_hints;
+        let only_promise_pipelining =
+            usage == RequestUsage::Pipeline && self.options.use_pipeline_hints;
 
         let (request, responder) = req.respond();
         macro_rules! err_response {
@@ -574,7 +600,11 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             return;
         }
 
-        let Params { root, message, table } = request.params;
+        let Params {
+            root,
+            message,
+            table,
+        } = request.params;
 
         enum ParamsToFill<'b> {
             /// The params to fill are an external message where the root is the params themselves.
@@ -597,7 +627,10 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             }
             (ParamsRoot::Params, MessagePayload::Local(local)) => {
                 outgoing = local;
-                let BuilderParts { mut root, orphanage } = outgoing.builder().into_parts();
+                let BuilderParts {
+                    mut root,
+                    orphanage,
+                } = outgoing.builder().into_parts();
                 let orphan = root.disown_into(&orphanage);
                 let message = root.init_struct::<rpc_capnp::Message>();
                 (ParamsToFill::LocalOrphan(orphan), message)
@@ -620,8 +653,10 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                 msg_promised.question_id().set(question_id);
 
                 let Ok(mut transform) = msg_promised.transform().try_init(ops.len() as u32) else {
-                    responder.respond(RpcResults::Owned(Err(Error::failed("too many pipeline ops"))));
-                    return
+                    responder.respond(RpcResults::Owned(Err(Error::failed(
+                        "too many pipeline ops",
+                    ))));
+                    return;
                 };
 
                 for (op, idx) in ops.iter().zip(0..) {
@@ -642,7 +677,8 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             ParamsToFill::ExternalParams(params) => {
                 table_to_write = Table::new(Vec::with_capacity(table.len()));
 
-                let params_reader = message::Reader::new(&*params, self.options.reader_options.clone());
+                let params_reader =
+                    message::Reader::new(&*params, self.options.reader_options.clone());
                 let table_reader = table.reader();
                 let params = params_reader.root().imbue::<CapTable>(table_reader);
 
@@ -650,7 +686,9 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                 let mut content = payload.content().ptr().imbue::<CapTable>(table_builder);
 
                 if let Err(err) = content.try_set(&params, false, ReturnErrors) {
-                    err_response!(Error::failed(format!("failed to copy params into call: {err:}")));
+                    err_response!(Error::failed(format!(
+                        "failed to copy params into call: {err:}"
+                    )));
                     return;
                 }
             }
@@ -664,7 +702,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         let table_len = cap_table.len() as u32;
         let Ok(mut payload_table) = payload.cap_table().try_init(table_len) else {
             err_response!(Error::failed("too many caps in message"));
-            return
+            return;
         };
         for (i, cap) in (0..table_len).zip(cap_table.iter()) {
             let Some(cap) = cap else { continue };
@@ -692,7 +730,10 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
         call.question_id().set(id);
 
-        let pipeline = QuestionPipeline { question: id, events: events.clone() };
+        let pipeline = QuestionPipeline {
+            question: id,
+            events: events.clone(),
+        };
         let results = responder.set_pipeline(SetPipeline::RemotePipeline(pipeline));
         let finished = results.finished();
         *question = Question::Call {
@@ -714,10 +755,15 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         }
     }
 
-    fn handle_pipeline(&mut self, question_id: QuestionId, ops: Arc<[PipelineOp]>, receiver: mpsc::Receiver<RpcClient>) {
+    fn handle_pipeline(
+        &mut self,
+        question_id: QuestionId,
+        ops: Arc<[PipelineOp]>,
+        receiver: mpsc::Receiver<RpcClient>,
+    ) {
         let Some(question) = self.questions.get_mut(question_id) else {
             receiver.close(Error::disconnected("invalid question ID"));
-            return
+            return;
         };
 
         todo!()
@@ -726,14 +772,14 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     fn handle_finished(&mut self, question_id: QuestionId) {
         let Some(question) = self.questions.get_mut(question_id) else {
             self.close(Error::failed("invalid question ID"));
-            return
+            return;
         };
 
         todo!()
     }
 
     /// Handles cleaning up the connection after it has been closed.
-    /// 
+    ///
     /// If it hasn't been closed, this does nothing.
     fn handle_close(&mut self) -> Result<(), Error> {
         todo!()
@@ -750,7 +796,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     /// Handle an incoming message, but return any immediate errors intead of closing
     /// the connection.
-    /// 
+    ///
     /// If an error is returned, that error should eventually be passed to `close()`.
     pub fn try_handle_message(&mut self, incoming: impl IncomingMessage) -> Result<(), Error> {
         let message = incoming.message();
@@ -762,25 +808,19 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             Ok(Which::Unimplemented(unimplemented)) => {
                 todo!()
             }
-            Ok(Which::Abort(abort)) => {
-                Err(exception_to_error(&abort.try_get()?))
-            },
+            Ok(Which::Abort(abort)) => Err(exception_to_error(&abort.try_get()?)),
             Ok(Which::Bootstrap(bootstrap)) => {
                 self.handle_bootstrap(bootstrap.try_get()?.question_id())
-            },
-            Ok(Which::Call(_)) => {
-                self.handle_call(incoming.into_owned().message)
             }
-            Ok(Which::Return(_)) => {
-                self.handle_return(incoming.into_owned().message)
-            }
+            Ok(Which::Call(_)) => self.handle_call(incoming.into_owned().message),
+            Ok(Which::Return(_)) => self.handle_return(incoming.into_owned().message),
             Ok(Which::Finish(finish)) => {
                 todo!()
             }
             Ok(Which::Resolve(resolve)) => {
                 todo!()
             }
-            Ok(Which::Release(release))=> {
+            Ok(Which::Release(release)) => {
                 todo!()
             }
             Ok(Which::Disembargo(disembargo)) => {
@@ -816,7 +856,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         let answer_value = Answer::Bootstrap { export, client };
 
         let Ok(()) = self.answers.insert(answer, answer_value) else {
-            return Err(Error::failed("questionId is already in use"))
+            return Err(Error::failed("questionId is already in use"));
         };
 
         self.outbound.send(OutboundMessage { message: response });
@@ -853,18 +893,22 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         let ret: ReaderOf<rpc_capnp::Return> = message.r#return().field().unwrap().try_get()?;
 
         let question_id = ret.answer_id();
-        let question = self.questions.get_mut(question_id)
+        let question = self
+            .questions
+            .get_mut(question_id)
             .ok_or_else(|| Error::failed("invalid answerId"))?;
 
         use Question::*;
         match replace(question, Question::Incomplete) {
             Bootstrap { resolver } => match self.resolve_bootstrap_question(&ret) {
                 Ok(res) => todo!(),
-                Err(err) => {
-                    
-                }
-            }
-            Call { response, pipelines_count, finished } => {
+                Err(err) => {}
+            },
+            Call {
+                response,
+                pipelines_count,
+                finished,
+            } => {
                 todo!()
             }
             Reflected => {
@@ -878,9 +922,13 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         todo!()
     }
 
-    fn resolve_bootstrap_question(&mut self, ret: &ReaderOf<rpc_capnp::Return>) -> Result<CapResolution, Error> {
-        let which = ret.which().map_err(|NotInSchema(variant)|
-            Error::failed(format!("unknown return variant {variant}")))?;
+    fn resolve_bootstrap_question(
+        &mut self,
+        ret: &ReaderOf<rpc_capnp::Return>,
+    ) -> Result<CapResolution, Error> {
+        let which = ret.which().map_err(|NotInSchema(variant)| {
+            Error::failed(format!("unknown return variant {variant}"))
+        })?;
 
         use rpc_capnp::r#return::Which as WhichReturn;
         match which {
@@ -890,17 +938,15 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                     Some(idx) => {
                         let table = payload.cap_table().try_get()?;
                         let Some(descriptor) = table.try_at(idx) else {
-                            return Err(Error::failed("missing bootstrap capability"))
+                            return Err(Error::failed("missing bootstrap capability"));
                         };
                         let cap = self.read_cap_descriptor(&descriptor)?;
                         match cap {
                             Some(sender) => Ok(CapResolution::Resolve(sender)),
                             None => Ok(CapResolution::Broken(null_cap_error())),
                         }
-                    },
-                    None => {
-                        Ok(CapResolution::Broken(null_cap_error()))
-                    },
+                    }
+                    None => Ok(CapResolution::Broken(null_cap_error())),
                 }
             }
             WhichReturn::Exception(ex) => {
@@ -908,28 +954,30 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             }
             WhichReturn::AcceptFromThirdParty(_) => todo!(),
             WhichReturn::Canceled(_) => Err(Error::failed("bootstrap was not canceled")),
-            WhichReturn::ResultsSentElsewhere(_) =>
-                Err(Error::failed("bootstrap results cannot be sent elsewhere")),
-            WhichReturn::TakeFromOtherQuestion(_) =>
-                Err(Error::failed("bootstrap results cannot be taken from another previous question")),
+            WhichReturn::ResultsSentElsewhere(_) => {
+                Err(Error::failed("bootstrap results cannot be sent elsewhere"))
+            }
+            WhichReturn::TakeFromOtherQuestion(_) => Err(Error::failed(
+                "bootstrap results cannot be taken from another previous question",
+            )),
         }
     }
 
-    fn write_cap_descriptor(&mut self, cap: &RpcSender, descriptor: &mut BuilderOf<rpc_capnp::CapDescriptor>) -> Option<ExportId> {
+    fn write_cap_descriptor(
+        &mut self,
+        cap: &RpcSender,
+        descriptor: &mut BuilderOf<rpc_capnp::CapDescriptor>,
+    ) -> Option<ExportId> {
         let (cap, res) = cap.most_resolved();
         match cap.chan() {
             RpcClient::Import(import) => {
                 descriptor.receiver_hosted().set(import.id);
-            },
+            }
             RpcClient::RemotePipeline => {
                 todo!()
-            },
-            &RpcClient::Bootstrap(question) => {
-
-            },
-            _ => {
-
             }
+            &RpcClient::Bootstrap(question) => {}
+            _ => {}
         }
         if let Some(err) = res {
             // The channel terminated with an error or was dropped. We can't actually write it here
@@ -938,19 +986,28 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         }
 
         let (id, export) = if let Some(&existing) = self.export_by_client.get(cap) {
-            let export = self.exports.get_mut(existing)
+            let export = self
+                .exports
+                .get_mut(existing)
                 .expect("missing export from by client table");
             export.ref_count += 1;
             (existing, export)
         } else {
             // This is the first time we've seen this capability.
-            self.exports.push(Export { ref_count: 1, client: cap.clone(), resolve: None })
+            self.exports.push(Export {
+                ref_count: 1,
+                client: cap.clone(),
+                resolve: None,
+            })
         };
 
         todo!()
     }
 
-    fn read_cap_descriptor(&mut self, descriptor: &ReaderOf<rpc_capnp::CapDescriptor>) -> Result<Option<RpcSender>, Error> {
+    fn read_cap_descriptor(
+        &mut self,
+        descriptor: &ReaderOf<rpc_capnp::CapDescriptor>,
+    ) -> Result<Option<RpcSender>, Error> {
         use rpc_capnp::cap_descriptor::Which;
         match descriptor.which() {
             Ok(Which::None(())) => Ok(None),
@@ -970,7 +1027,10 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         }
     }
 
-    fn read_cap_descriptors(&mut self, table: list::StructListReader<rpc_capnp::CapDescriptor>) -> Result<Vec<Option<Client>>, Error> {
+    fn read_cap_descriptors(
+        &mut self,
+        table: list::StructListReader<rpc_capnp::CapDescriptor>,
+    ) -> Result<Vec<Option<Client>>, Error> {
         let mut descriptors = Vec::with_capacity(table.len() as usize);
         for d in table {
             let client = self.read_cap_descriptor(&d)?;
@@ -983,17 +1043,24 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         todo!()
     }
 
-    fn read_message_target(&mut self, target: &ReaderOf<rpc_capnp::MessageTarget>) -> Result<Client, Error> {
-        let which = target.which()
+    fn read_message_target(
+        &mut self,
+        target: &ReaderOf<rpc_capnp::MessageTarget>,
+    ) -> Result<Client, Error> {
+        let which = target
+            .which()
             .map_err(|NotInSchema(v)| Error::failed(format!("Unknown message target type: {v}")))?;
         use rpc_capnp::message_target::Which;
         match which {
-            Which::ImportedCap(cap) =>
+            Which::ImportedCap(cap) => {
                 if let Some(export) = self.exports.get(cap) {
-                    Ok(Client { sender: export.client.clone() })
+                    Ok(Client {
+                        sender: export.client.clone(),
+                    })
                 } else {
                     Err(Error::failed("Message target is not a current export ID."))
-                },
+                }
+            }
             Which::PromisedAnswer(promised_answer) => {
                 let promised_answer = promised_answer.try_get()?;
                 let ops = promised_answer.transform().try_get()?;
@@ -1003,7 +1070,9 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                         // This is targeting their bootstrap request! Make sure there are no ops in
                         // the ops list and just return the client specified by the export.
 
-                        Client { sender: client.clone() }
+                        Client {
+                            sender: client.clone(),
+                        }
                     }
                     Some(Answer::Bootstrap { .. }) | None => {
                         Client::broken(Error::failed("Invalid pipeline call"))
@@ -1016,13 +1085,13 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
     }
 
     /// Closes the connection and forces all dependencies to fail.
-    /// 
+    ///
     /// This will be called if any tasks have a fatal error, or can be called
     /// by the network if a message fails to be read.
-    /// 
+    ///
     /// If the connection has already been closed, this returns an Err with the
     /// original error that caused it to close.
-    /// 
+    ///
     /// After calling this, messages may still be sent out on the connection.
     /// If possible, the system should attempt to send these messages, as the
     /// last message sent will be an Abort to the other side. However, it's acceptable

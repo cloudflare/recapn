@@ -1,10 +1,10 @@
-pub mod linked_list;
 pub mod array_vec;
+pub mod linked_list;
 
 use std::sync::Arc;
 
 /// A **M**ovable **Arc**.
-/// 
+///
 /// A utility for a shared value wrapped in an Arc that can be moved away unsafely,
 /// for example, for dropping or transfering to another type state.
 pub struct Marc<T> {
@@ -13,7 +13,9 @@ pub struct Marc<T> {
 
 impl<T> Marc<T> {
     pub fn new(value: Arc<T>) -> Self {
-        Self { shared: Some(value) }
+        Self {
+            shared: Some(value),
+        }
     }
 
     pub fn get(&self) -> &T {

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use anyhow::{Result, ensure};
+use anyhow::{ensure, Result};
 
 fn make_ident(s: &str) -> Result<syn::Ident> {
     let mut ident_str = make_ident_str(s)?;
@@ -25,9 +25,11 @@ fn make_ident_str(s: &str) -> Result<String> {
         output.push('_')
     }
 
-    output.extend(chars.map(|c|
-        unicode_ident::is_xid_continue(c).then_some(c).unwrap_or('_')
-    ));
+    output.extend(chars.map(|c| {
+        unicode_ident::is_xid_continue(c)
+            .then_some(c)
+            .unwrap_or('_')
+    }));
 
     Ok(output)
 }
@@ -38,7 +40,9 @@ pub struct IdentifierSet {
 
 impl IdentifierSet {
     pub fn new() -> Self {
-        Self { idents: HashSet::new() }
+        Self {
+            idents: HashSet::new(),
+        }
     }
 
     pub fn make_unique(&mut self, name: impl ToString) -> Result<syn::Ident> {
@@ -50,7 +54,7 @@ impl IdentifierSet {
                 ident = make_ident(&name)?;
             } else {
                 self.idents.insert(ident.clone());
-                break Ok(ident)
+                break Ok(ident);
             }
         }
     }
@@ -70,7 +74,7 @@ impl<T> Scope<T> {
     pub fn file(file: T) -> Self {
         Self {
             file,
-            types: Vec::new()
+            types: Vec::new(),
         }
     }
 
@@ -99,12 +103,21 @@ pub struct ScopedIdentifierSet<T> {
 
 impl<T: Hash + Eq> ScopedIdentifierSet<T> {
     pub fn new() -> Self {
-        Self { idents: HashSet::new() }
+        Self {
+            idents: HashSet::new(),
+        }
     }
 
-    pub fn make_unique(&mut self, scope: Option<Scope<T>>, name: impl ToString) -> Result<syn::Ident> {
+    pub fn make_unique(
+        &mut self,
+        scope: Option<Scope<T>>,
+        name: impl ToString,
+    ) -> Result<syn::Ident> {
         let mut name = name.to_string();
-        let mut scoped = ScopedIdent { scope, ident: make_ident(&name)? };
+        let mut scoped = ScopedIdent {
+            scope,
+            ident: make_ident(&name)?,
+        };
         loop {
             if self.idents.contains(&scoped) {
                 name.push('_');
@@ -112,7 +125,7 @@ impl<T: Hash + Eq> ScopedIdentifierSet<T> {
             } else {
                 let ident = scoped.ident.clone();
                 self.idents.insert(scoped);
-                break Ok(ident)
+                break Ok(ident);
             }
         }
     }

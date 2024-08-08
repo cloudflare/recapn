@@ -1,6 +1,6 @@
 #![allow(unused, unsafe_code)]
-use recapn::prelude::gen as _p;
 use super::{__file, __imports};
+use recapn::prelude::gen as _p;
 #[derive(Clone)]
 pub struct TestImport<T = _p::Family>(T);
 impl<T> _p::IntoFamily for TestImport<T> {
@@ -35,21 +35,24 @@ impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for test_import::Reader<'a, T> {
     type Ptr = _p::StructReader<'a, T>;
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
-for test_import::Reader<'a, T> {
+    for test_import::Reader<'a, T>
+{
     #[inline]
     fn from(ptr: _p::StructReader<'a, T>) -> Self {
         TestImport(ptr)
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<test_import::Reader<'a, T>>
-for _p::StructReader<'a, T> {
+    for _p::StructReader<'a, T>
+{
     #[inline]
     fn from(reader: test_import::Reader<'a, T>) -> Self {
         reader.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
-for test_import::Reader<'a, T> {
+    for test_import::Reader<'a, T>
+{
     #[inline]
     fn as_ref(&self) -> &_p::StructReader<'a, T> {
         &self.0
@@ -60,21 +63,24 @@ impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for test_import::Builder<'a, T> {
     type Ptr = _p::StructBuilder<'a, T>;
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<test_import::Builder<'a, T>>
-for _p::StructBuilder<'a, T> {
+    for _p::StructBuilder<'a, T>
+{
     #[inline]
     fn from(reader: test_import::Builder<'a, T>) -> Self {
         reader.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
-for test_import::Builder<'a, T> {
+    for test_import::Builder<'a, T>
+{
     #[inline]
     fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
         &self.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
-for test_import::Builder<'a, T> {
+    for test_import::Builder<'a, T>
+{
     #[inline]
     fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
         &mut self.0
@@ -96,12 +102,11 @@ impl _p::ty::Struct for TestImport {
     };
 }
 impl TestImport {
-    const FIELD: _p::Descriptor<_p::Struct<__imports::capnp_test_capnp::TestAllTypes>> = _p::Descriptor::<
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
-    > {
-        slot: 0u32,
-        default: None,
-    };
+    const FIELD: _p::Descriptor<_p::Struct<__imports::capnp_test_capnp::TestAllTypes>> =
+        _p::Descriptor::<_p::Struct<__imports::capnp_test_capnp::TestAllTypes>> {
+            slot: 0u32,
+            default: None,
+        };
 }
 impl<'p, T: _p::rpc::Table + 'p> test_import::Reader<'p, T> {
     #[inline]
@@ -119,12 +124,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_import::Builder<'p, T> {
     #[inline]
     pub fn field(
         &mut self,
-    ) -> _p::AccessorMut<
-        '_,
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
-    > {
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Struct<__imports::capnp_test_capnp::TestAllTypes>> {
         unsafe {
             <_p::Struct<
                 __imports::capnp_test_capnp::TestAllTypes,
@@ -134,11 +134,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_import::Builder<'p, T> {
     #[inline]
     pub fn into_field(
         self,
-    ) -> _p::AccessorOwned<
-        'p,
-        T,
-        _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
-    > {
+    ) -> _p::AccessorOwned<'p, T, _p::Struct<__imports::capnp_test_capnp::TestAllTypes>> {
         unsafe {
             <_p::Struct<
                 __imports::capnp_test_capnp::TestAllTypes,
@@ -149,7 +145,5 @@ impl<'p, T: _p::rpc::Table + 'p> test_import::Builder<'p, T> {
 pub mod test_import {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestImport<_p::StructReader<'a, T>>;
-    pub type Builder<'a, T = _p::rpc::Empty> = super::TestImport<
-        _p::StructBuilder<'a, T>,
-    >;
+    pub type Builder<'a, T = _p::rpc::Empty> = super::TestImport<_p::StructBuilder<'a, T>>;
 }

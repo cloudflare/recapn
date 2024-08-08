@@ -4,22 +4,19 @@ use core::ptr::NonNull;
 use core::slice;
 use core::str::Utf8Error;
 
-use crate::ptr::ElementCount;
 use crate::list::ElementSize;
+use crate::ptr::ElementCount;
 use crate::ty;
 use crate::{internal::Sealed, Family};
 
 pub type ByteCount = crate::num::NonZeroU29;
 
 pub mod ptr {
-    pub use crate::ptr::{
-        BlobReader as Reader,
-        BlobBuilder as Builder,
-    };
+    pub use crate::ptr::{BlobBuilder as Builder, BlobReader as Reader};
 }
 
 /// Concatenates literals into a static text reader.
-/// 
+///
 /// Internally this uses `core::concat!` and adds an extra nul byte. The resulting bytes
 /// are passed directly to `text::Reader::from_slice`.
 #[macro_export]
@@ -65,11 +62,9 @@ impl<'a> Reader<'a> {
     #[inline]
     pub const fn from_slice(s: &'a [u8]) -> Self {
         match s {
-            [.., 0] => {
-                match ptr::Reader::new(s) {
-                    Some(r) => Some(Self(r)),
-                    None => None,
-                }
+            [.., 0] => match ptr::Reader::new(s) {
+                Some(r) => Some(Self(r)),
+                None => None,
             },
             _ => None,
         }
@@ -97,9 +92,12 @@ impl<'a> Reader<'a> {
         match self.as_bytes_with_nul().split_last() {
             Some((_, remainder)) => remainder,
             _ => {
-                debug_assert!(false, "this shouldn't happen, it's to avoid panic code in release");
+                debug_assert!(
+                    false,
+                    "this shouldn't happen, it's to avoid panic code in release"
+                );
                 EMPTY_SLICE
-            },
+            }
         }
     }
 

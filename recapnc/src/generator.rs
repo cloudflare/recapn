@@ -1,32 +1,32 @@
 use std::collections::{HashMap, HashSet};
 use std::ptr::NonNull;
 
-use anyhow::{Result, Context, ensure};
+use anyhow::{ensure, Context, Result};
+use heck::{AsPascalCase, AsShoutySnakeCase, AsSnakeCase};
 use proc_macro2::TokenStream;
 use quote::quote;
-use heck::{AsSnakeCase, AsPascalCase, AsShoutySnakeCase};
 use recapn::alloc::{self, AllocLen, Segment, SegmentOffset, Word};
-use recapn::{any, ReaderOf};
 use recapn::any::{AnyList, AnyStruct};
 use recapn::ptr::{ElementSize, StructSize, UnwrapErrors};
-use syn::PathSegment;
+use recapn::{any, ReaderOf};
 use syn::punctuated::Punctuated;
+use syn::PathSegment;
 
-use crate::quotes::{
-    FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem, GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich
-};
 use crate::gen::capnp_schema_capnp as schema;
-use schema::{Node, Field, Value, CodeGeneratorRequest, Type};
-use schema::node::{Struct, Const, Which as NodeKind};
-use schema::r#type::{
-    Which as TypeKind,
-    any_pointer::Which as AnyPtrKind,
-    any_pointer::unconstrained::Which as ConstraintKind,
+use crate::quotes::{
+    FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem,
+    GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich,
 };
+use schema::node::{Const, Struct, Which as NodeKind};
+use schema::r#type::{
+    any_pointer::unconstrained::Which as ConstraintKind, any_pointer::Which as AnyPtrKind,
+    Which as TypeKind,
+};
+use schema::{CodeGeneratorRequest, Field, Node, Type, Value};
 
 pub mod ident;
 
-use self::ident::{ScopedIdentifierSet, Scope, IdentifierSet};
+use self::ident::{IdentifierSet, Scope, ScopedIdentifierSet};
 
 const NO_DISCRIMINANT: u16 = 0xffff;
 
@@ -55,14 +55,14 @@ struct TypeInfo {
 
 impl TypeInfo {
     /// Resolve a path to this type from the given reference scope.
-    /// 
+    ///
     /// For example in the case where we want to refer to A from B, B is the ref scope we're
     /// resolving from.
     pub fn resolve_path(&self, ref_scope: &TypeScope) -> syn::Path {
         let Self { type_ident, scope } = self;
         if ref_scope == scope {
             // We're referencing this type from the same scope, so we can just use the type identifier.
-            return syn::Path::from(type_ident.clone())
+            return syn::Path::from(type_ident.clone());
         }
 
         let mut segments: Punctuated<PathSegment, _> = Punctuated::new();
@@ -72,7 +72,7 @@ impl TypeInfo {
             if let Some((_, ref_parent_types)) = ref_scope.types.split_last() {
                 if mod_path == ref_parent_types {
                     // It's the parent scope! So we can use `super` directly instead of `__file`
-                    return syn::parse_quote!(super::#type_ident)
+                    return syn::parse_quote!(super::#type_ident);
                 }
             }
 
@@ -96,10 +96,17 @@ impl TypeInfo {
             segments.push(PathSegment::from(scope.file.mod_ident.clone()));
         }
 
-        segments.extend(mod_path.iter().map(|s| PathSegment::from(s.mod_ident.clone())));
+        segments.extend(
+            mod_path
+                .iter()
+                .map(|s| PathSegment::from(s.mod_ident.clone())),
+        );
         segments.push(PathSegment::from(type_ident.clone()));
 
-        syn::Path { leading_colon: None, segments }
+        syn::Path {
+            leading_colon: None,
+            segments,
+        }
     }
 }
 
@@ -149,25 +156,25 @@ impl FieldKind {
     pub fn from_proto(r: &ReaderOf<Type>) -> Result<Self> {
         use TypeKind as Kind;
         Ok(match r.which()? {
-            Kind::Void(_) |
-            Kind::Bool(_) |
-            Kind::Uint8(_) |
-            Kind::Uint16(_) |
-            Kind::Uint32(_) |
-            Kind::Uint64(_) |
-            Kind::Int8(_) |
-            Kind::Int16(_) |
-            Kind::Int32(_) |
-            Kind::Int64(_) |
-            Kind::Float32(_) |
-            Kind::Float64(_) |
-            Kind::Enum(_) => Self::Data,
-            Kind::Text(_) |
-            Kind::Data(_) |
-            Kind::List(_) |
-            Kind::Struct(_) |
-            Kind::Interface(_) |
-            Kind::AnyPointer(_) => Self::Pointer,
+            Kind::Void(_)
+            | Kind::Bool(_)
+            | Kind::Uint8(_)
+            | Kind::Uint16(_)
+            | Kind::Uint32(_)
+            | Kind::Uint64(_)
+            | Kind::Int8(_)
+            | Kind::Int16(_)
+            | Kind::Int32(_)
+            | Kind::Int64(_)
+            | Kind::Float32(_)
+            | Kind::Float64(_)
+            | Kind::Enum(_) => Self::Data,
+            Kind::Text(_)
+            | Kind::Data(_)
+            | Kind::List(_)
+            | Kind::Struct(_)
+            | Kind::Interface(_)
+            | Kind::AnyPointer(_) => Self::Pointer,
         })
     }
 }
@@ -179,12 +186,16 @@ pub struct GeneratorContext<'a> {
 impl<'a> GeneratorContext<'a> {
     pub fn new(request: &ReaderOf<'a, CodeGeneratorRequest>) -> Result<Self> {
         let mut identifiers = ScopedIdentifierSet::new();
-        let mut nodes = request.nodes()
+        let mut nodes = request
+            .nodes()
             .into_iter()
             .map(|node| (node.id(), NodeContext { node, info: None }))
             .collect();
 
-        let files = request.nodes().into_iter().filter(|node| node.file().is_set());
+        let files = request
+            .nodes()
+            .into_iter()
+            .filter(|node| node.file().is_set());
         for node in files {
             Self::validate_file_node(&mut nodes, &mut identifiers, &node)
                 .with_context(|| format!("Failed to validate file node {}", node.id()))?;
@@ -198,12 +209,18 @@ impl<'a> GeneratorContext<'a> {
         identifiers: &mut ScopedIdentifierSet<ModScope>,
         file: &ReaderOf<'a, Node>,
     ) -> Result<()> {
-        let node = nodes.get_mut(&file.id())
+        let node = nodes
+            .get_mut(&file.id())
             .with_context(|| format!("missing node {}", file.id()))?;
 
         ensure!(node.info.is_none(), "node already has associated info");
 
-        let path = file.display_name().try_get()?.as_bytes().escape_ascii().to_string();
+        let path = file
+            .display_name()
+            .try_get()?
+            .as_bytes()
+            .escape_ascii()
+            .to_string();
         let mod_ident = identifiers.make_unique(None, &path)?;
         let file_path = format!("{path}.rs");
         node.info = Some(NodeInfo::File(FileInfo {
@@ -211,7 +228,10 @@ impl<'a> GeneratorContext<'a> {
             path: file_path,
         }));
 
-        let mut scope = Scope::file(ModScope { id: file.id(), mod_ident });
+        let mut scope = Scope::file(ModScope {
+            id: file.id(),
+            mod_ident,
+        });
 
         Self::validate_scope(file, nodes, identifiers, &mut scope)?;
 
@@ -251,13 +271,16 @@ impl<'a> GeneratorContext<'a> {
         identifiers: &mut ScopedIdentifierSet<ModScope>,
         scope: &mut TypeScope,
     ) -> Result<()> {
-        let Some(NodeContext { info, ref node }) = nodes.get_mut(&node) else { return Ok(()); };
+        let Some(NodeContext { info, ref node }) = nodes.get_mut(&node) else {
+            return Ok(());
+        };
 
         ensure!(info.is_none(), "node already has associated info");
 
         match node.which()? {
             NodeKind::Struct(s) => {
-                let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+                let type_ident =
+                    identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
                 let mod_ident = identifiers.make_unique(Some(scope.clone()), AsSnakeCase(name))?;
 
                 let node_info = StructInfo {
@@ -270,7 +293,10 @@ impl<'a> GeneratorContext<'a> {
 
                 *info = Some(NodeInfo::Struct(node_info));
 
-                scope.push(ModScope { id: node.id(), mod_ident });
+                scope.push(ModScope {
+                    id: node.id(),
+                    mod_ident,
+                });
 
                 if s.discriminant_count() != 0 {
                     // Insert Which into the identifier set so if any conflicts appear they'll
@@ -281,9 +307,10 @@ impl<'a> GeneratorContext<'a> {
                 Self::validate_scope(&node.clone(), nodes, identifiers, scope)?;
 
                 scope.pop();
-            },
+            }
             NodeKind::Enum(e) => {
-                let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+                let type_ident =
+                    identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
 
                 let enumerants = {
                     let mut idents = IdentifierSet::new();
@@ -308,14 +335,14 @@ impl<'a> GeneratorContext<'a> {
             NodeKind::Const(_) => {
                 *info = Some(NodeInfo::Const(ConstInfo {
                     scope: scope.clone(),
-                    ident: identifiers.make_unique(Some(scope.clone()), AsShoutySnakeCase(name))?
+                    ident: identifiers.make_unique(Some(scope.clone()), AsShoutySnakeCase(name))?,
                 }))
-            },
+            }
             NodeKind::File(()) => unreachable!(),
             NodeKind::Interface(_) => {
                 // todo: generate interface info
-            },
-            NodeKind::Annotation(_) => {}, // ignored
+            }
+            NodeKind::Annotation(_) => {} // ignored
         }
 
         Ok(())
@@ -324,11 +351,17 @@ impl<'a> GeneratorContext<'a> {
     pub fn generate_file(&self, id: u64) -> Result<(GeneratedFile, GeneratedRootFile)> {
         let NodeContext {
             node,
-            info: Some(NodeInfo::File(FileInfo { mod_ident, path }))
-        } = &self.nodes[&id] else { anyhow::bail!("expected file node") };
+            info: Some(NodeInfo::File(FileInfo { mod_ident, path })),
+        } = &self.nodes[&id]
+        else {
+            anyhow::bail!("expected file node")
+        };
 
         let mut required_imports = HashSet::new();
-        let mut file = GeneratedFile { items: Vec::new(), ident: mod_ident.clone() };
+        let mut file = GeneratedFile {
+            items: Vec::new(),
+            ident: mod_ident.clone(),
+        };
 
         for nested in node.nested_nodes() {
             if let Some(item) = self.generate_item(nested.id(), &mut required_imports)? {
@@ -336,14 +369,20 @@ impl<'a> GeneratorContext<'a> {
             }
         }
 
-        let imports = required_imports.iter().map(|id| {
-            let NodeContext {
-                info: Some(NodeInfo::File(FileInfo { mod_ident, .. })),
-                ..
-            } = &self.nodes[id] else { anyhow::bail!("expected imported file node") };
+        let imports = required_imports
+            .iter()
+            .map(|id| {
+                let NodeContext {
+                    info: Some(NodeInfo::File(FileInfo { mod_ident, .. })),
+                    ..
+                } = &self.nodes[id]
+                else {
+                    anyhow::bail!("expected imported file node")
+                };
 
-            Ok(mod_ident.clone())
-        }).collect::<Result<Vec<_>, _>>()?;
+                Ok(mod_ident.clone())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let root_mod = GeneratedRootFile {
             ident: mod_ident.clone(),
             imports,
@@ -353,34 +392,45 @@ impl<'a> GeneratorContext<'a> {
         Ok((file, root_mod))
     }
 
-    fn generate_item(&self, id: u64, required_imports: &mut HashSet<u64>) -> Result<Option<GeneratedItem>> {
+    fn generate_item(
+        &self,
+        id: u64,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<Option<GeneratedItem>> {
         let NodeContext { node, info } = &self.nodes[&id];
         let item = match (node.which()?, info) {
             (NodeKind::Struct(s), Some(NodeInfo::Struct(info))) => {
                 GeneratedItem::Struct(self.generate_struct(node, &s, info, required_imports)?)
-            },
+            }
             (NodeKind::Enum(_), Some(NodeInfo::Enum(info))) => {
                 GeneratedItem::Enum(self.generate_enum(info)?)
-            },
+            }
             (NodeKind::Const(c), Some(NodeInfo::Const(info))) => {
                 GeneratedItem::Const(self.generate_const(&c, info, required_imports)?)
             }
             (NodeKind::Interface(_), _) => {
                 // todo: generate interface items
-                return Ok(None)
-            },
+                return Ok(None);
+            }
             (NodeKind::Annotation(_), _) => {
                 // todo: generate annotation items
-                return Ok(None)
-            },
+                return Ok(None);
+            }
             (NodeKind::File(()), _) => unreachable!("found nested file node inside a file"),
             _ => anyhow::bail!("missing node info"),
         };
         Ok(Some(item))
     }
 
-    fn generate_struct(&self, node: &ReaderOf<Node>, struct_group: &ReaderOf<Struct>, info: &StructInfo, required_imports: &mut HashSet<u64>) -> Result<GeneratedStruct> {
-        let (fields, variants) = struct_group.fields()
+    fn generate_struct(
+        &self,
+        node: &ReaderOf<Node>,
+        struct_group: &ReaderOf<Struct>,
+        info: &StructInfo,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<GeneratedStruct> {
+        let (fields, variants) = struct_group
+            .fields()
             .into_iter()
             .partition::<Vec<_>, _>(|field| field.discriminant_value() == NO_DISCRIMINANT);
 
@@ -388,32 +438,59 @@ impl<'a> GeneratorContext<'a> {
         let mut descriptor_idents = IdentifierSet::new();
         let mut accessor_idents = IdentifierSet::new();
 
-        let fields = fields.into_iter().map(|field| {
-            self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents, required_imports)
-        }).collect::<Result<_>>()?;
+        let fields = fields
+            .into_iter()
+            .map(|field| {
+                self.generate_field(
+                    &field,
+                    info,
+                    &mut descriptor_idents,
+                    &mut accessor_idents,
+                    required_imports,
+                )
+            })
+            .collect::<Result<_>>()?;
 
         assert_eq!(struct_group.discriminant_count() as usize, variants.len());
         let which = if struct_group.discriminant_count() != 0 {
             // Create a scope used for resolving types from within the struct's mod scope.
             let struct_mod_scope = {
                 let mut struct_scope = info.type_info.scope.clone();
-                struct_scope.push(ModScope { id: node.id(), mod_ident: info.mod_ident.clone() });
+                struct_scope.push(ModScope {
+                    id: node.id(),
+                    mod_ident: info.mod_ident.clone(),
+                });
                 struct_scope
             };
-            let fields = variants.into_iter().map(|field| {
-                let name = field.name().as_str()?;
-                let discriminant_ident = discriminant_idents.make_unique(AsPascalCase(name))?;
+            let fields = variants
+                .into_iter()
+                .map(|field| {
+                    let name = field.name().as_str()?;
+                    let discriminant_ident = discriminant_idents.make_unique(AsPascalCase(name))?;
 
-                let generated_field = self.generate_field(&field, info, &mut descriptor_idents, &mut accessor_idents, required_imports)?;
-                let variant = GeneratedVariant {
-                    discriminant_ident,
-                    discriminant_field_type: self.field_type(&field, &struct_mod_scope, required_imports)?.0,
-                    case: field.discriminant_value(),
-                    field: generated_field,
-                };
-                Ok(variant)
-            }).collect::<Result<_>>()?;
-            Some(GeneratedWhich { tag_slot: struct_group.discriminant_offset(), fields, type_params: Vec::new() })
+                    let generated_field = self.generate_field(
+                        &field,
+                        info,
+                        &mut descriptor_idents,
+                        &mut accessor_idents,
+                        required_imports,
+                    )?;
+                    let variant = GeneratedVariant {
+                        discriminant_ident,
+                        discriminant_field_type: self
+                            .field_type(&field, &struct_mod_scope, required_imports)?
+                            .0,
+                        case: field.discriminant_value(),
+                        field: generated_field,
+                    };
+                    Ok(variant)
+                })
+                .collect::<Result<_>>()?;
+            Some(GeneratedWhich {
+                tag_slot: struct_group.discriminant_offset(),
+                fields,
+                type_params: Vec::new(),
+            })
         } else {
             None
         };
@@ -455,10 +532,7 @@ impl<'a> GeneratorContext<'a> {
         &self,
         field: &ReaderOf<Field>,
         StructInfo {
-            type_info: TypeInfo {
-                type_ident,
-                scope,
-            },
+            type_info: TypeInfo { type_ident, scope },
             ..
         }: &StructInfo,
         descriptor_idents: &mut IdentifierSet,
@@ -471,15 +545,29 @@ impl<'a> GeneratorContext<'a> {
         let (field_type, kind) = self.field_type(field, scope, required_imports)?;
         let descriptor = self.descriptor(field, scope, required_imports)?;
         let type_name = type_ident.clone();
-        let own_accessor_ident = match kind { 
+        let own_accessor_ident = match kind {
             FieldKind::Data => None,
-            FieldKind::Pointer => Some(accessor_idents.make_unique(AsSnakeCase(format!("into_{name}")))?),
+            FieldKind::Pointer => {
+                Some(accessor_idents.make_unique(AsSnakeCase(format!("into_{name}")))?)
+            }
         };
 
-        Ok(GeneratedField { type_name, field_type, own_accessor_ident, accessor_ident, descriptor_ident, descriptor })
+        Ok(GeneratedField {
+            type_name,
+            field_type,
+            own_accessor_ident,
+            accessor_ident,
+            descriptor_ident,
+            descriptor,
+        })
     }
 
-    fn field_type(&self, field: &ReaderOf<Field>, scope: &TypeScope, required_imports: &mut HashSet<u64>) -> Result<(Box<syn::Type>, FieldKind)> {
+    fn field_type(
+        &self,
+        field: &ReaderOf<Field>,
+        scope: &TypeScope,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<(Box<syn::Type>, FieldKind)> {
         match field.which()? {
             schema::field::Which::Slot(slot) => {
                 let type_info = slot.r#type().get();
@@ -488,14 +576,19 @@ impl<'a> GeneratorContext<'a> {
                 Ok((syn_type, kind))
             }
             schema::field::Which::Group(group) => {
-                let type_name = self.resolve_type_name(scope, group.type_id(), required_imports)?; 
+                let type_name = self.resolve_type_name(scope, group.type_id(), required_imports)?;
                 let syn_type = Box::new(syn::parse_quote!(_p::Group<#type_name>));
                 Ok((syn_type, FieldKind::Pointer))
             }
         }
     }
 
-    fn descriptor(&self, field: &ReaderOf<Field>, scope: &TypeScope, required_imports: &mut HashSet<u64>) -> Result<Option<FieldDescriptor>> {
+    fn descriptor(
+        &self,
+        field: &ReaderOf<Field>,
+        scope: &TypeScope,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<Option<FieldDescriptor>> {
         Ok(match field.which()? {
             schema::field::Which::Slot(slot) => {
                 let type_info = slot.r#type().get();
@@ -503,15 +596,28 @@ impl<'a> GeneratorContext<'a> {
                     None
                 } else {
                     let default_value = slot.default_value().get_option();
-                    let value = self.generate_value(scope, &type_info, default_value.as_ref(), required_imports)?;
-                    Some(FieldDescriptor { slot: slot.offset(), default: value })
+                    let value = self.generate_value(
+                        scope,
+                        &type_info,
+                        default_value.as_ref(),
+                        required_imports,
+                    )?;
+                    Some(FieldDescriptor {
+                        slot: slot.offset(),
+                        default: value,
+                    })
                 }
             }
-            schema::field::Which::Group(_) => None
+            schema::field::Which::Group(_) => None,
         })
     }
 
-    fn resolve_type(&self, scope: &TypeScope, info: &ReaderOf<Type>, required_imports: &mut HashSet<u64>) -> Result<Box<syn::Type>> {
+    fn resolve_type(
+        &self,
+        scope: &TypeScope,
+        info: &ReaderOf<Type>,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<Box<syn::Type>> {
         Ok(Box::new(match info.which()? {
             TypeKind::Void(()) => syn::parse_quote!(()),
             TypeKind::Bool(()) => syn::parse_quote!(bool),
@@ -531,15 +637,15 @@ impl<'a> GeneratorContext<'a> {
                 let element_type = list.element_type().get();
                 let resolved = self.resolve_type(scope, &element_type, required_imports)?;
                 syn::parse_quote!(_p::List<#resolved>)
-            },
+            }
             TypeKind::Enum(e) => {
                 let type_name = self.resolve_type_name(scope, e.type_id(), required_imports)?;
                 syn::parse_quote!(_p::Enum<#type_name>)
-            },
+            }
             TypeKind::Struct(s) => {
                 let type_name = self.resolve_type_name(scope, s.type_id(), required_imports)?;
                 syn::parse_quote!(_p::Struct<#type_name>)
-            },
+            }
             TypeKind::Interface(_) => syn::parse_quote!(_p::AnyPtr), // TODO
             TypeKind::AnyPointer(ptr) => match ptr.which()? {
                 AnyPtrKind::Unconstrained(unconstrained) => match unconstrained.which()? {
@@ -550,26 +656,39 @@ impl<'a> GeneratorContext<'a> {
                 },
                 AnyPtrKind::Parameter(_) => syn::parse_quote!(_p::AnyPtr), // TODO
                 AnyPtrKind::ImplicitMethodParameter(_) => todo!(),
-            }
+            },
         }))
     }
 
-    fn resolve_type_name(&self, ref_scope: &TypeScope, id: u64, required_imports: &mut HashSet<u64>) -> Result<syn::Path> {
-        let Some(info) = &self.nodes[&id].info else { anyhow::bail!("missing type info for {}", id) };
+    fn resolve_type_name(
+        &self,
+        ref_scope: &TypeScope,
+        id: u64,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<syn::Path> {
+        let Some(info) = &self.nodes[&id].info else {
+            anyhow::bail!("missing type info for {}", id)
+        };
         match info {
-            NodeInfo::Struct(StructInfo { type_info, .. }) |
-            NodeInfo::Enum(EnumInfo { type_info, .. }) => {
+            NodeInfo::Struct(StructInfo { type_info, .. })
+            | NodeInfo::Enum(EnumInfo { type_info, .. }) => {
                 if type_info.scope.file != ref_scope.file {
                     let _ = required_imports.insert(type_info.scope.file.id);
                 }
 
                 Ok(type_info.resolve_path(ref_scope))
-            },
+            }
             NodeInfo::File(_) | NodeInfo::Const(_) => anyhow::bail!("unexpected node type"),
         }
     }
 
-    fn generate_value(&self, scope: &TypeScope, type_info: &ReaderOf<Type>, value: Option<&ReaderOf<Value>>, required_imports: &mut HashSet<u64>) -> Result<TokenStream> {
+    fn generate_value(
+        &self,
+        scope: &TypeScope,
+        type_info: &ReaderOf<Type>,
+        value: Option<&ReaderOf<Value>>,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<TokenStream> {
         macro_rules! value_or_default {
             ($field:ident) => {{
                 let value = value.and_then(|v| v.$field().get()).unwrap_or_default();
@@ -590,36 +709,32 @@ impl<'a> GeneratorContext<'a> {
             TypeKind::Uint64(()) => value_or_default!(uint64),
             TypeKind::Float32(()) => value_or_default!(float32),
             TypeKind::Float64(()) => value_or_default!(float64),
-            TypeKind::Text(()) => {
-                match value.and_then(|v| v.text().field()).map(|v| v.get()) {
-                    Some(text) if !text.is_empty() => {
-                        let bytes = syn::LitByteStr::new(
-                            text.as_bytes_with_nul(),
-                            proc_macro2::Span::call_site()
-                        );
+            TypeKind::Text(()) => match value.and_then(|v| v.text().field()).map(|v| v.get()) {
+                Some(text) if !text.is_empty() => {
+                    let bytes = syn::LitByteStr::new(
+                        text.as_bytes_with_nul(),
+                        proc_macro2::Span::call_site(),
+                    );
 
-                        quote!(_p::text::Reader::from_slice(#bytes))
-                    }
-                    _ => quote!(None),
+                    quote!(_p::text::Reader::from_slice(#bytes))
                 }
-            }
-            TypeKind::Data(()) => {
-                match value.and_then(|v| v.data().field()).map(|v| v.get()) {
-                    Some(data) if !data.is_empty() => {
-                        let bytes = syn::LitByteStr::new(
-                            data.as_slice(),
-                            proc_macro2::Span::call_site()
-                        );
+                _ => quote!(None),
+            },
+            TypeKind::Data(()) => match value.and_then(|v| v.data().field()).map(|v| v.get()) {
+                Some(data) if !data.is_empty() => {
+                    let bytes =
+                        syn::LitByteStr::new(data.as_slice(), proc_macro2::Span::call_site());
 
-                        quote!(_p::data::Reader::from_slice(#bytes))
-                    }
-                    _ => quote!(None),
+                    quote!(_p::data::Reader::from_slice(#bytes))
                 }
-            }
+                _ => quote!(None),
+            },
             TypeKind::List(list) => {
                 let element_type = list.element_type().get();
-                let element_type_quote = self.resolve_type(scope, &element_type, required_imports)?;
-                let default_value = value.and_then(|v| v.list().field())
+                let element_type_quote =
+                    self.resolve_type(scope, &element_type, required_imports)?;
+                let default_value = value
+                    .and_then(|v| v.list().field())
                     .map(|v| v.ptr().read_as::<AnyList>());
                 let element_size_quote = quote!(_p::ElementSize::size_of::<#element_type_quote>());
                 match default_value {
@@ -641,19 +756,24 @@ impl<'a> GeneratorContext<'a> {
             TypeKind::Enum(info) => {
                 let value = value.and_then(|v| v.r#enum().get()).unwrap_or(0);
                 let NodeContext {
-                    info: Some(NodeInfo::Enum(EnumInfo {
-                        enumerants,
-                        type_info,
-                    })),
+                    info:
+                        Some(NodeInfo::Enum(EnumInfo {
+                            enumerants,
+                            type_info,
+                        })),
                     ..
-                } = &self.nodes[&info.type_id()] else { anyhow::bail!("expected enum node") };
+                } = &self.nodes[&info.type_id()]
+                else {
+                    anyhow::bail!("expected enum node")
+                };
                 let type_name = type_info.resolve_path(scope);
                 let enumerant = &enumerants[value as usize];
 
                 quote!(#type_name::#enumerant)
             }
             TypeKind::Struct(_) => {
-                let any = value.and_then(|v| v.r#struct().field())
+                let any = value
+                    .and_then(|v| v.r#struct().field())
                     .and_then(|v| v.ptr().try_read_option_as::<AnyStruct>().ok().flatten());
                 match any {
                     Some(value) if !value.as_ref().size().is_empty() => {
@@ -671,41 +791,51 @@ impl<'a> GeneratorContext<'a> {
             }
             TypeKind::Interface(_) => quote!(None),
             TypeKind::AnyPointer(kind) => {
-                let ptr = value.and_then(|v| v.any_pointer().field())
-                    .map(|p| p.ptr()).filter(|p| !p.is_null());
+                let ptr = value
+                    .and_then(|v| v.any_pointer().field())
+                    .map(|p| p.ptr())
+                    .filter(|p| !p.is_null());
                 match kind.which()? {
                     AnyPtrKind::Unconstrained(unconstrained) => match unconstrained.which()? {
-                        ConstraintKind::AnyKind(_) => if let Some(ptr) = ptr {
-                            let slice = ptr_to_slice(&ptr);
-                            let words = words_lit(&slice);
+                        ConstraintKind::AnyKind(_) => {
+                            if let Some(ptr) = ptr {
+                                let slice = ptr_to_slice(&ptr);
+                                let words = words_lit(&slice);
 
-                            quote!(_p::PtrReader::slice_unchecked(#words))
-                        } else {
-                            quote!(None)
+                                quote!(_p::PtrReader::slice_unchecked(#words))
+                            } else {
+                                quote!(None)
+                            }
                         }
-                        ConstraintKind::Struct(_) => if let Some(ptr) = ptr {
-                            let reader = ptr.try_read_as::<AnyStruct>()
-                                .expect("struct pointer value is not struct!");
-                            let slice = struct_to_slice(&reader);
-                            let words = words_lit(slice.split_first().unwrap().1);
-                            let StructSize { data, ptrs } = reader.as_ref().size();
-                            let size = quote!(_p::StructSize { data: #data, ptrs: #ptrs });
+                        ConstraintKind::Struct(_) => {
+                            if let Some(ptr) = ptr {
+                                let reader = ptr
+                                    .try_read_as::<AnyStruct>()
+                                    .expect("struct pointer value is not struct!");
+                                let slice = struct_to_slice(&reader);
+                                let words = words_lit(slice.split_first().unwrap().1);
+                                let StructSize { data, ptrs } = reader.as_ref().size();
+                                let size = quote!(_p::StructSize { data: #data, ptrs: #ptrs });
 
-                            quote!(_p::StructReader::slice_unchecked(#words, #size))
-                        } else {
-                            quote!(None)
+                                quote!(_p::StructReader::slice_unchecked(#words, #size))
+                            } else {
+                                quote!(None)
+                            }
                         }
-                        ConstraintKind::List(_) => if let Some(ptr) = ptr {
-                            let reader = ptr.try_read_as::<AnyList>()
-                                .expect("list pointer value is not list!");
-                            let slice = list_to_slice(&reader);
-                            let words = words_lit(slice.split_first().unwrap().1);
-                            let len = reader.len();
-                            let size_quote = element_size_to_tokens(reader.element_size());
+                        ConstraintKind::List(_) => {
+                            if let Some(ptr) = ptr {
+                                let reader = ptr
+                                    .try_read_as::<AnyList>()
+                                    .expect("list pointer value is not list!");
+                                let slice = list_to_slice(&reader);
+                                let words = words_lit(slice.split_first().unwrap().1);
+                                let len = reader.len();
+                                let size_quote = element_size_to_tokens(reader.element_size());
 
-                            quote!(_p::ListReader::slice_unchecked(#words, #len, #size_quote))
-                        } else {
-                            quote!(None)
+                                quote!(_p::ListReader::slice_unchecked(#words, #len, #size_quote))
+                            } else {
+                                quote!(None)
+                            }
                         }
                         ConstraintKind::Capability(_) => quote!(None),
                     },
@@ -725,15 +855,28 @@ impl<'a> GeneratorContext<'a> {
             enumerants,
         }: &EnumInfo,
     ) -> Result<GeneratedEnum> {
-        Ok(GeneratedEnum { name: type_ident.clone(), enumerants: enumerants.clone() })
+        Ok(GeneratedEnum {
+            name: type_ident.clone(),
+            enumerants: enumerants.clone(),
+        })
     }
 
-    fn generate_const(&self, node: &ReaderOf<Const>, info: &ConstInfo, required_imports: &mut HashSet<u64>) -> Result<GeneratedConst> {
+    fn generate_const(
+        &self,
+        node: &ReaderOf<Const>,
+        info: &ConstInfo,
+        required_imports: &mut HashSet<u64>,
+    ) -> Result<GeneratedConst> {
         let type_info = node.r#type().get();
         Ok(GeneratedConst {
             ident: info.ident.clone(),
             const_type: self.resolve_type(&info.scope, &type_info, required_imports)?,
-            value: self.generate_value(&info.scope, &type_info, node.value().get_option().as_ref(), required_imports)?,
+            value: self.generate_value(
+                &info.scope,
+                &type_info,
+                node.value().get_option().as_ref(),
+                required_imports,
+            )?,
         })
     }
 
@@ -746,14 +889,18 @@ impl<'a> GeneratorContext<'a> {
             TypeKind::Int16(_) | TypeKind::Uint16(_) | TypeKind::Enum(_) => TwoBytes,
             TypeKind::Int32(_) | TypeKind::Uint32(_) | TypeKind::Float32(_) => FourBytes,
             TypeKind::Int64(_) | TypeKind::Uint64(_) | TypeKind::Float64(_) => EightBytes,
-            TypeKind::Text(_) | TypeKind::Data(_) | TypeKind::List(_) | TypeKind::Interface(_) | TypeKind::AnyPointer(_) => Pointer,
+            TypeKind::Text(_)
+            | TypeKind::Data(_)
+            | TypeKind::List(_)
+            | TypeKind::Interface(_)
+            | TypeKind::AnyPointer(_) => Pointer,
             TypeKind::Struct(s) => {
                 let s = self.nodes[&s.type_id()].node.r#struct().get_or_default();
                 InlineComposite(StructSize {
                     data: s.data_word_count(),
                     ptrs: s.pointer_count(),
                 })
-            },
+            }
         })
     }
 }
@@ -767,9 +914,14 @@ fn words_lit(words: &[Word]) -> TokenStream {
 }
 
 fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
-    let size = p.target_size().expect("failed to calculate size of struct default");
+    let size = p
+        .target_size()
+        .expect("failed to calculate size of struct default");
     assert_eq!(size.caps, 0, "default value contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
+    assert!(
+        size.words < SegmentOffset::MAX_VALUE as u64,
+        "default value is too large to fit in a single segment!"
+    );
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
@@ -781,10 +933,18 @@ fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
 
     let mut message = recapn::message::Message::new(alloc);
     let mut builder = message.builder();
-    builder.by_ref().into_root().try_set(p, false, UnwrapErrors).unwrap();
+    builder
+        .by_ref()
+        .into_root()
+        .try_set(p, false, UnwrapErrors)
+        .unwrap();
 
     let result = builder.segments().first();
-    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+    assert_eq!(
+        result.len(),
+        size.get(),
+        "written struct value doesn't match size of original"
+    );
 
     space
 }
@@ -792,7 +952,10 @@ fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
 fn struct_to_slice(s: &any::StructReader) -> Box<[Word]> {
     let size = s.total_size().expect("failed to calculate size of struct");
     assert_eq!(size.caps, 0, "struct contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "struct is too large to fit in a single segment!");
+    assert!(
+        size.words < SegmentOffset::MAX_VALUE as u64,
+        "struct is too large to fit in a single segment!"
+    );
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
@@ -804,18 +967,31 @@ fn struct_to_slice(s: &any::StructReader) -> Box<[Word]> {
 
     let mut message = recapn::message::Message::new(alloc);
     let mut builder = message.builder();
-    builder.by_ref().into_root().try_set_any_struct(s, UnwrapErrors).unwrap();
+    builder
+        .by_ref()
+        .into_root()
+        .try_set_any_struct(s, UnwrapErrors)
+        .unwrap();
 
     let result = builder.segments().first();
-    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+    assert_eq!(
+        result.len(),
+        size.get(),
+        "written struct value doesn't match size of original"
+    );
 
     space
 }
 
 fn list_to_slice(l: &any::ListReader) -> Box<[Word]> {
-    let size = l.total_size().expect("failed to calculate size of list value");
+    let size = l
+        .total_size()
+        .expect("failed to calculate size of list value");
     assert_eq!(size.caps, 0, "list contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "list is too large to fit in a single segment!");
+    assert!(
+        size.words < SegmentOffset::MAX_VALUE as u64,
+        "list is too large to fit in a single segment!"
+    );
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
@@ -827,10 +1003,18 @@ fn list_to_slice(l: &any::ListReader) -> Box<[Word]> {
 
     let mut message = recapn::message::Message::new(alloc);
     let mut builder = message.builder();
-    builder.by_ref().into_root().try_set_any_list(l, UnwrapErrors).unwrap();
+    builder
+        .by_ref()
+        .into_root()
+        .try_set_any_list(l, UnwrapErrors)
+        .unwrap();
 
     let result = builder.segments().first();
-    assert_eq!(result.len(), size.get(), "written struct value doesn't match size of original");
+    assert_eq!(
+        result.len(),
+        size.get(),
+        "written struct value doesn't match size of original"
+    );
 
     space
 }
@@ -844,7 +1028,8 @@ fn element_size_to_tokens(s: ElementSize) -> TokenStream {
         ElementSize::FourBytes => quote!(_p::ElementSize::FourBytes),
         ElementSize::EightBytes => quote!(_p::ElementSize::EightBytes),
         ElementSize::Pointer => quote!(_p::ElementSize::Pointer),
-        ElementSize::InlineComposite(StructSize { data, ptrs })
-            => quote!(_p::ElementSize::InlineComposite(_p::StructSize { data: #data, ptrs: #ptrs })),
+        ElementSize::InlineComposite(StructSize { data, ptrs }) => {
+            quote!(_p::ElementSize::InlineComposite(_p::StructSize { data: #data, ptrs: #ptrs }))
+        }
     }
 }

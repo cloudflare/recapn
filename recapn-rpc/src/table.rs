@@ -7,12 +7,12 @@ use super::client::Client;
 type TableVec = Vec<Option<Client>>;
 
 /// A cap table represented internally as a `Vec` of `Client`s.
-/// 
+///
 /// Much like the Message type, this serves to satisfy the thread-safety type system
 /// by having the type that owns the table separate from the types that mutate and read
 /// the table. This makes it safe for us to move the table itself between threads, reference
 /// it across threads, etc.
-/// 
+///
 /// However, the reader and builder types for the table are not thread safe, even though the
 /// underlying table itself is. You can't share a TableReader across threads because you might've
 /// gotten it from a TableBuilder, and TableBuilders can exist alongside readers, due to the

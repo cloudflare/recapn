@@ -1,11 +1,11 @@
 //! Segment allocation APIs and other primitives.
 
+use crate::num::{i30, u29, NonZeroU29};
 use core::cmp;
 use core::fmt::{self, Debug};
 use core::marker::PhantomData;
 use core::ops::Range;
 use core::ptr::NonNull;
-use crate::num::{u29, NonZeroU29, i30};
 
 #[cfg(feature = "alloc")]
 use rustalloc::{
@@ -310,12 +310,14 @@ unsafe impl Alloc for Global {
         let layout = Layout::array::<Word>(size.get() as usize).ok()?;
         let ptr = alloc::alloc_zeroed(layout);
         let ptr = NonNull::new(ptr)?;
-        Some(Segment { data: ptr.cast(), len: size.into() })
+        Some(Segment {
+            data: ptr.cast(),
+            len: size.into(),
+        })
     }
     #[inline]
     unsafe fn dealloc(&mut self, segment: Segment) {
-        let layout =
-            Layout::array::<Word>(segment.len.get() as usize).expect("Segment too large!");
+        let layout = Layout::array::<Word>(segment.len.get() as usize).expect("Segment too large!");
         alloc::dealloc(segment.data.as_ptr().cast(), layout)
     }
 }
@@ -425,19 +427,21 @@ impl<const N: usize> Space<N> {
 }
 
 /// A simple alias that makes it easy to create scratch space.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use recapn::alloc;
 /// use recapn::message::Message;
-/// 
+///
 /// let mut space = alloc::space::<16>();
 /// let message = Message::with_scratch(&mut space);
 /// # drop(message);
 /// ```
 #[inline]
-pub const fn space<const N: usize>() -> Space<N> { Space::new() }
+pub const fn space<const N: usize>() -> Space<N> {
+    Space::new()
+}
 
 /// Scratch space with a dynamic length that can be passed to a [Scratch] allocator.
 #[cfg(feature = "alloc")]
@@ -451,7 +455,10 @@ impl DynSpace {
     #[inline]
     pub fn new(len: AllocLen) -> Self {
         let space = vec![Word::NULL; len.get() as usize].into_boxed_slice();
-        DynSpace { dirty: false, space }
+        DynSpace {
+            dirty: false,
+            space,
+        }
     }
 
     #[inline]
@@ -504,9 +511,9 @@ impl<'s, A> Scratch<'s, A> {
 
     /// Creates a new scratch space allocator with the given segment. This effectively allows
     /// you to allocate and manage scratch space anywhere.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The segment data must last as long as the lifetime of the scratch allocator and be
     /// completely zeroed, otherwise this allocator may exhibit **undefined behavior**.
     #[inline]

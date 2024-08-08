@@ -11,9 +11,9 @@ use std::pin::{pin, Pin};
 use tokio::task::JoinHandle;
 
 use crate::sync::mpsc::Receiver;
-use crate::{Result, Error};
+use crate::{Error, Result};
 
-use super::{RpcClient, RpcCall};
+use super::{RpcCall, RpcClient};
 
 enum DispatcherState {
     Broken(Error),
@@ -31,9 +31,9 @@ pub struct Dispatcher<T: ?Sized> {
 impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// Run the dispatcher with the given executor and handle all
     /// requests until all connections to the server have been severed.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// This must be called within the context of a LocalSet. Calling this outside a LocalSet
     /// will result in a panic.
     pub async fn run(&mut self) -> Result<()> {
@@ -45,14 +45,14 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// Handles exactly one message to the server. Returns a bool indicating whether a message
     /// was handled. If the server is broken or breaks while handling a blocking message, this
     /// returns an error.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// This must be called within the context of a LocalSet. Calling this outside a LocalSet
     /// will result in a panic.
-    /// 
+    ///
     /// # Drop safety
-    /// 
+    ///
     /// It is safe to drop the future returned by this function, but if the dispatcher is handling
     /// a blocking request, that request might be canceled prematurely. If this occurs, the
     /// dispatcher is automatically broken.
@@ -62,9 +62,13 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
             Active(r) => r,
         };
 
-        let Some(req) = receiver.recv().await else { return Ok(false) };
+        let Some(req) = receiver.recv().await else {
+            return Ok(false);
+        };
         let (request, _) = req.respond();
-        let RpcCall { interface, method, .. } = request;
+        let RpcCall {
+            interface, method, ..
+        } = request;
 
         let request = DispatchRequest { interface, method };
         let DispatchResponse(result) = self.inner.dispatch(request);
@@ -82,10 +86,11 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
                 impl Drop for Bomb<'_> {
                     fn drop(&mut self) {
                         if let Some(s) = self.0.take() {
-                            let err = Error::failed("a future handling a blocking request was dropped");
+                            let err =
+                                Error::failed("a future handling a blocking request was dropped");
                             match mem::replace(s, Broken(err.clone())) {
                                 Active(r) => r.close(err),
-                                Broken(_) => unreachable!()
+                                Broken(_) => unreachable!(),
                             }
                         }
                     }
@@ -93,17 +98,17 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
                 let bomb = Bomb(Some(&mut self.state));
                 let result = task.await;
                 bomb.defuse(); // counter-terrorists win
-    
+
                 let flattened = result
                     .map_err(|join_err| Error::failed(join_err.to_string()))
                     .and_then(convert::identity);
-    
+
                 if let Err(err) = flattened {
                     match mem::replace(&mut self.state, Broken(err.clone())) {
                         Active(r) => r.close(err.clone()),
-                        Broken(_) => unreachable!()
+                        Broken(_) => unreachable!(),
                     }
-                    return Err(err)
+                    return Err(err);
                 }
             }
         }
@@ -112,7 +117,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     }
 
     /// Returns a reference to the error indicating why this dispatcher is broken.
-    /// 
+    ///
     /// If an error is returned while handling a blocking request, the dispatcher becomes
     /// broken. In this case, this function returns the error and all future requests
     /// return the same error.
@@ -130,20 +135,20 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
 }
 
 /// Dispatches requests to given interface methods by their IDs.
-/// 
+///
 /// In generated code, a server dispatcher struct and server trait are generated for each
 /// interface. Dispatcher structs wrap a type that implement their server trait and implement
 /// the `Dispatch` trait to route requests by their interface and method ID.
-/// 
+///
 /// # Example
-/// 
+///
 /// Given this capnp interface
 /// ```capnp
 /// interface Foo {
 ///   bar @0 (baz :Text);
 /// }
 /// ```
-/// 
+///
 /// A struct and trait could be generated like so
 ///
 /// ```ignore
@@ -152,14 +157,14 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
 ///     type BarFuture: Future<Output = Result<()>> + 'static;
 ///     fn bar(&self, BarContext ctx) -> Self::BarFuture;
 /// }
-/// 
+///
 /// pub struct FooDispatcher<T>(T);
 /// impl<T> FooDispatcher<T>
 /// where
 ///     T: Foo,
 /// {
 ///     pub const INTERFACE_NAME: &str = "foobar.capnp:Foo";
-/// 
+///
 ///     #[doc(hidden)]
 ///     pub fn dispatch_method<E>(this: &T, request: Request<E>) -> DispatchResponse
 ///     where
@@ -171,7 +176,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
 ///         }
 ///     }
 /// }
-/// 
+///
 /// impl<T, E> Dispatch<E> for FooDispatcher<T>
 /// where
 ///     T: Foo,
@@ -190,15 +195,15 @@ pub trait Dispatch {
 }
 
 /// A helper type for constructing a `Parameters<'a, P>` in-place, pinned, on the stack.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```text
 /// let mut in_place = ParametersInPlace::new(params);
 /// let mut pinned = pin!(in_place);
-/// 
+///
 /// // pass to call via pinned.get()
-/// 
+///
 /// pinned.drop();
 /// ```
 struct ParametersInPlace {
@@ -221,7 +226,7 @@ impl ParametersInPlace {
 }
 
 /// The params payload.
-/// 
+///
 /// This contains methods to read the parameters of the call. Dropping this releases the
 /// underlying params message and may allow the RPC system to free up buffer space to handle
 /// other requests. Long-running asynchronous methods should try to drop this as early as is
@@ -233,7 +238,7 @@ pub struct Parameters<'a, P> {
 
 impl<'a, P> Parameters<'a, P> {
     pub fn get(&self) -> P {
-        let _ptr =  unsafe { self.inner.as_ref().root() };
+        let _ptr = unsafe { self.inner.as_ref().root() };
         todo!()
     }
 }
@@ -245,32 +250,32 @@ impl<'a, P> Drop for Parameters<'a, P> {
 }
 
 /// The results payload and the response pipeline.
-/// 
+///
 /// This contains methods to manipulate the results payload, the response pipeline,
 /// or perform a tail call. Dropping this causes an empty response to be sent.
-/// 
+///
 /// There are three primary ways to manipulate the response:
-/// 
+///
 /// - `respond()`
 /// - `tail_call()`
 /// - `pipeline_and_results()`
-/// 
+///
 /// `respond()` returns an instance of `Results` for manipulating the results payload.
-/// 
+///
 /// `tail_call()` accepts a new Request that should be sent and have the response sent
 /// in place for this call. With a tail call, the RPC implementation may be able to optimize
 /// the tail call to another machine such that the results never actually pass through this
 /// machine. Even if no such optimization is possible, `tail_call()` may allow pipelined calls
 /// to be forwarded optimistically to the new call site.
-/// 
+///
 /// `pipeline_and_results()` allows configuring the response pipeline and results separately.
 /// This is analogous to `setPipeline` in C++, allowing you to tell the RPC system where the
 /// capabilities in the response will resolve to, before making the response, allowing requests
 /// that are promise-pipelined on this call's results to continue their journey to the final
 /// destination before this call itself has completed.
-/// 
+///
 /// # Cancellation
-/// 
+///
 /// Request cancellation will not automatically cancel spawned futures handling requests. Instead,
 /// Response and ResponseSender have functions that can be used to hook into the cancellation
 /// future, allowing them to listen for cancellation to occur if the user requests it.
@@ -291,10 +296,14 @@ pub struct DispatchRequest {
 
 impl DispatchRequest {
     #[inline]
-    pub fn interface(&self) -> u64 { self.interface }
+    pub fn interface(&self) -> u64 {
+        self.interface
+    }
 
     #[inline]
-    pub fn method(&self) -> u16 { self.method }
+    pub fn method(&self) -> u16 {
+        self.method
+    }
 
     pub fn respond_with<P, R, Res>(self, responder: Res) -> DispatchResponse
     where

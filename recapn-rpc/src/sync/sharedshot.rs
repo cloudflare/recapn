@@ -10,15 +10,15 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::pin::{pin, Pin};
 use std::process::abort;
-use std::ptr::{NonNull, addr_of_mut};
-use std::sync::Arc;
+use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::Ordering::{self, *};
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize};
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-use super::util::Marc;
-use super::util::linked_list::{LinkedList, GuardedLinkedList, Link, Pointers};
 use super::util::array_vec::ArrayVec;
+use super::util::linked_list::{GuardedLinkedList, Link, LinkedList, Pointers};
+use super::util::Marc;
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
@@ -99,7 +99,10 @@ impl<'a> RecvWaitersList<'a> {
 
     /// Removes the last element from the guarded list. Modifying this list
     /// requires an exclusive access to the main list in `Notify`.
-    fn pop_back_locked(&mut self, _waiters: &mut LinkedList<Waiter, Waiter>) -> Option<NonNull<Waiter>> {
+    fn pop_back_locked(
+        &mut self,
+        _waiters: &mut LinkedList<Waiter, Waiter>,
+    ) -> Option<NonNull<Waiter>> {
         let result = self.list.pop_back();
         if result.is_none() {
             // Save information about emptiness to avoid waiting for lock
@@ -132,7 +135,9 @@ pub(crate) struct WaitList {
 
 impl WaitList {
     pub const fn new() -> Self {
-        Self { list: Mutex::new(LinkedList::new()) }
+        Self {
+            list: Mutex::new(LinkedList::new()),
+        }
     }
 
     pub fn wake_all(&self) {
@@ -151,7 +156,8 @@ impl WaitList {
         // * This wrapper will empty the list on drop. It is critical for safety
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
-        let mut list = RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), &self);
+        let mut list =
+            RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), &self);
 
         const NUM_WAKERS: usize = 32;
 
@@ -200,7 +206,7 @@ impl WaitList {
 }
 
 /// A waiter helper to make the poll logic behind sharedshot components reusable.
-/// 
+///
 /// This contains the state of the waiter and nothing else. Custom pollers call into this
 /// via the poll function and provide the atomic state and wait list that the waiter puts
 /// itself in.
@@ -217,13 +223,18 @@ impl RecvWaiter {
         Self { waiter: None }
     }
 
-    pub fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>, atom: &AtomicState, waiters: &WaitList) -> ShotState {
+    pub fn poll(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+        atom: &AtomicState,
+        waiters: &WaitList,
+    ) -> ShotState {
         let mut this = self.project();
 
         match this.waiter.as_mut().as_pin_mut() {
             None => {
                 if let ShotState::Sent = atom.state() {
-                    return ShotState::Sent
+                    return ShotState::Sent;
                 }
 
                 // Clone the waker before locking, a waker clone can be triggering arbitrary code.
@@ -233,19 +244,17 @@ impl RecvWaiter {
                 let mut waiters = waiters.list.lock();
 
                 if let ShotState::Sent = atom.state() {
-                    return ShotState::Sent
+                    return ShotState::Sent;
                 }
 
-                let waiter = unsafe {
-                    Pin::get_unchecked_mut(this.waiter)
-                        .insert(Waiter::new(Some(waker)))
-                };
+                let waiter =
+                    unsafe { Pin::get_unchecked_mut(this.waiter).insert(Waiter::new(Some(waker))) };
 
                 // Insert the waiter into the linked list
                 waiters.push_front(NonNull::from(&*waiter));
 
                 ShotState::Empty
-            },
+            }
             Some(waiter) => {
                 if waiter.notified.load(Acquire) {
                     // Safety: waiter is already unlinked and will not be shared again,
@@ -256,7 +265,7 @@ impl RecvWaiter {
                     }
 
                     this.waiter.set(None);
-                    return atom.state()
+                    return atom.state();
                 }
 
                 // We were not notified, implying it is still stored in a waiter list.
@@ -280,7 +289,7 @@ impl RecvWaiter {
                     drop(old_waker);
 
                     this.waiter.set(None);
-                    return atom.state()
+                    return atom.state();
                 }
 
                 // Before we add a waiter to the list we check if the channel has closed.
@@ -297,17 +306,18 @@ impl RecvWaiter {
                         unsafe {
                             let current = &mut *waiter.waker.get();
                             let polling_waker = ctx.waker();
-                            let should_update =
-                                current.is_none() || matches!(current, Some(w) if w.will_wake(polling_waker));
+                            let should_update = current.is_none()
+                                || matches!(current, Some(w) if w.will_wake(polling_waker));
                             if should_update {
-                                old_waker = std::mem::replace(&mut *current, Some(polling_waker.clone()));
+                                old_waker =
+                                    std::mem::replace(&mut *current, Some(polling_waker.clone()));
                             }
                         }
-    
+
                         // Drop the old waker after releasing the lock.
                         drop(waiters);
                         drop(old_waker);
-                    },
+                    }
                     ShotState::Sent | ShotState::Closed => {
                         // Safety: we hold the lock, so we can modify the waker.
                         old_waker = unsafe {
@@ -334,7 +344,7 @@ impl RecvWaiter {
                 }
 
                 state
-            },
+            }
         }
     }
 
@@ -356,7 +366,9 @@ impl RecvWaiter {
 
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let state = Arc::new(State::new(1));
-    let sender = Sender { shared: Marc::new(state.clone()) };
+    let sender = Sender {
+        shared: Marc::new(state.clone()),
+    };
     let receiver = Receiver { shared: state };
 
     (sender, receiver)
@@ -380,12 +392,12 @@ impl ShotState {
     }
 }
 
-const STATE_SET: u8 =             0b0000_0001;
-const STATE_SEND_CLOSED: u8 =     0b0000_0010;
-const STATE_RECV_CLOSED: u8 =     0b0000_0100;
+const STATE_SET: u8 = 0b0000_0001;
+const STATE_SEND_CLOSED: u8 = 0b0000_0010;
+const STATE_RECV_CLOSED: u8 = 0b0000_0100;
 const STATE_CLOSED_TASK_SET: u8 = 0b0000_1000;
 
-const STATE_SET_PIPELINE: u8 =    0b0001_0000;
+const STATE_SET_PIPELINE: u8 = 0b0001_0000;
 
 /// Atomic state used by sharedshot and request state.
 #[derive(Debug)]
@@ -462,8 +474,9 @@ impl AtomicState {
                 break;
             }
 
-            let exchange_result = self.0.compare_exchange_weak(
-                state, state | STATE_SET, Release, Acquire);
+            let exchange_result =
+                self.0
+                    .compare_exchange_weak(state, state | STATE_SET, Release, Acquire);
             match exchange_result {
                 Ok(_) => break,
                 Err(actual) => state = actual,
@@ -533,7 +546,9 @@ pub(crate) struct ClosedTask {
 impl ClosedTask {
     #[inline]
     pub const fn new() -> Self {
-        Self { waker: UnsafeCell::new(MaybeUninit::uninit()) }
+        Self {
+            waker: UnsafeCell::new(MaybeUninit::uninit()),
+        }
     }
 
     #[inline]
@@ -542,7 +557,7 @@ impl ClosedTask {
 
         // The channel is closed. The waker will be destroyed when the sharedshot is dropped.
         if state.is_recv_closed() {
-            return Poll::Ready(())
+            return Poll::Ready(());
         }
 
         let waker = cx.waker();
@@ -559,7 +574,7 @@ impl ClosedTask {
                     // Oop, the task closed while we were doing this. Let's set the flag again
                     // so the waker is dropped when the sharedshot is destroyed.
                     atom.set_closed_task();
-                    return Poll::Ready(())
+                    return Poll::Ready(());
                 }
 
                 unsafe { closed_task_store.assume_init_drop() }
@@ -571,7 +586,7 @@ impl ClosedTask {
             state = atom.set_closed_task();
 
             if state.is_recv_closed() {
-                return Poll::Ready(())
+                return Poll::Ready(());
             }
         }
 
@@ -582,7 +597,7 @@ impl ClosedTask {
     pub fn close(&self, atom: &AtomicState) {
         let state = atom.set_recv_closed();
         if state.is_closed_task_set() && !(state.is_send_closed() || state.is_set()) {
-            unsafe { 
+            unsafe {
                 let closed_task_store = &*self.waker.get();
                 closed_task_store.assume_init_ref().wake_by_ref();
             }
@@ -647,10 +662,10 @@ impl<T> State<T> {
     }
 
     /// Remove a tracked receiver from the receiver count.
-    /// 
+    ///
     /// If this is the last receiver (and the receiver count is zero), this closes the channel on
     /// the receiving side.
-    /// 
+    ///
     /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
     pub unsafe fn remove_receiver(&self) {
         let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
@@ -765,7 +780,11 @@ unsafe impl<T: Sync> Sync for Recv<T> {}
 
 impl<T> Recv<T> {
     fn new(shot: Receiver<T>) -> Self {
-        Recv { shot, waiter: RecvWaiter::new(), state: Poll::Pending }
+        Recv {
+            shot,
+            waiter: RecvWaiter::new(),
+            state: Poll::Pending,
+        }
     }
 }
 
@@ -776,13 +795,15 @@ impl<T> Future for Recv<T> {
         let this = self.project();
 
         if this.state.is_ready() {
-            return this.state.clone()
+            return this.state.clone();
         }
 
         let shared = &this.shot.shared;
         let value = match this.waiter.poll(ctx, &shared.state, &shared.waiters) {
             ShotState::Empty => return Poll::Pending,
-            ShotState::Sent => Some(Value { shared: shared.clone() }),
+            ShotState::Sent => Some(Value {
+                shared: shared.clone(),
+            }),
             ShotState::Closed => None,
         };
         *this.state = Poll::Ready(value.clone());
@@ -810,12 +831,17 @@ impl<T> Receiver<T> {
         match self.shared.state.state() {
             ShotState::Closed => Err(TryRecvError::Closed),
             ShotState::Empty => Err(TryRecvError::Empty),
-            ShotState::Sent => Ok(Value { shared: self.shared.clone() }),
+            ShotState::Sent => Ok(Value {
+                shared: self.shared.clone(),
+            }),
         }
     }
 
     pub fn try_ref(&self) -> Result<&T, TryRecvError> {
-        self.shared.state.state().map_sent(|| unsafe { self.shared.get_ref() })
+        self.shared
+            .state
+            .state()
+            .map_sent(|| unsafe { self.shared.get_ref() })
     }
 
     pub fn recv(self) -> Recv<T> {
@@ -827,7 +853,9 @@ impl<T> Clone for Receiver<T> {
     fn clone(&self) -> Self {
         unsafe { self.shared.add_receiver() }
 
-        Self { shared: self.shared.clone() }
+        Self {
+            shared: self.shared.clone(),
+        }
     }
 }
 
@@ -868,7 +896,9 @@ impl<T> Value<T> {
 
 impl<T> Clone for Value<T> {
     fn clone(&self) -> Self {
-        Self { shared: Arc::clone(&self.shared) }
+        Self {
+            shared: Arc::clone(&self.shared),
+        }
     }
 }
 
@@ -894,8 +924,8 @@ impl<T> Deref for Value<T> {
 
 #[cfg(test)]
 mod test {
-    use tokio_test::*;
     use super::*;
+    use tokio_test::*;
 
     #[test]
     fn send_recv() {

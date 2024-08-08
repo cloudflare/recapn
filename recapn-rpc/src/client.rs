@@ -1,17 +1,17 @@
-use crate::sync::{request, mpsc};
 use crate::sync::request::{PipelineResolver, ResponseReceiverFactory};
-use crate::table::{Table, CapTable};
-use crate::{connection, Result, Error, PipelineOp};
+use crate::sync::{mpsc, request};
+use crate::table::{CapTable, Table};
+use crate::{connection, Error, PipelineOp, Result};
+use recapn::alloc::{Alloc, Global, Growing};
+use recapn::any::{self, AnyStruct};
+use recapn::arena::ReadArena;
+use recapn::message::{self, Message};
+use recapn::rpc::Capable;
+use recapn::{ty, ReaderOf};
 use std::borrow::Cow;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use recapn::{ReaderOf, ty};
-use recapn::alloc::{Alloc, Global, Growing};
-use recapn::arena::ReadArena;
-use recapn::any::{AnyStruct, self};
-use recapn::message::{self, Message};
-use recapn::rpc::Capable;
 
 mod local;
 mod queue;
@@ -45,10 +45,10 @@ impl MessagePayload {
 }
 
 /// Indicates what kind of structure exists in the root pointer of the params message.
-/// 
+///
 /// For most messages, like local or queued messages, this will be a pointer to the user defined
 /// params structure itself. For outgoing messages, this will be a Call structure.
-/// 
+///
 /// As the message flows through the RPC system, what exists in the root pointer might change.
 /// If a local queue resolves into a remote capability, the parameters at the root will be
 /// disowned so a Call structure can be made there instead. The parameters will then be accessable
@@ -73,7 +73,7 @@ impl Params {
 
 /// Like [`ParamsRoot`], indicates what kind of structure exists in the root pointer of the
 /// results message.
-/// 
+///
 /// For most messages, like local or queued messages, this will be a pointer to the user defined
 /// results structure itself. For incoming messages, this will be a Return structure.
 enum ResultsRoot {
@@ -89,22 +89,40 @@ pub struct RpcResponse {
 }
 
 impl PipelineResolver<RpcClient> for RpcResponse {
-    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+        channel: mpsc::Receiver<RpcClient>,
+    ) {
         todo!()
     }
-    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+    ) -> mpsc::Sender<RpcClient> {
         todo!()
     }
 }
 
 impl PipelineResolver<RpcClient> for Result<RpcResponse, Error> {
-    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+        channel: mpsc::Receiver<RpcClient>,
+    ) {
         match self {
             Ok(r) => r.resolve(recv, key, channel),
             Err(err) => channel.close(err.clone()),
         }
     }
-    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+    ) -> mpsc::Sender<RpcClient> {
         match self {
             Ok(r) => r.pipeline(recv, key),
             Err(err) => mpsc::broken(RpcClient::Broken, err.clone()),
@@ -113,14 +131,23 @@ impl PipelineResolver<RpcClient> for Result<RpcResponse, Error> {
 }
 
 impl PipelineResolver<RpcClient> for RpcResults {
-    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+        channel: mpsc::Receiver<RpcClient>,
+    ) {
         match self {
             Owned(r) => r.resolve(recv, key, channel),
             OtherResponse(r) => r.resolve(recv, key, channel),
             Shared(r) => r.resolve(recv, key, channel),
         }
     }
-    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+    ) -> mpsc::Sender<RpcClient> {
         match self {
             Owned(r) => r.pipeline(recv, key),
             OtherResponse(r) => r.pipeline(recv, key),
@@ -135,13 +162,22 @@ pub(crate) enum SetPipeline {
 }
 
 impl PipelineResolver<RpcClient> for SetPipeline {
-    fn resolve(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>, channel: mpsc::Receiver<RpcClient>) {
+    fn resolve(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+        channel: mpsc::Receiver<RpcClient>,
+    ) {
         match self {
             Self::Response(r) => r.resolve(recv, key, channel),
             Self::RemotePipeline(r) => r.resolve(recv, key, channel),
         }
     }
-    fn pipeline(&self, recv: ResponseReceiverFactory<RpcClient>, key: Arc<[PipelineOp]>) -> mpsc::Sender<RpcClient> {
+    fn pipeline(
+        &self,
+        recv: ResponseReceiverFactory<RpcClient>,
+        key: Arc<[PipelineOp]>,
+    ) -> mpsc::Sender<RpcClient> {
         match self {
             Self::Response(r) => r.pipeline(recv, key),
             Self::RemotePipeline(r) => r.pipeline(recv, key),
@@ -156,7 +192,7 @@ impl request::IntoResults<RpcClient> for Error {
 }
 
 /// Tracks where the response to this call is expected to go.
-/// 
+///
 /// This is used to detect when a question is reflected back to the original
 /// caller. When a reflected call is detected the RPC system sets up the call
 /// back so that the caller doesn't send the response through us and instead
@@ -202,7 +238,7 @@ pub(crate) enum RpcResults {
     /// A response owned by this request.
     Owned(Result<RpcResponse, Error>),
     /// A response shared from another request.
-    /// 
+    ///
     /// This is useful if a call is sent to ourselves and another question needs to pull the
     /// response from it.
     OtherResponse(request::Response<RpcClient>),
@@ -239,41 +275,47 @@ impl Client {
     /// Create a new client which is "broken". This client when called will always
     /// return the error passed in here.
     pub fn broken(err: Error) -> Client {
-        Client { sender: mpsc::broken(RpcClient::Broken, err) }
+        Client {
+            sender: mpsc::broken(RpcClient::Broken, err),
+        }
     }
 
     /// Returns a Client that queues up calls until `future` is ready, then forwards them
     /// to the new client.
-    /// 
+    ///
     /// The future is spawned using the tokio `spawn()` function. It begins running automatically
     /// in the background.
-    /// 
+    ///
     /// # Cancelation
-    /// 
+    ///
     /// The future will be dropped if all client references are dropped, including those kept
     /// transitively through active requests.
     pub fn spawn<F>(future: F) -> Client
     where
         F: Future<Output = Client> + Send + 'static,
     {
-        Client { sender: queue::spawn(future) }
+        Client {
+            sender: queue::spawn(future),
+        }
     }
 
     /// Returns a Client that queues up calls until `future` is ready, then forwards them
     /// to the new client.
-    /// 
+    ///
     /// The future is spawned using the tokio `spawn_local()` function. It begins running automatically
     /// in the background.
-    /// 
+    ///
     /// # Cancelation
-    /// 
+    ///
     /// The future will be canceled if all client references are dropped, including those kept
     /// transitively through active requests.
     pub fn spawn_local<F>(future: F) -> Client
     where
         F: Future<Output = Client> + 'static,
     {
-        Client { sender: queue::spawn_local(future) }
+        Client {
+            sender: queue::spawn_local(future),
+        }
     }
 
     pub fn call(&self, interface_id: u64, method_id: u16) -> Result<Request> {
@@ -299,7 +341,7 @@ impl Request {
                     table: Table::new(Vec::new()),
                 },
                 target: ResponseTarget::Local,
-            }
+            },
         }
     }
 

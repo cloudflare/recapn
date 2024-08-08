@@ -6,9 +6,9 @@ pub mod build_gen {
     include!(concat!(env!("OUT_DIR"), "/mod.rs"));
 }
 
+use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
 use recapn::message::Message;
 use recapn::text;
-use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
 
 #[test]
 fn make_all_types() {
@@ -37,7 +37,9 @@ fn make_all_types() {
 fn make_build_gen_type() {
     let mut message = Message::global();
     let mut builder = message.builder();
-    let mut foo = builder.by_ref().init_struct_root::<build_gen::build_capnp::Foo>();
+    let mut foo = builder
+        .by_ref()
+        .init_struct_root::<build_gen::build_capnp::Foo>();
     let mut bar = foo.bar().init();
     bar.flub().set(1234);
 

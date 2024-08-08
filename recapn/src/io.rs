@@ -1,39 +1,36 @@
 //! Helpers for reading and writing Cap'n Proto messages in standard formats.
 
-pub mod stream;
 pub mod packing;
+pub mod stream;
 
 use {
-    core::{
-        fmt::{self, Debug, Display},
-        ptr::NonNull,
-    },
+    self::packing::StopReason,
+    self::stream::{SegmentLenReader, StreamTableRef, TableReadError},
     crate::{
         alloc::{Segment, Word},
         arena::{ReadArena, SegmentId},
         message::ReaderOptions,
     },
-    self::packing::StopReason,
-    self::stream::{StreamTableRef, SegmentLenReader, TableReadError},
+    core::{
+        fmt::{self, Debug, Display},
+        ptr::NonNull,
+    },
 };
 
 #[cfg(feature = "alloc")]
 use {
-    core::ops::Bound,
-    rustalloc::{
-        boxed::Box,
-        vec::Vec,
-    },
     crate::alloc::SegmentLen,
+    core::ops::Bound,
+    rustalloc::{boxed::Box, vec::Vec},
 };
 
 #[cfg(feature = "std")]
 use {
-    core::iter,
-    std::io,
     crate::message::MessageSegments,
-    stream::StreamTable,
+    core::iter,
     packing::{Packer, Unpacker},
+    std::io,
+    stream::StreamTable,
 };
 
 #[derive(Debug)]
@@ -90,18 +87,18 @@ impl<'a> TableSegmentSet<'a> {
         let mut total_len = 0usize;
         for (len, id) in table.segments().into_iter().zip(0u32..) {
             let Some(len) = len.try_get() else {
-                return Err(ReadError::SegmentTooLarge { segment: id, })
+                return Err(ReadError::SegmentTooLarge { segment: id });
             };
             let Some(new_total) = total_len.checked_add(len.get() as usize) else {
                 // Return incomplete since the slice could never contain all the data if this
                 // overflows
-                return Err(ReadError::Incomplete)
+                return Err(ReadError::Incomplete);
             };
             total_len = new_total;
         }
 
         if total_len > data.len() {
-            return Err(ReadError::Incomplete)
+            return Err(ReadError::Incomplete);
         }
 
         let (data, remainder) = data.split_at(total_len);
@@ -111,11 +108,16 @@ impl<'a> TableSegmentSet<'a> {
 
 unsafe impl ReadArena for TableSegmentSet<'_> {
     fn segment(&self, id: SegmentId) -> Option<Segment> {
-        let (segment, leading_segments) = self.table.segments()
+        let (segment, leading_segments) = self
+            .table
+            .segments()
             .get(..=(id as usize))?
             .split_last()
             .unwrap();
-        let start = leading_segments.into_iter().map(|l| l.raw() as usize).sum::<usize>();
+        let start = leading_segments
+            .into_iter()
+            .map(|l| l.raw() as usize)
+            .sum::<usize>();
         let data = NonNull::from(&self.data[start]);
         let len = segment.try_get().unwrap();
         Some(Segment { data, len })
@@ -129,7 +131,7 @@ unsafe impl ReadArena for TableSegmentSet<'_> {
 
 /// A generic table of segment locations where all segments are contiguously laid out in a
 /// flat slice.
-/// 
+///
 /// This is used in combination with `SegmentSet` to create a generic arena type for
 /// reading messages from slices or streams.
 #[derive(Debug)]
@@ -157,14 +159,14 @@ impl SegmentSetTable {
         let (first, remainder) = table.split_first();
         let mut current_pos = segment_len_to_usize(first, 0)?;
         if current_pos > limit {
-            return Err(ReadError::MessageTooLarge)
+            return Err(ReadError::MessageTooLarge);
         }
 
         let mut start_idxs = Vec::with_capacity(remainder.len());
         for (len, id) in remainder.into_iter().zip(1u32..) {
             let len = segment_len_to_usize(len, id)?;
             let Some(new_pos) = current_pos.checked_add(len).filter(|&new| new <= limit) else {
-                return Err(ReadError::MessageTooLarge)
+                return Err(ReadError::MessageTooLarge);
             };
 
             start_idxs.push(current_pos);
@@ -319,11 +321,13 @@ impl Default for StreamOptions {
 ///
 /// If the content is incomplete or invalid, this returns Err
 #[cfg(feature = "alloc")]
-pub fn read_from_slice<'a>(slice: &'a [Word]) -> Result<(SegmentSet<&'a [Word]>, &'a [Word]), ReadError> {
+pub fn read_from_slice<'a>(
+    slice: &'a [Word],
+) -> Result<(SegmentSet<&'a [Word]>, &'a [Word]), ReadError> {
     let (table, content) = StreamTableRef::try_read(slice)?;
     let (table, message_len) = SegmentSetTable::from_stream(table, content.len())?;
     if content.len() < message_len {
-        return Err(ReadError::Incomplete)
+        return Err(ReadError::Incomplete);
     }
 
     let (content, remainder) = content.split_at(message_len);
@@ -345,7 +349,10 @@ fn map_read_err(err: ReadError) -> StreamError {
 }
 
 #[cfg(feature = "std")]
-pub fn read_from_stream<R: io::Read>(mut r: R, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
+pub fn read_from_stream<R: io::Read>(
+    mut r: R,
+    options: StreamOptions,
+) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
     let mut first = [Word::NULL; 1];
 
     const TABLE_STACK_BUF_LEN: usize = 32;
@@ -361,17 +368,16 @@ pub fn read_from_stream<R: io::Read>(mut r: R, options: StreamOptions) -> Result
                 return Err(StreamError::Table(TableReadError::TooManySegments));
             }
 
-            let buffer =
-                if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
-                    // There's too many segments for our stack buffer, so we need to allocate
-                    // a buffer on the heap
+            let buffer = if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
+                // There's too many segments for our stack buffer, so we need to allocate
+                // a buffer on the heap
 
-                    table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
-                    &mut *table_heap_buf
-                } else {
-                    table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
-                    &mut table_stack_buf[..(required + 1)]
-                };
+                table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
+                &mut *table_heap_buf
+            } else {
+                table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
+                &mut table_stack_buf[..(required + 1)]
+            };
 
             let (buffer_first, rest) = buffer.split_first_mut().unwrap();
             *buffer_first = first[0];
@@ -385,8 +391,8 @@ pub fn read_from_stream<R: io::Read>(mut r: R, options: StreamOptions) -> Result
         Err(err @ TableReadError::TooManySegments) => return Err(StreamError::Table(err)),
         Err(TableReadError::Empty) => unreachable!(),
     };
-    let (table, message_len) = SegmentSetTable::from_stream(segment_table, options.read_limit)
-        .map_err(map_read_err)?;
+    let (table, message_len) =
+        SegmentSetTable::from_stream(segment_table, options.read_limit).map_err(map_read_err)?;
 
     let mut data = vec![Word::NULL; message_len].into_boxed_slice();
     r.read_exact(Word::slice_to_bytes_mut(&mut data))?;
@@ -395,7 +401,7 @@ pub fn read_from_stream<R: io::Read>(mut r: R, options: StreamOptions) -> Result
 }
 
 /// A `BufRead` paired with an unpacker.
-/// 
+///
 /// This allows for easily reading words from a packed input stream.
 #[cfg(feature = "std")]
 #[derive(Debug)]
@@ -407,12 +413,15 @@ pub struct PackedStream<R> {
 #[cfg(feature = "std")]
 impl<R: io::BufRead> PackedStream<R> {
     pub const fn new(stream: R) -> Self {
-        Self { unpacker: Unpacker::new(), stream }
+        Self {
+            unpacker: Unpacker::new(),
+            stream,
+        }
     }
 
     pub fn read(&mut self, out: &mut [Word]) -> Result<usize, io::Error> {
         if out.is_empty() {
-            return Ok(0)
+            return Ok(0);
         }
 
         loop {
@@ -421,7 +430,7 @@ impl<R: io::BufRead> PackedStream<R> {
                 return match self.unpacker.finish() {
                     Ok(()) => Ok(0),
                     Err(err) => Err(io::Error::new(io::ErrorKind::UnexpectedEof, err)),
-                }
+                };
             }
 
             let result = self.unpacker.unpack(buf, out);
@@ -458,8 +467,10 @@ impl<R: io::BufRead> PackedStream<R> {
         loop {
             let buf = self.stream.fill_buf()?;
             if buf.is_empty() {
-                return self.unpacker.finish()
-                    .map_err(|e| io::Error::new(io::ErrorKind::UnexpectedEof, e))
+                return self
+                    .unpacker
+                    .finish()
+                    .map_err(|e| io::Error::new(io::ErrorKind::UnexpectedEof, e));
             }
 
             let result = self.unpacker.unpack(buf, &mut []);
@@ -467,8 +478,12 @@ impl<R: io::BufRead> PackedStream<R> {
 
             match result.reason {
                 StopReason::NeedInput => continue,
-                StopReason::NeedOutput => return self.unpacker.finish()
-                    .map_err(|e| io::Error::new(io::ErrorKind::WriteZero, e)),
+                StopReason::NeedOutput => {
+                    return self
+                        .unpacker
+                        .finish()
+                        .map_err(|e| io::Error::new(io::ErrorKind::WriteZero, e))
+                }
             }
         }
     }
@@ -480,7 +495,10 @@ impl<R: io::BufRead> PackedStream<R> {
 }
 
 #[cfg(feature = "std")]
-pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, options: StreamOptions) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
+pub fn read_packed_from_stream<R: io::BufRead>(
+    stream: &mut PackedStream<R>,
+    options: StreamOptions,
+) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
     const TABLE_STACK_BUF_LEN: usize = 32;
     let mut table_stack_buf: [Word; TABLE_STACK_BUF_LEN];
     let mut table_heap_buf: Box<[Word]>;
@@ -497,17 +515,16 @@ pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, opt
                 return Err(StreamError::Table(TableReadError::TooManySegments));
             }
 
-            let buffer =
-                if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
-                    // There's too many segments for our stack buffer, so we need to allocate
-                    // a buffer on the heap
+            let buffer = if count > stream::max_table_size_from_len(TABLE_STACK_BUF_LEN) {
+                // There's too many segments for our stack buffer, so we need to allocate
+                // a buffer on the heap
 
-                    table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
-                    &mut *table_heap_buf
-                } else {
-                    table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
-                    &mut table_stack_buf[..(required + 1)]
-                };
+                table_heap_buf = vec![Word::NULL; required + 1].into_boxed_slice();
+                &mut *table_heap_buf
+            } else {
+                table_stack_buf = [Word::NULL; TABLE_STACK_BUF_LEN];
+                &mut table_stack_buf[..(required + 1)]
+            };
 
             let (buffer_first, rest) = buffer.split_first_mut().unwrap();
             *buffer_first = first[0];
@@ -520,8 +537,8 @@ pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, opt
         }
     };
 
-    let (table, message_len) = SegmentSetTable::from_stream(table, options.read_limit as usize)
-        .map_err(map_read_err)?;
+    let (table, message_len) =
+        SegmentSetTable::from_stream(table, options.read_limit as usize).map_err(map_read_err)?;
 
     let mut data = vec![Word::NULL; message_len].into_boxed_slice();
     stream.read_exact(&mut data)?;
@@ -542,7 +559,10 @@ pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments) -> Resu
 }
 
 #[cfg(feature = "std")]
-pub fn write_message_packed<W: io::Write>(mut w: W, segments: &MessageSegments) -> Result<(), io::Error> {
+pub fn write_message_packed<W: io::Write>(
+    mut w: W,
+    segments: &MessageSegments,
+) -> Result<(), io::Error> {
     let mut buffer = [0u8; 256];
 
     let stream_table = StreamTable::from_segments(segments);
@@ -554,7 +574,7 @@ pub fn write_message_packed<W: io::Write>(mut w: W, segments: &MessageSegments) 
             let result = packer.pack(&mut buffer);
             w.write_all(&buffer[..result.bytes_written])?;
             if result.completed {
-                break
+                break;
             }
         }
     }

@@ -3,7 +3,7 @@
 //! The data structure supports tracking pinned nodes. Most of the data
 //! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
-//! 
+//!
 //! This is largely copied from tokio, as many of the types in this lib use similar mechanisms
 //! for handling futures.
 
@@ -354,15 +354,16 @@ impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
             }
         }
 
-        GuardedLinkedList { guard, _marker: PhantomData }
+        GuardedLinkedList {
+            guard,
+            _marker: PhantomData,
+        }
     }
 }
 
 impl<L: Link> GuardedLinkedList<L, L::Target> {
     fn tail(&self) -> Option<NonNull<L::Target>> {
-        let tail_ptr = unsafe {
-            L::pointers(self.guard).as_ref().get_prev().unwrap()
-        };
+        let tail_ptr = unsafe { L::pointers(self.guard).as_ref().get_prev().unwrap() };
 
         // Compare the tail pointer with the address of the guard node itself.
         // If the guard points at itself, then there are no other nodes and

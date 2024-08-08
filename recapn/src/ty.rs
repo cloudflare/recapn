@@ -5,11 +5,11 @@ use core::convert::TryFrom;
 use crate::any;
 use crate::field;
 use crate::internal::Sealed;
-use crate::list::{self, List, ElementSize};
-use crate::ptr::{self, StructSize, MessageSize};
+use crate::list::{self, ElementSize, List};
+use crate::ptr::{self, MessageSize, StructSize};
 use crate::rpc::{Capable, Table};
 use crate::ReaderOf;
-use crate::{NotInSchema, IntoFamily, Result};
+use crate::{IntoFamily, NotInSchema, Result};
 
 /// An enum marker trait.
 pub trait Enum: Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
@@ -29,16 +29,18 @@ pub trait Capability: 'static {
 }
 
 /// Provides associated types for readers and builders of a struct with the given type.
-/// 
+///
 /// Note, this is applied to both structs and *groups* which are not values that you can read
 /// from a pointer.
 pub trait StructView: 'static {
-    type Reader<'a, T: Table>: StructReader<Ptr = ptr::StructReader<'a, T>> + IntoFamily<Family = Self>;
-    type Builder<'a, T: Table>: StructBuilder<Ptr = ptr::StructBuilder<'a, T>> + IntoFamily<Family = Self>;
+    type Reader<'a, T: Table>: StructReader<Ptr = ptr::StructReader<'a, T>>
+        + IntoFamily<Family = Self>;
+    type Builder<'a, T: Table>: StructBuilder<Ptr = ptr::StructBuilder<'a, T>>
+        + IntoFamily<Family = Self>;
 }
 
 /// A marker that indicates that a type represents a struct.
-/// 
+///
 /// This provides the struct's size, along with the reader and builder associated types.
 pub trait Struct: StructView {
     const SIZE: StructSize;
@@ -99,9 +101,9 @@ where
 
 pub trait StructBuilder: TypedPtr + Into<Self::Ptr> + AsRef<Self::Ptr> + AsMut<Self::Ptr> {
     /// Interprets the raw builder as this type.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The specified builder must have a size greater than or equal to the size of this
     /// struct type.
     unsafe fn from_ptr(ptr: Self::Ptr) -> Self;
@@ -176,7 +178,8 @@ impl<'a, S: Struct, T: Table> FromPtr<any::PtrReader<'a, T>> for field::Struct<S
         match reader.as_ref().to_struct() {
             Ok(Some(ptr)) => ptr,
             _ => reader.imbue_into(ptr::StructReader::empty()),
-        }.into()
+        }
+        .into()
     }
 }
 

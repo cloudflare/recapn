@@ -67,7 +67,11 @@ pub(crate) mod internal {
         D::TableBuilder: CapTranslator<C::Cap>,
     {
         #[inline]
-        fn copy(reader: &Self::Reader, index: u32, builder: &D::TableBuilder) -> Result<Option<u32>> {
+        fn copy(
+            reader: &Self::Reader,
+            index: u32,
+            builder: &D::TableBuilder,
+        ) -> Result<Option<u32>> {
             let cap = reader
                 .extract_cap(index)
                 .ok_or_else(|| ErrorKind::InvalidCapabilityPointer(index))?;
@@ -287,7 +291,9 @@ pub trait PipelineBuilder<T> {
 pub struct Pipeline<P: Pipelined>(P);
 
 impl<P: Pipelined> Pipeline<P> {
-    pub fn new(pipeline: P) -> Self { Pipeline(pipeline) }
+    pub fn new(pipeline: P) -> Self {
+        Pipeline(pipeline)
+    }
 
     pub fn push<T>(self, op: <P as PipelineBuilder<T>>::Operation) -> Self
     where

@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use crate::any::AnyStruct;
 use crate::data::Data;
-use crate::field::{Struct, Capability};
+use crate::field::{Capability, Struct};
 use crate::list::List;
 use crate::ptr::{ElementCount, ElementSize, ObjectBuilder, OrphanBuilder, StructSize};
 use crate::rpc::{self, Capable, Table};
@@ -21,7 +21,9 @@ impl<'b, T: Table> Capable for Orphanage<'b, T> {
     type ImbuedWith<T2: Table> = Orphanage<'b, T2>;
 
     #[inline]
-    fn imbued(&self) -> &Self::Imbued { &self.table }
+    fn imbued(&self) -> &Self::Imbued {
+        &self.table
+    }
 
     #[inline]
     fn imbue_release<T2: Table>(
@@ -29,7 +31,10 @@ impl<'b, T: Table> Capable for Orphanage<'b, T> {
         new_table: <Self::ImbuedWith<T2> as Capable>::Imbued,
     ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
         let old_table = self.table;
-        let orphanage = Orphanage { builder: self.builder, table: new_table };
+        let orphanage = Orphanage {
+            builder: self.builder,
+            table: new_table,
+        };
         (orphanage, old_table)
     }
 
@@ -46,7 +51,10 @@ impl<'b, T: Table> Capable for Orphanage<'b, T> {
 impl<'b> Orphanage<'b, rpc::Empty> {
     #[inline]
     pub(crate) fn new(builder: ObjectBuilder<'b>) -> Self {
-        Self { builder, table: rpc::Empty }
+        Self {
+            builder,
+            table: rpc::Empty,
+        }
     }
 }
 
@@ -63,7 +71,11 @@ impl<'a, T: Table> Orphanage<'a, T> {
     }
 
     #[inline]
-    fn try_new_list_orphan(&self, size: ElementSize, count: ElementCount) -> Result<OrphanBuilder<'a, T>> {
+    fn try_new_list_orphan(
+        &self,
+        size: ElementSize,
+        count: ElementCount,
+    ) -> Result<OrphanBuilder<'a, T>> {
         let (object, builder) = self.builder.alloc_list_orphan(size, count)?;
         Ok(OrphanBuilder::new(builder, object, self.table.clone()))
     }
@@ -75,7 +87,8 @@ impl<'a, T: Table> Orphanage<'a, T> {
 
     #[inline]
     pub fn new_struct<S: ty::Struct>(&self) -> Orphan<'a, Struct<S>, T> {
-        self.try_new_struct::<S>().expect("failed to allocate struct")
+        self.try_new_struct::<S>()
+            .expect("failed to allocate struct")
     }
 
     #[inline]
@@ -85,7 +98,8 @@ impl<'a, T: Table> Orphanage<'a, T> {
 
     #[inline]
     pub fn new_any_struct(&self, size: StructSize) -> Orphan<'a, AnyStruct, T> {
-        self.try_new_any_struct(size).expect("failed to allocate struct")
+        self.try_new_any_struct(size)
+            .expect("failed to allocate struct")
     }
 
     #[inline]
@@ -93,12 +107,14 @@ impl<'a, T: Table> Orphanage<'a, T> {
         &self,
         count: ElementCount,
     ) -> Result<Orphan<'a, List<V>, T>> {
-        self.try_new_list_orphan(V::ELEMENT_SIZE, count).map(Orphan::new)
+        self.try_new_list_orphan(V::ELEMENT_SIZE, count)
+            .map(Orphan::new)
     }
 
     #[inline]
     pub fn new_list_of<V: ty::ListValue>(&self, count: ElementCount) -> Orphan<'a, List<V>, T> {
-        self.try_new_list_of::<V>(count).expect("failed to allocate list")
+        self.try_new_list_of::<V>(count)
+            .expect("failed to allocate list")
     }
 
     #[inline]
@@ -107,7 +123,8 @@ impl<'a, T: Table> Orphanage<'a, T> {
         size: StructSize,
         count: ElementCount,
     ) -> Result<Orphan<'a, List<AnyStruct>, T>> {
-        self.try_new_list_orphan(ElementSize::InlineComposite(size), count).map(Orphan::new)
+        self.try_new_list_orphan(ElementSize::InlineComposite(size), count)
+            .map(Orphan::new)
     }
 
     #[inline]
@@ -116,27 +133,32 @@ impl<'a, T: Table> Orphanage<'a, T> {
         size: StructSize,
         count: ElementCount,
     ) -> Orphan<'a, List<AnyStruct>, T> {
-        self.try_new_list_of_any_struct(size, count).expect("failed to allocate list")
+        self.try_new_list_of_any_struct(size, count)
+            .expect("failed to allocate list")
     }
 
     #[inline]
     pub fn try_new_data(&self, size: ElementCount) -> Result<Orphan<'a, Data, T>> {
-        self.try_new_list_orphan(ElementSize::Byte, size).map(Orphan::new)
+        self.try_new_list_orphan(ElementSize::Byte, size)
+            .map(Orphan::new)
     }
 
     #[inline]
     pub fn new_data(&self, size: ElementCount) -> Orphan<'a, Data, T> {
-        self.try_new_data(size).expect("failed to allocate data blob")
+        self.try_new_data(size)
+            .expect("failed to allocate data blob")
     }
 
     #[inline]
     pub fn try_new_text(&self, size: text::ByteCount) -> Result<Orphan<'a, Text, T>> {
-        self.try_new_list_orphan(ElementSize::Byte, size.into()).map(Orphan::new)
+        self.try_new_list_orphan(ElementSize::Byte, size.into())
+            .map(Orphan::new)
     }
 
     #[inline]
     pub fn new_text(&self, size: text::ByteCount) -> Orphan<'a, Text, T> {
-        self.try_new_text(size).expect("failed to allocate text blob")
+        self.try_new_text(size)
+            .expect("failed to allocate text blob")
     }
 }
 
@@ -159,7 +181,9 @@ impl<'a, T, Table: rpc::Table> Capable for Orphan<'a, T, Table> {
     type ImbuedWith<Table2: rpc::Table> = Orphan<'a, T, Table2>;
 
     #[inline]
-    fn imbued(&self) -> &Self::Imbued { self.builder.imbued() }
+    fn imbued(&self) -> &Self::Imbued {
+        self.builder.imbued()
+    }
 
     #[inline]
     fn imbue_release<T2: rpc::Table>(
@@ -167,7 +191,13 @@ impl<'a, T, Table: rpc::Table> Capable for Orphan<'a, T, Table> {
         new_table: T2::Builder,
     ) -> (Self::ImbuedWith<T2>, <Self::Table as rpc::Table>::Builder) {
         let (ptr, old_table) = self.builder.imbue_release(new_table);
-        (Orphan { t: PhantomData, builder: ptr }, old_table)
+        (
+            Orphan {
+                t: PhantomData,
+                builder: ptr,
+            },
+            old_table,
+        )
     }
 
     #[inline]
@@ -183,7 +213,10 @@ impl<'a, T, Table: rpc::Table> Capable for Orphan<'a, T, Table> {
 impl<'a, T, Table: rpc::Table> Orphan<'a, T, Table> {
     #[inline]
     pub(crate) fn new(builder: OrphanBuilder<'a, Table>) -> Self {
-        Self { t: PhantomData, builder }
+        Self {
+            t: PhantomData,
+            builder,
+        }
     }
 
     #[inline]
@@ -197,7 +230,6 @@ where
     S: ty::Struct,
     Table: rpc::Table,
 {
-
 }
 
 // TODO accessors

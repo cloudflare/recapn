@@ -1,6 +1,6 @@
 #![allow(unused, unsafe_code)]
-use recapn::prelude::gen as _p;
 use super::{__file, __imports};
+use recapn::prelude::gen as _p;
 #[repr(u16)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum TestEnum {
@@ -72,21 +72,24 @@ impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for test_all_types::Reader<'a, T> {
     type Ptr = _p::StructReader<'a, T>;
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
-for test_all_types::Reader<'a, T> {
+    for test_all_types::Reader<'a, T>
+{
     #[inline]
     fn from(ptr: _p::StructReader<'a, T>) -> Self {
         TestAllTypes(ptr)
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<test_all_types::Reader<'a, T>>
-for _p::StructReader<'a, T> {
+    for _p::StructReader<'a, T>
+{
     #[inline]
     fn from(reader: test_all_types::Reader<'a, T>) -> Self {
         reader.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
-for test_all_types::Reader<'a, T> {
+    for test_all_types::Reader<'a, T>
+{
     #[inline]
     fn as_ref(&self) -> &_p::StructReader<'a, T> {
         &self.0
@@ -97,21 +100,24 @@ impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for test_all_types::Builder<'a, T> 
     type Ptr = _p::StructBuilder<'a, T>;
 }
 impl<'a, T: _p::rpc::Table> core::convert::From<test_all_types::Builder<'a, T>>
-for _p::StructBuilder<'a, T> {
+    for _p::StructBuilder<'a, T>
+{
     #[inline]
     fn from(reader: test_all_types::Builder<'a, T>) -> Self {
         reader.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
-for test_all_types::Builder<'a, T> {
+    for test_all_types::Builder<'a, T>
+{
     #[inline]
     fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
         &self.0
     }
 }
 impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
-for test_all_types::Builder<'a, T> {
+    for test_all_types::Builder<'a, T>
+{
     #[inline]
     fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
         &mut self.0
@@ -186,15 +192,12 @@ impl TestAllTypes {
         slot: 1u32,
         default: None,
     };
-    const STRUCT_FIELD: _p::Descriptor<_p::Struct<TestAllTypes>> = _p::Descriptor::<
-        _p::Struct<TestAllTypes>,
-    > {
-        slot: 2u32,
-        default: None,
-    };
-    const ENUM_FIELD: _p::Descriptor<_p::Enum<TestEnum>> = _p::Descriptor::<
-        _p::Enum<TestEnum>,
-    > {
+    const STRUCT_FIELD: _p::Descriptor<_p::Struct<TestAllTypes>> =
+        _p::Descriptor::<_p::Struct<TestAllTypes>> {
+            slot: 2u32,
+            default: None,
+        };
+    const ENUM_FIELD: _p::Descriptor<_p::Enum<TestEnum>> = _p::Descriptor::<_p::Enum<TestEnum>> {
         slot: 18u32,
         default: TestEnum::Foo,
     };
@@ -247,30 +250,24 @@ impl TestAllTypes {
         slot: 14u32,
         default: None,
     };
-    const TEXT_LIST: _p::Descriptor<_p::List<_p::Text>> = _p::Descriptor::<
-        _p::List<_p::Text>,
-    > {
+    const TEXT_LIST: _p::Descriptor<_p::List<_p::Text>> = _p::Descriptor::<_p::List<_p::Text>> {
         slot: 15u32,
         default: None,
     };
-    const DATA_LIST: _p::Descriptor<_p::List<_p::Data>> = _p::Descriptor::<
-        _p::List<_p::Data>,
-    > {
+    const DATA_LIST: _p::Descriptor<_p::List<_p::Data>> = _p::Descriptor::<_p::List<_p::Data>> {
         slot: 16u32,
         default: None,
     };
-    const STRUCT_LIST: _p::Descriptor<_p::List<_p::Struct<TestAllTypes>>> = _p::Descriptor::<
-        _p::List<_p::Struct<TestAllTypes>>,
-    > {
-        slot: 17u32,
-        default: None,
-    };
-    const ENUM_LIST: _p::Descriptor<_p::List<_p::Enum<TestEnum>>> = _p::Descriptor::<
-        _p::List<_p::Enum<TestEnum>>,
-    > {
-        slot: 18u32,
-        default: None,
-    };
+    const STRUCT_LIST: _p::Descriptor<_p::List<_p::Struct<TestAllTypes>>> =
+        _p::Descriptor::<_p::List<_p::Struct<TestAllTypes>>> {
+            slot: 17u32,
+            default: None,
+        };
+    const ENUM_LIST: _p::Descriptor<_p::List<_p::Enum<TestEnum>>> =
+        _p::Descriptor::<_p::List<_p::Enum<TestEnum>>> {
+            slot: 18u32,
+            default: None,
+        };
     const INTERFACE_LIST: _p::Descriptor<_p::List<()>> = _p::Descriptor::<_p::List<()>> {
         slot: 19u32,
         default: None,
@@ -279,408 +276,272 @@ impl TestAllTypes {
 impl<'p, T: _p::rpc::Table + 'p> test_all_types::Reader<'p, T> {
     #[inline]
     pub fn void_field(&self) -> _p::Accessor<'_, 'p, T, ()> {
-        unsafe {
-            <() as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::VOID_FIELD)
-        }
+        unsafe { <() as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::VOID_FIELD) }
     }
     #[inline]
     pub fn bool_field(&self) -> _p::Accessor<'_, 'p, T, bool> {
-        unsafe {
-            <bool as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::BOOL_FIELD)
-        }
+        unsafe { <bool as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::BOOL_FIELD) }
     }
     #[inline]
     pub fn int8_field(&self) -> _p::Accessor<'_, 'p, T, i8> {
-        unsafe {
-            <i8 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT8_FIELD)
-        }
+        unsafe { <i8 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT8_FIELD) }
     }
     #[inline]
     pub fn int16_field(&self) -> _p::Accessor<'_, 'p, T, i16> {
-        unsafe {
-            <i16 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT16_FIELD)
-        }
+        unsafe { <i16 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT16_FIELD) }
     }
     #[inline]
     pub fn int32_field(&self) -> _p::Accessor<'_, 'p, T, i32> {
-        unsafe {
-            <i32 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT32_FIELD)
-        }
+        unsafe { <i32 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT32_FIELD) }
     }
     #[inline]
     pub fn int64_field(&self) -> _p::Accessor<'_, 'p, T, i64> {
-        unsafe {
-            <i64 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT64_FIELD)
-        }
+        unsafe { <i64 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT64_FIELD) }
     }
     #[inline]
     pub fn u_int8_field(&self) -> _p::Accessor<'_, 'p, T, u8> {
-        unsafe {
-            <u8 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT8_FIELD)
-        }
+        unsafe { <u8 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT8_FIELD) }
     }
     #[inline]
     pub fn u_int16_field(&self) -> _p::Accessor<'_, 'p, T, u16> {
-        unsafe {
-            <u16 as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::U_INT16_FIELD,
-            )
-        }
+        unsafe { <u16 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT16_FIELD) }
     }
     #[inline]
     pub fn u_int32_field(&self) -> _p::Accessor<'_, 'p, T, u32> {
-        unsafe {
-            <u32 as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::U_INT32_FIELD,
-            )
-        }
+        unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT32_FIELD) }
     }
     #[inline]
     pub fn u_int64_field(&self) -> _p::Accessor<'_, 'p, T, u64> {
-        unsafe {
-            <u64 as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::U_INT64_FIELD,
-            )
-        }
+        unsafe { <u64 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT64_FIELD) }
     }
     #[inline]
     pub fn float32_field(&self) -> _p::Accessor<'_, 'p, T, f32> {
-        unsafe {
-            <f32 as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::FLOAT32_FIELD,
-            )
-        }
+        unsafe { <f32 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT32_FIELD) }
     }
     #[inline]
     pub fn float64_field(&self) -> _p::Accessor<'_, 'p, T, f64> {
-        unsafe {
-            <f64 as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::FLOAT64_FIELD,
-            )
-        }
+        unsafe { <f64 as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT64_FIELD) }
     }
     #[inline]
     pub fn text_field(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
-        unsafe {
-            <_p::Text as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::TEXT_FIELD,
-            )
-        }
+        unsafe { <_p::Text as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::TEXT_FIELD) }
     }
     #[inline]
     pub fn data_field(&self) -> _p::Accessor<'_, 'p, T, _p::Data> {
-        unsafe {
-            <_p::Data as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestAllTypes::DATA_FIELD,
-            )
-        }
+        unsafe { <_p::Data as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::DATA_FIELD) }
     }
     #[inline]
     pub fn struct_field(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<TestAllTypes>> {
         unsafe {
-            <_p::Struct<
-                TestAllTypes,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::STRUCT_FIELD)
+            <_p::Struct<TestAllTypes> as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestAllTypes::STRUCT_FIELD,
+            )
         }
     }
     #[inline]
     pub fn enum_field(&self) -> _p::Accessor<'_, 'p, T, _p::Enum<TestEnum>> {
         unsafe {
-            <_p::Enum<
-                TestEnum,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::ENUM_FIELD)
-        }
-    }
-    #[inline]
-    pub fn interface_field(&self) -> _p::Accessor<'_, 'p, T, ()> {
-        unsafe {
-            <() as _p::field::FieldType>::accessor(
+            <_p::Enum<TestEnum> as _p::field::FieldType>::accessor(
                 &self.0,
-                &TestAllTypes::INTERFACE_FIELD,
+                &TestAllTypes::ENUM_FIELD,
             )
         }
     }
     #[inline]
+    pub fn interface_field(&self) -> _p::Accessor<'_, 'p, T, ()> {
+        unsafe { <() as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INTERFACE_FIELD) }
+    }
+    #[inline]
     pub fn void_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::VOID_LIST)
+            <_p::List<()> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::VOID_LIST)
         }
     }
     #[inline]
     pub fn bool_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<bool>> {
         unsafe {
-            <_p::List<
-                bool,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::BOOL_LIST)
+            <_p::List<bool> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::BOOL_LIST)
         }
     }
     #[inline]
     pub fn int8_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<i8>> {
         unsafe {
-            <_p::List<
-                i8,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT8_LIST)
+            <_p::List<i8> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT8_LIST)
         }
     }
     #[inline]
     pub fn int16_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<i16>> {
         unsafe {
-            <_p::List<
-                i16,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT16_LIST)
+            <_p::List<i16> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT16_LIST)
         }
     }
     #[inline]
     pub fn int32_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<i32>> {
         unsafe {
-            <_p::List<
-                i32,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT32_LIST)
+            <_p::List<i32> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT32_LIST)
         }
     }
     #[inline]
     pub fn int64_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<i64>> {
         unsafe {
-            <_p::List<
-                i64,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT64_LIST)
+            <_p::List<i64> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INT64_LIST)
         }
     }
     #[inline]
     pub fn u_int8_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<u8>> {
         unsafe {
-            <_p::List<
-                u8,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT8_LIST)
+            <_p::List<u8> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT8_LIST)
         }
     }
     #[inline]
     pub fn u_int16_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<u16>> {
         unsafe {
-            <_p::List<
-                u16,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT16_LIST)
+            <_p::List<u16> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT16_LIST)
         }
     }
     #[inline]
     pub fn u_int32_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<u32>> {
         unsafe {
-            <_p::List<
-                u32,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT32_LIST)
+            <_p::List<u32> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT32_LIST)
         }
     }
     #[inline]
     pub fn u_int64_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<u64>> {
         unsafe {
-            <_p::List<
-                u64,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT64_LIST)
+            <_p::List<u64> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::U_INT64_LIST)
         }
     }
     #[inline]
     pub fn float32_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<f32>> {
         unsafe {
-            <_p::List<
-                f32,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT32_LIST)
+            <_p::List<f32> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT32_LIST)
         }
     }
     #[inline]
     pub fn float64_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<f64>> {
         unsafe {
-            <_p::List<
-                f64,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT64_LIST)
+            <_p::List<f64> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::FLOAT64_LIST)
         }
     }
     #[inline]
     pub fn text_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::Text>> {
         unsafe {
-            <_p::List<
-                _p::Text,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::TEXT_LIST)
+            <_p::List<_p::Text> as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestAllTypes::TEXT_LIST,
+            )
         }
     }
     #[inline]
     pub fn data_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::Data>> {
         unsafe {
-            <_p::List<
-                _p::Data,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::DATA_LIST)
+            <_p::List<_p::Data> as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestAllTypes::DATA_LIST,
+            )
         }
     }
     #[inline]
-    pub fn struct_list(
-        &self,
-    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<TestAllTypes>>> {
+    pub fn struct_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::Struct<TestAllTypes>>> {
         unsafe {
-            <_p::List<
-                _p::Struct<TestAllTypes>,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::STRUCT_LIST)
+            <_p::List<_p::Struct<TestAllTypes>> as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestAllTypes::STRUCT_LIST,
+            )
         }
     }
     #[inline]
     pub fn enum_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::Enum<TestEnum>>> {
         unsafe {
-            <_p::List<
-                _p::Enum<TestEnum>,
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::ENUM_LIST)
+            <_p::List<_p::Enum<TestEnum>> as _p::field::FieldType>::accessor(
+                &self.0,
+                &TestAllTypes::ENUM_LIST,
+            )
         }
     }
     #[inline]
     pub fn interface_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INTERFACE_LIST)
+            <_p::List<()> as _p::field::FieldType>::accessor(&self.0, &TestAllTypes::INTERFACE_LIST)
         }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn void_field(&mut self) -> _p::AccessorMut<'_, 'p, T, ()> {
-        unsafe {
-            <() as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::VOID_FIELD,
-            )
-        }
+        unsafe { <() as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::VOID_FIELD) }
     }
     #[inline]
     pub fn bool_field(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
-        unsafe {
-            <bool as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::BOOL_FIELD,
-            )
-        }
+        unsafe { <bool as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::BOOL_FIELD) }
     }
     #[inline]
     pub fn int8_field(&mut self) -> _p::AccessorMut<'_, 'p, T, i8> {
-        unsafe {
-            <i8 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::INT8_FIELD,
-            )
-        }
+        unsafe { <i8 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT8_FIELD) }
     }
     #[inline]
     pub fn int16_field(&mut self) -> _p::AccessorMut<'_, 'p, T, i16> {
-        unsafe {
-            <i16 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::INT16_FIELD,
-            )
-        }
+        unsafe { <i16 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT16_FIELD) }
     }
     #[inline]
     pub fn int32_field(&mut self) -> _p::AccessorMut<'_, 'p, T, i32> {
-        unsafe {
-            <i32 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::INT32_FIELD,
-            )
-        }
+        unsafe { <i32 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT32_FIELD) }
     }
     #[inline]
     pub fn int64_field(&mut self) -> _p::AccessorMut<'_, 'p, T, i64> {
-        unsafe {
-            <i64 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::INT64_FIELD,
-            )
-        }
+        unsafe { <i64 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT64_FIELD) }
     }
     #[inline]
     pub fn u_int8_field(&mut self) -> _p::AccessorMut<'_, 'p, T, u8> {
-        unsafe {
-            <u8 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::U_INT8_FIELD,
-            )
-        }
+        unsafe { <u8 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::U_INT8_FIELD) }
     }
     #[inline]
     pub fn u_int16_field(&mut self) -> _p::AccessorMut<'_, 'p, T, u16> {
         unsafe {
-            <u16 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::U_INT16_FIELD,
-            )
+            <u16 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::U_INT16_FIELD)
         }
     }
     #[inline]
     pub fn u_int32_field(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
         unsafe {
-            <u32 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::U_INT32_FIELD,
-            )
+            <u32 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::U_INT32_FIELD)
         }
     }
     #[inline]
     pub fn u_int64_field(&mut self) -> _p::AccessorMut<'_, 'p, T, u64> {
         unsafe {
-            <u64 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::U_INT64_FIELD,
-            )
+            <u64 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::U_INT64_FIELD)
         }
     }
     #[inline]
     pub fn float32_field(&mut self) -> _p::AccessorMut<'_, 'p, T, f32> {
         unsafe {
-            <f32 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::FLOAT32_FIELD,
-            )
+            <f32 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::FLOAT32_FIELD)
         }
     }
     #[inline]
     pub fn float64_field(&mut self) -> _p::AccessorMut<'_, 'p, T, f64> {
         unsafe {
-            <f64 as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::FLOAT64_FIELD,
-            )
+            <f64 as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::FLOAT64_FIELD)
         }
     }
     #[inline]
     pub fn text_field(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
         unsafe {
-            <_p::Text as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::TEXT_FIELD,
-            )
+            <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::TEXT_FIELD)
         }
     }
     #[inline]
     pub fn data_field(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Data> {
         unsafe {
-            <_p::Data as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::DATA_FIELD,
-            )
+            <_p::Data as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::DATA_FIELD)
         }
     }
     #[inline]
-    pub fn struct_field(
-        &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::Struct<TestAllTypes>> {
+    pub fn struct_field(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<TestAllTypes>> {
         unsafe {
-            <_p::Struct<
-                TestAllTypes,
-            > as _p::field::FieldType>::accessor(
+            <_p::Struct<TestAllTypes> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::STRUCT_FIELD,
             )
@@ -689,82 +550,79 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn enum_field(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Enum<TestEnum>> {
         unsafe {
-            <_p::Enum<
-                TestEnum,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::ENUM_FIELD)
+            <_p::Enum<TestEnum> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::ENUM_FIELD,
+            )
         }
     }
     #[inline]
     pub fn interface_field(&mut self) -> _p::AccessorMut<'_, 'p, T, ()> {
         unsafe {
-            <() as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestAllTypes::INTERFACE_FIELD,
-            )
+            <() as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INTERFACE_FIELD)
         }
     }
     #[inline]
     pub fn void_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::VOID_LIST)
+            <_p::List<()> as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::VOID_LIST)
         }
     }
     #[inline]
     pub fn bool_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<bool>> {
         unsafe {
-            <_p::List<
-                bool,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::BOOL_LIST)
+            <_p::List<bool> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::BOOL_LIST,
+            )
         }
     }
     #[inline]
     pub fn int8_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<i8>> {
         unsafe {
-            <_p::List<
-                i8,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT8_LIST)
+            <_p::List<i8> as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT8_LIST)
         }
     }
     #[inline]
     pub fn int16_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<i16>> {
         unsafe {
-            <_p::List<
-                i16,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT16_LIST)
+            <_p::List<i16> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::INT16_LIST,
+            )
         }
     }
     #[inline]
     pub fn int32_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<i32>> {
         unsafe {
-            <_p::List<
-                i32,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT32_LIST)
+            <_p::List<i32> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::INT32_LIST,
+            )
         }
     }
     #[inline]
     pub fn int64_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<i64>> {
         unsafe {
-            <_p::List<
-                i64,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::INT64_LIST)
+            <_p::List<i64> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::INT64_LIST,
+            )
         }
     }
     #[inline]
     pub fn u_int8_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<u8>> {
         unsafe {
-            <_p::List<
-                u8,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::U_INT8_LIST)
+            <_p::List<u8> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::U_INT8_LIST,
+            )
         }
     }
     #[inline]
     pub fn u_int16_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<u16>> {
         unsafe {
-            <_p::List<
-                u16,
-            > as _p::field::FieldType>::accessor(
+            <_p::List<u16> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::U_INT16_LIST,
             )
@@ -773,9 +631,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn u_int32_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<u32>> {
         unsafe {
-            <_p::List<
-                u32,
-            > as _p::field::FieldType>::accessor(
+            <_p::List<u32> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::U_INT32_LIST,
             )
@@ -784,9 +640,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn u_int64_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<u64>> {
         unsafe {
-            <_p::List<
-                u64,
-            > as _p::field::FieldType>::accessor(
+            <_p::List<u64> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::U_INT64_LIST,
             )
@@ -795,9 +649,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn float32_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<f32>> {
         unsafe {
-            <_p::List<
-                f32,
-            > as _p::field::FieldType>::accessor(
+            <_p::List<f32> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::FLOAT32_LIST,
             )
@@ -806,9 +658,7 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn float64_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<f64>> {
         unsafe {
-            <_p::List<
-                f64,
-            > as _p::field::FieldType>::accessor(
+            <_p::List<f64> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::FLOAT64_LIST,
             )
@@ -817,17 +667,19 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     #[inline]
     pub fn text_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Text>> {
         unsafe {
-            <_p::List<
-                _p::Text,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::TEXT_LIST)
+            <_p::List<_p::Text> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::TEXT_LIST,
+            )
         }
     }
     #[inline]
     pub fn data_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Data>> {
         unsafe {
-            <_p::List<
-                _p::Data,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::DATA_LIST)
+            <_p::List<_p::Data> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::DATA_LIST,
+            )
         }
     }
     #[inline]
@@ -835,27 +687,25 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
         &mut self,
     ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Struct<TestAllTypes>>> {
         unsafe {
-            <_p::List<
-                _p::Struct<TestAllTypes>,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::STRUCT_LIST)
+            <_p::List<_p::Struct<TestAllTypes>> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::STRUCT_LIST,
+            )
         }
     }
     #[inline]
-    pub fn enum_list(
-        &mut self,
-    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Enum<TestEnum>>> {
+    pub fn enum_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Enum<TestEnum>>> {
         unsafe {
-            <_p::List<
-                _p::Enum<TestEnum>,
-            > as _p::field::FieldType>::accessor(&mut self.0, &TestAllTypes::ENUM_LIST)
+            <_p::List<_p::Enum<TestEnum>> as _p::field::FieldType>::accessor(
+                &mut self.0,
+                &TestAllTypes::ENUM_LIST,
+            )
         }
     }
     #[inline]
     pub fn interface_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(
+            <_p::List<()> as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAllTypes::INTERFACE_LIST,
             )
@@ -863,179 +713,132 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
     }
     #[inline]
     pub fn into_text_field(self) -> _p::AccessorOwned<'p, T, _p::Text> {
-        unsafe {
-            <_p::Text as _p::field::FieldType>::accessor(
-                self.0,
-                &TestAllTypes::TEXT_FIELD,
-            )
-        }
+        unsafe { <_p::Text as _p::field::FieldType>::accessor(self.0, &TestAllTypes::TEXT_FIELD) }
     }
     #[inline]
     pub fn into_data_field(self) -> _p::AccessorOwned<'p, T, _p::Data> {
-        unsafe {
-            <_p::Data as _p::field::FieldType>::accessor(
-                self.0,
-                &TestAllTypes::DATA_FIELD,
-            )
-        }
+        unsafe { <_p::Data as _p::field::FieldType>::accessor(self.0, &TestAllTypes::DATA_FIELD) }
     }
     #[inline]
-    pub fn into_struct_field(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::Struct<TestAllTypes>> {
+    pub fn into_struct_field(self) -> _p::AccessorOwned<'p, T, _p::Struct<TestAllTypes>> {
         unsafe {
-            <_p::Struct<
-                TestAllTypes,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::STRUCT_FIELD)
+            <_p::Struct<TestAllTypes> as _p::field::FieldType>::accessor(
+                self.0,
+                &TestAllTypes::STRUCT_FIELD,
+            )
         }
     }
     #[inline]
     pub fn into_void_list(self) -> _p::AccessorOwned<'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::VOID_LIST)
+            <_p::List<()> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::VOID_LIST)
         }
     }
     #[inline]
     pub fn into_bool_list(self) -> _p::AccessorOwned<'p, T, _p::List<bool>> {
         unsafe {
-            <_p::List<
-                bool,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::BOOL_LIST)
+            <_p::List<bool> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::BOOL_LIST)
         }
     }
     #[inline]
     pub fn into_int8_list(self) -> _p::AccessorOwned<'p, T, _p::List<i8>> {
         unsafe {
-            <_p::List<
-                i8,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT8_LIST)
+            <_p::List<i8> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT8_LIST)
         }
     }
     #[inline]
     pub fn into_int16_list(self) -> _p::AccessorOwned<'p, T, _p::List<i16>> {
         unsafe {
-            <_p::List<
-                i16,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT16_LIST)
+            <_p::List<i16> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT16_LIST)
         }
     }
     #[inline]
     pub fn into_int32_list(self) -> _p::AccessorOwned<'p, T, _p::List<i32>> {
         unsafe {
-            <_p::List<
-                i32,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT32_LIST)
+            <_p::List<i32> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT32_LIST)
         }
     }
     #[inline]
     pub fn into_int64_list(self) -> _p::AccessorOwned<'p, T, _p::List<i64>> {
         unsafe {
-            <_p::List<
-                i64,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT64_LIST)
+            <_p::List<i64> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INT64_LIST)
         }
     }
     #[inline]
     pub fn into_u_int8_list(self) -> _p::AccessorOwned<'p, T, _p::List<u8>> {
         unsafe {
-            <_p::List<
-                u8,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT8_LIST)
+            <_p::List<u8> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT8_LIST)
         }
     }
     #[inline]
     pub fn into_u_int16_list(self) -> _p::AccessorOwned<'p, T, _p::List<u16>> {
         unsafe {
-            <_p::List<
-                u16,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT16_LIST)
+            <_p::List<u16> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT16_LIST)
         }
     }
     #[inline]
     pub fn into_u_int32_list(self) -> _p::AccessorOwned<'p, T, _p::List<u32>> {
         unsafe {
-            <_p::List<
-                u32,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT32_LIST)
+            <_p::List<u32> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT32_LIST)
         }
     }
     #[inline]
     pub fn into_u_int64_list(self) -> _p::AccessorOwned<'p, T, _p::List<u64>> {
         unsafe {
-            <_p::List<
-                u64,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT64_LIST)
+            <_p::List<u64> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::U_INT64_LIST)
         }
     }
     #[inline]
     pub fn into_float32_list(self) -> _p::AccessorOwned<'p, T, _p::List<f32>> {
         unsafe {
-            <_p::List<
-                f32,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::FLOAT32_LIST)
+            <_p::List<f32> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::FLOAT32_LIST)
         }
     }
     #[inline]
     pub fn into_float64_list(self) -> _p::AccessorOwned<'p, T, _p::List<f64>> {
         unsafe {
-            <_p::List<
-                f64,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::FLOAT64_LIST)
+            <_p::List<f64> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::FLOAT64_LIST)
         }
     }
     #[inline]
     pub fn into_text_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::Text>> {
         unsafe {
-            <_p::List<
-                _p::Text,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::TEXT_LIST)
+            <_p::List<_p::Text> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::TEXT_LIST)
         }
     }
     #[inline]
     pub fn into_data_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::Data>> {
         unsafe {
-            <_p::List<
-                _p::Data,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::DATA_LIST)
+            <_p::List<_p::Data> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::DATA_LIST)
         }
     }
     #[inline]
-    pub fn into_struct_list(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<TestAllTypes>>> {
+    pub fn into_struct_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::Struct<TestAllTypes>>> {
         unsafe {
-            <_p::List<
-                _p::Struct<TestAllTypes>,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::STRUCT_LIST)
+            <_p::List<_p::Struct<TestAllTypes>> as _p::field::FieldType>::accessor(
+                self.0,
+                &TestAllTypes::STRUCT_LIST,
+            )
         }
     }
     #[inline]
-    pub fn into_enum_list(
-        self,
-    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Enum<TestEnum>>> {
+    pub fn into_enum_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::Enum<TestEnum>>> {
         unsafe {
-            <_p::List<
-                _p::Enum<TestEnum>,
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::ENUM_LIST)
+            <_p::List<_p::Enum<TestEnum>> as _p::field::FieldType>::accessor(
+                self.0,
+                &TestAllTypes::ENUM_LIST,
+            )
         }
     }
     #[inline]
     pub fn into_interface_list(self) -> _p::AccessorOwned<'p, T, _p::List<()>> {
         unsafe {
-            <_p::List<
-                (),
-            > as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INTERFACE_LIST)
+            <_p::List<()> as _p::field::FieldType>::accessor(self.0, &TestAllTypes::INTERFACE_LIST)
         }
     }
 }
 pub mod test_all_types {
     use super::{__file, __imports, _p};
-    pub type Reader<'a, T = _p::rpc::Empty> = super::TestAllTypes<
-        _p::StructReader<'a, T>,
-    >;
-    pub type Builder<'a, T = _p::rpc::Empty> = super::TestAllTypes<
-        _p::StructBuilder<'a, T>,
-    >;
+    pub type Reader<'a, T = _p::rpc::Empty> = super::TestAllTypes<_p::StructReader<'a, T>>;
+    pub type Builder<'a, T = _p::rpc::Empty> = super::TestAllTypes<_p::StructBuilder<'a, T>>;
 }

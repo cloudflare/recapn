@@ -1,12 +1,15 @@
+use crate::client::Client;
 use crate::sync::mpsc;
 use crate::Error;
-use crate::client::Client;
 use std::future::Future;
 use tokio::select;
 
 use super::RpcClient;
 
-async fn wait_and_resolve(future: impl Future<Output = Client>, mut receiver: mpsc::Receiver<RpcClient>) {
+async fn wait_and_resolve(
+    future: impl Future<Output = Client>,
+    mut receiver: mpsc::Receiver<RpcClient>,
+) {
     select! {
         // if all the senders and requests drop, just cancel
         _ = receiver.closed() => {},

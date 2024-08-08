@@ -1,5 +1,5 @@
-use std::{fs::File, process::exit};
 use std::path::Path;
+use std::{fs::File, process::exit};
 
 use fuzz::{TestAllTypes, TestEnum};
 use recapn::alloc::Alloc;
@@ -73,7 +73,14 @@ fn valid_all_types() -> Message<'static, impl Alloc> {
     }
 
     let mut l = b.float64_list().init(6);
-    let floats = [f64::NEG_INFINITY, f64::EPSILON, f64::NAN, f64::MIN, f64::MAX, f64::INFINITY];
+    let floats = [
+        f64::NEG_INFINITY,
+        f64::EPSILON,
+        f64::NAN,
+        f64::MIN,
+        f64::MAX,
+        f64::INFINITY,
+    ];
     for (i, value) in floats.into_iter().enumerate() {
         l.at(i as u32).set(value);
     }

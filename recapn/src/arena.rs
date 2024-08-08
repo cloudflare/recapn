@@ -1,6 +1,6 @@
 //! Types and traits for implementing custom message arenas.
 
-use crate::alloc::{Word, AllocLen, Segment, SegmentLen, SegmentRef, SegmentOffset};
+use crate::alloc::{AllocLen, Segment, SegmentLen, SegmentOffset, SegmentRef, Word};
 use core::cell::Cell;
 use core::ptr::NonNull;
 
@@ -17,7 +17,7 @@ pub type SegmentId = u32;
 ///
 /// The segments returned by this function have many of the same constraints as a slice of
 /// [`Word`]s. In particular:
-/// 
+///
 /// * `data` must be valid for reads for `len * 8` bytes, and it must be properly aligned.
 ///   This means in particular:
 ///   * The entire memory range of this slice must be contained within a single allocated object!
@@ -66,7 +66,10 @@ pub(crate) struct SegmentWithId {
 
 impl SegmentWithId {
     pub fn segment(&self) -> Segment {
-        Segment { data: self.data, len: self.len }
+        Segment {
+            data: self.data,
+            len: self.len,
+        }
     }
 }
 
@@ -150,7 +153,9 @@ impl ArenaSegment {
     /// a [`SegmentRef`] to the start of the area if successful.
     #[inline]
     pub(crate) fn try_use_len(&self, len: AllocLen) -> Option<SegmentOffset> {
-        let SegmentState::Used(old_used) = self.state.get() else { unreachable!() };
+        let SegmentState::Used(old_used) = self.state.get() else {
+            unreachable!()
+        };
         let max = self.segment.len.get();
 
         let new_used = old_used.get() + len.get();
@@ -158,7 +163,8 @@ impl ArenaSegment {
             return None;
         }
 
-        self.state.set(SegmentState::Used(AllocLen::new(new_used).unwrap()));
+        self.state
+            .set(SegmentState::Used(AllocLen::new(new_used).unwrap()));
         Some(old_used.into())
     }
 
@@ -174,7 +180,10 @@ impl ArenaSegment {
     /// Returns a segment of the used data in this segment.
     #[inline]
     pub fn used_segment(&self) -> Segment {
-        Segment { data: self.segment.data, len: self.used_len() }
+        Segment {
+            data: self.segment.data,
+            len: self.used_len(),
+        }
     }
 }
 
@@ -195,10 +204,10 @@ pub unsafe trait BuildArena {
 #[cfg(feature = "alloc")]
 pub(crate) mod growing {
     use super::*;
+    use crate::alloc::Alloc;
     use core::cell::UnsafeCell;
     use core::ptr::{addr_of, addr_of_mut, from_mut, from_ref};
     use rustalloc::vec::Vec;
-    use crate::alloc::Alloc;
 
     pub struct ArenaSegments {
         /// Optimize for the first (and possibly only) segment
@@ -214,7 +223,8 @@ pub(crate) mod growing {
     /// an `Arena` with an unsized alloc type.
     struct ArenaVtable {
         as_read: unsafe fn(*const ()) -> *const dyn ReadArena,
-        try_root_and_build: unsafe fn(*const ()) -> Option<(*const ArenaSegment, *const dyn BuildArena)>,
+        try_root_and_build:
+            unsafe fn(*const ()) -> Option<(*const ArenaSegment, *const dyn BuildArena)>,
         root_and_build: unsafe fn(*mut ()) -> (*const ArenaSegment, *const dyn BuildArena),
         clear: unsafe fn(*mut ()),
     }
@@ -254,9 +264,7 @@ pub(crate) mod growing {
                     let arena = core::mem::transmute(obj);
                     (root, arena)
                 },
-                clear: |ptr| unsafe {
-                    (*ptr.cast::<Self>()).clear_inner()
-                },
+                clear: |ptr| unsafe { (*ptr.cast::<Self>()).clear_inner() },
             };
 
             Self {
@@ -277,7 +285,8 @@ pub(crate) mod growing {
             unsafe {
                 let first = &mut (*self.segments.get()).first;
                 first.get_or_insert_with(|| {
-                    self.alloc(AllocLen::ONE, 0).expect("failed to allocate root segment")
+                    self.alloc(AllocLen::ONE, 0)
+                        .expect("failed to allocate root segment")
                 })
             }
         }
@@ -305,9 +314,11 @@ pub(crate) mod growing {
         fn size_in_words(&self) -> usize {
             let Some(root) = self.root() else { return 0 };
             let root_len = root.used_len().get() as usize;
-            let tail_sum = self.tail().iter().map(|ptr| unsafe {
-                ptr.as_ref().used_len().get() as usize
-            }).sum::<usize>();
+            let tail_sum = self
+                .tail()
+                .iter()
+                .map(|ptr| unsafe { ptr.as_ref().used_len().get() as usize })
+                .sum::<usize>();
             root_len + tail_sum
         }
         fn clear_inner(&mut self) {
@@ -370,12 +381,12 @@ pub(crate) mod growing {
         fn alloc(&self, min_size: AllocLen) -> Option<(SegmentOffset, &ArenaSegment)> {
             let last_owned = self.segment(self.last_owned.get()).unwrap();
             if let Some(rf) = last_owned.try_use_len(min_size) {
-                return Some((rf, last_owned))
+                return Some((rf, last_owned));
             }
 
             let tail = self.tail_mut();
             if tail.len() >= Self::MAX_SEGMENTS {
-                return None
+                return None;
             }
 
             let id = tail.len() as SegmentId + 1;
@@ -393,7 +404,7 @@ pub(crate) mod growing {
         fn insert_external_segment(&self, segment: Segment) -> Option<SegmentId> {
             let tail = self.tail_mut();
             if tail.len() >= Self::MAX_SEGMENTS {
-                return None
+                return None;
             }
 
             let id = tail.len() as SegmentId;
@@ -403,10 +414,14 @@ pub(crate) mod growing {
             Some(id)
         }
         fn remove_external_segment(&self, id: SegmentId) {
-            self.segment(id).expect("cannot remove segment that doesn't exist").delete();
+            self.segment(id)
+                .expect("cannot remove segment that doesn't exist")
+                .delete();
         }
 
-        fn as_read_arena(&self) -> &dyn ReadArena { self }
+        fn as_read_arena(&self) -> &dyn ReadArena {
+            self
+        }
         fn len(&self) -> u32 {
             let has_first = self.root().is_some() as u32;
             let tail_len = self.tail().len() as u32;

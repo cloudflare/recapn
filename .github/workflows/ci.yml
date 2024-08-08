@@ -11,6 +11,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Check Formatting
+        run: cargo fmt --check
       - name: Test no default features
         run: cargo test --all --no-default-features
       - name: Test all features
