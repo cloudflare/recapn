@@ -29,3 +29,6 @@ bench = false
 
 [build-dependencies]
 recapnc = { path = "../recapnc" }
+
+[dev-dependencies]
+rusty-hook = "^0.11.2"
