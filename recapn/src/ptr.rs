@@ -1966,6 +1966,8 @@ unsafe fn iter_unchecked(place: SegmentRef<'_>, offset: SegmentOffset) -> impl I
 
 #[inline]
 unsafe fn step_by_unchecked(place: SegmentRef<'_>, offset: SegmentOffset, len: SegmentOffset) -> impl Iterator<Item = SegmentRef<'_>> {
+    assert!(offset.get().checked_mul(len.get()).is_some_and(|size| size <= SegmentOffset::MAX_VALUE));
+
     let range = 0..len.get();
     range.into_iter().map(move |idx| unsafe {
         let new_offset = SegmentOffset::new_unchecked(offset.get() * idx);
