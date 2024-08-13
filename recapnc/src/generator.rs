@@ -769,7 +769,7 @@ fn words_lit(words: &[Word]) -> TokenStream {
 fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
     let size = p.target_size().expect("failed to calculate size of struct default");
     assert_eq!(size.caps, 0, "default value contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "default value is too large to fit in a single segment!");
+    assert!(size.words < u64::from(SegmentOffset::MAX_VALUE), "default value is too large to fit in a single segment!");
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
@@ -792,7 +792,7 @@ fn ptr_to_slice(p: &any::PtrReader) -> Box<[Word]> {
 fn struct_to_slice(s: &any::StructReader) -> Box<[Word]> {
     let size = s.total_size().expect("failed to calculate size of struct");
     assert_eq!(size.caps, 0, "struct contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "struct is too large to fit in a single segment!");
+    assert!(size.words < u64::from(SegmentOffset::MAX_VALUE), "struct is too large to fit in a single segment!");
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();
@@ -815,7 +815,7 @@ fn struct_to_slice(s: &any::StructReader) -> Box<[Word]> {
 fn list_to_slice(l: &any::ListReader) -> Box<[Word]> {
     let size = l.total_size().expect("failed to calculate size of list value");
     assert_eq!(size.caps, 0, "list contains caps!");
-    assert!(size.words < SegmentOffset::MAX_VALUE as u64, "list is too large to fit in a single segment!");
+    assert!(size.words < u64::from(SegmentOffset::MAX_VALUE), "list is too large to fit in a single segment!");
 
     let size = AllocLen::new(size.words as u32 + 1).unwrap();
     let mut space = vec![Word::NULL; size.get() as usize].into_boxed_slice();

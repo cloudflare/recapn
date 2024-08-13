@@ -64,7 +64,7 @@ impl Data for bool {
         let written_value = value ^ default;
         let (byte_offset, bit_num) = (slot / 8, slot % 8);
         let byte = ptr.add(byte_offset);
-        *byte = (*byte & !(1 << bit_num)) | ((written_value as u8) << bit_num);
+        *byte = (*byte & !(1 << bit_num)) | (u8::from(written_value) << bit_num);
     }
 }
 
@@ -547,7 +547,7 @@ impl WirePtr {
 
 impl<'a> From<&'a Word> for &'a WirePtr {
     fn from(w: &'a Word) -> Self {
-        unsafe { &*(w as *const Word as *const WirePtr) }
+        unsafe { &*std::ptr::from_ref::<Word>(w).cast::<WirePtr>() }
     }
 }
 
@@ -1839,7 +1839,7 @@ impl<'a> ObjectReader<'a> {
 
             let words_per_element = struct_size.total();
 
-            if element_count.get() as u64 * words_per_element as u64 > word_count.into() {
+            if u64::from(element_count.get()) * u64::from(words_per_element) > word_count.into() {
                 // Make sure the tag reports a struct size that matches the reported word count
                 return Err(ErrorKind::InlineCompositeOverrun.into());
             }
@@ -1847,7 +1847,7 @@ impl<'a> ObjectReader<'a> {
             if words_per_element == 0 {
                 // watch out for zero-sized structs, which can claim to be arbitrarily
                 // large without having sent actual data.
-                if !self.try_amplified_read(element_count.get() as u64) {
+                if !self.try_amplified_read(u64::from(element_count.get())) {
                     return Err(ErrorKind::ReadLimitExceeded.into());
                 }
             }
@@ -1872,7 +1872,7 @@ impl<'a> ObjectReader<'a> {
             }
 
             let element_bits = element_size.bits();
-            let word_count = Word::round_up_bit_count(element_count.get() as u64 * element_bits as u64);
+            let word_count = Word::round_up_bit_count(u64::from(element_count.get()) * u64::from(element_bits));
             let len = ObjectLen::new(word_count).unwrap();
             let ptr = match location {
                 Location::Near { origin } | Location::Far { origin } => {
@@ -1987,7 +1987,7 @@ fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Re
             element_size,
             element_count,
         }) => {
-            let content_size = MessageSize { words: element_size.total_words(element_count) as u64, caps: 0 };
+            let content_size = MessageSize { words: u64::from(element_size.total_words(element_count)), caps: 0 };
             let targets_size = match element_size {
                 ElementSize::InlineComposite(size) => {
                     let nesting_limit = nesting_limit.checked_sub(1)
@@ -2019,7 +2019,7 @@ fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Re
 }
 
 fn total_struct_size(reader: &ObjectReader, content: StructContent, nesting_limit: u32) -> Result<MessageSize> {
-    let struct_size = MessageSize { words: content.size.total() as u64, caps: 0 };
+    let struct_size = MessageSize { words: u64::from(content.size.total()), caps: 0 };
     let ptrs_total_size = total_ptrs_size(
         reader, content.ptrs_start(), content.size.ptrs.into(), nesting_limit)?;
 
@@ -2124,7 +2124,7 @@ impl<'a> PtrReader<'a, Empty> {
     }
 
     pub const fn null() -> Self {
-        unsafe { Self::new_unchecked(NonNull::new_unchecked(Word::null() as *const _ as *mut _)) }
+        unsafe { Self::new_unchecked(NonNull::new_unchecked(std::ptr::from_ref(Word::null()).cast_mut())) }
     }
 }
 
@@ -2196,7 +2196,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
             reader,
             table: self.table.clone(),
             nesting_limit,
-            data_len: size.data as u32 * Word::BYTES as u32,
+            data_len: u32::from(size.data) * Word::BYTES as u32,
             ptrs_len: size.ptrs,
         }))
     }
@@ -2463,8 +2463,8 @@ impl<'a, T: Table> StructReader<'a, T> {
 
     #[inline]
     pub fn total_size(&self) -> Result<MessageSize> {
-        let struct_len = Word::round_up_byte_count(self.data_len) + self.ptrs_len as u32;
-        let struct_size = MessageSize { words: struct_len as u64, caps: 0 };
+        let struct_len = Word::round_up_byte_count(self.data_len) + u32::from(self.ptrs_len);
+        let struct_size = MessageSize { words: u64::from(struct_len), caps: 0 };
 
         let ptrs_targets_size = total_ptrs_size(
             &self.reader, self.ptrs_start, self.ptrs_len.into(), self.nesting_limit)?;
@@ -2716,7 +2716,7 @@ impl<'a, T: Table> ListReader<'a, T> {
     #[inline]
     pub fn total_size(&self) -> Result<MessageSize> {
         let len = self.element_count;
-        let mut word_count = self.element_size.total_words(len) as u64;
+        let mut word_count = u64::from(self.element_size.total_words(len));
         if self.element_size.is_inline_composite() {
             // Add a word for the tag pointer.
             word_count += 1;
@@ -2774,8 +2774,8 @@ impl<'a, T: Table> ListReader<'a, T> {
 
     #[inline]
     fn index_to_offset(&self, index: u32) -> usize {
-        let step = self.element_size.bits() as u64;
-        let index = index as u64;
+        let step = u64::from(self.element_size.bits());
+        let index = u64::from(index);
         let byte_offset = (step * index) / 8;
         byte_offset as usize
     }
@@ -3787,7 +3787,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                 table: self.table.clone(),
                 data_start: existing_struct.ptr,
                 ptrs_start: existing_struct.ptrs_start(),
-                data_len: existing_size.data as u32 * Word::BYTES as u32,
+                data_len: u32::from(existing_size.data) * Word::BYTES as u32,
                 ptrs_len: existing_size.ptrs,
             })
         };
@@ -3822,7 +3822,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
             table: self.table.clone(),
             data_start: new_start,
             ptrs_start: new_ptrs_start,
-            data_len: promotion_size.data as u32 * Word::BYTES as u32,
+            data_len: u32::from(promotion_size.data) * Word::BYTES as u32,
             ptrs_len: promotion_size.ptrs,
         })
     }
@@ -3855,7 +3855,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
             data_start: struct_start,
             ptrs_start,
             table: self.table.clone(),
-            data_len: (size.data as u32) * Word::BYTES as u32,
+            data_len: u32::from(size.data) * Word::BYTES as u32,
             ptrs_len: size.ptrs,
         })
     }
@@ -4894,8 +4894,8 @@ impl<'a, T: Table> ListBuilder<'a, T> {
 
     #[inline]
     fn index_to_offset(&self, index: u32) -> usize {
-        let step = self.element_size.bits() as u64;
-        let index = index as u64;
+        let step = u64::from(self.element_size.bits());
+        let index = u64::from(index);
         let byte_offset = (step * index) / 8;
         byte_offset as usize
     }
@@ -5567,7 +5567,7 @@ fn cmp_list(
         Bit => {
             let total_bits = len.get();
             let total_bytes = total_bits.div_ceil(8) as usize;
-            let total_words = Word::round_up_bit_count(total_bits as u64);
+            let total_words = Word::round_up_bit_count(u64::from(total_bits));
             let word_len = SegmentOffset::new(total_words).unwrap();
             let (our_data, their_data) = unsafe {(
                 Word::slice_to_bytes(our_reader.section_slice(our_list.ptr, word_len)),
@@ -6070,7 +6070,7 @@ where
 
                     let (dst_offset, dst_bit) = (dst_idx / 8, dst_idx % 8);
                     let byte = &mut dst_bytes[dst_offset];
-                    let new_byte = (byte.get() & !(1 << dst_bit)) | ((value as u8) << dst_bit);
+                    let new_byte = (byte.get() & !(1 << dst_bit)) | (u8::from(value) << dst_bit);
                     byte.set(new_byte);
                 }
             }

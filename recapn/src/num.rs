@@ -160,7 +160,7 @@ impl From<Option<NonZeroU29>> for u29 {
 
 impl From<u16> for u29 {
     fn from(v: u16) -> Self {
-        Self(v as u32)
+        Self(u32::from(v))
     }
 }
 
@@ -217,12 +217,12 @@ fwd_fmt_traits!(i30);
 
 impl From<u16> for i30 {
     fn from(v: u16) -> Self {
-        Self(v as i32)
+        Self(i32::from(v))
     }
 }
 
 impl From<i16> for i30 {
     fn from(v: i16) -> Self {
-        Self(v as i32)
+        Self(i32::from(v))
     }
 }

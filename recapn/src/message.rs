@@ -119,7 +119,7 @@ impl<'a> SingleSegmentMessage<'a> {
 
     /// Return the used space of the message as a slice of [`Word`]s.
     pub fn as_words(&self) -> &[Word] {
-        unsafe { self.arena.segment().used_segment().as_slice() }
+        unsafe { self.arena.segment().used_segment().as_slice_unchecked() }
     }
 
     /// Return the used space of the message as a slice of bytes.
@@ -356,7 +356,7 @@ impl<'b> MessageSegment<'b> {
 
     #[inline]
     pub fn as_words(&self) -> &'b [Word] {
-        unsafe { self.0.used_segment().as_slice() }
+        unsafe { self.0.used_segment().as_slice_unchecked() }
     }
 
     #[inline]

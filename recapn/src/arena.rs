@@ -408,7 +408,7 @@ pub(crate) mod growing {
 
         fn as_read_arena(&self) -> &dyn ReadArena { self }
         fn len(&self) -> u32 {
-            let has_first = self.root().is_some() as u32;
+            let has_first = u32::from(self.root().is_some());
             let tail_len = self.tail().len() as u32;
             has_first + tail_len
         }

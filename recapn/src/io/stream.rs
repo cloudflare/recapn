@@ -240,7 +240,7 @@ impl StreamTableRef {
 
     #[inline]
     pub fn segments(&self) -> &[SegmentLenReader] {
-        unsafe { &*(self as *const StreamTableRef as *const [SegmentLenReader]) }
+        unsafe { &*(std::ptr::from_ref::<StreamTableRef>(self) as *const [SegmentLenReader]) }
     }
 
     #[inline]
