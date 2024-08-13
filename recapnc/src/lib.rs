@@ -112,7 +112,7 @@ pub mod prelude {
                 }
 
                 impl _p::FieldGroup for $name {
-                    unsafe fn clear<'a, 'b, T: _p::rpc::Table>(_: &'a mut _p::StructBuilder<'b, T>) {
+                    unsafe fn clear<T: _p::rpc::Table>(_: &mut _p::StructBuilder<'_, T>) {
                         std::unimplemented!()
                     }
                 }
@@ -399,10 +399,10 @@ use gen::capnp_schema_capnp::CodeGeneratorRequest;
 use generator::GeneratorContext;
 use quotes::GeneratedRoot;
 
-/// Read from an existing CodeGeneratorRequest and write files based on the given output path.
+/// Read from an existing `CodeGeneratorRequest` and write files based on the given output path.
 pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl AsRef<Path>) -> anyhow::Result<()> {
     let out = out.as_ref();
-    let context = GeneratorContext::new(&request)?;
+    let context = GeneratorContext::new(request)?;
 
     let mut root_mod = GeneratedRoot { files: Vec::new() };
 
@@ -430,7 +430,7 @@ pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl
     Ok(())
 }
 
-/// Read a CodeGeneratorRequest capnp message from a stream and write files based on the given output path.
+/// Read a `CodeGeneratorRequest` capnp message from a stream and write files based on the given output path.
 pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> anyhow::Result<()> {
     let message = io::read_from_stream(r, StreamOptions::default())?;
     let reader = Reader::new(&message, ReaderOptions::default());

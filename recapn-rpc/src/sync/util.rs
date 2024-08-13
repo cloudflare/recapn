@@ -12,14 +12,14 @@ pub struct Marc<T> {
 }
 
 impl<T> Marc<T> {
-    pub fn new(value: Arc<T>) -> Self {
+    pub const fn new(value: Arc<T>) -> Self {
         Self { shared: Some(value) }
     }
 
     pub fn get(&self) -> &T {
         debug_assert!(self.shared.is_some());
 
-        unsafe { &**self.shared.as_ref().unwrap_unchecked() }
+        unsafe { self.shared.as_ref().unwrap_unchecked() }
     }
 
     pub fn inner(&self) -> &Arc<T> {

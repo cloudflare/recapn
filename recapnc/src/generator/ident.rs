@@ -26,7 +26,7 @@ fn make_ident_str(s: &str) -> Result<String> {
     }
 
     output.extend(chars.map(|c|
-        unicode_ident::is_xid_continue(c).then_some(c).unwrap_or('_')
+        if unicode_ident::is_xid_continue(c) { c } else { '_' }
     ));
 
     Ok(output)

@@ -1,9 +1,7 @@
 //! A fixed size blob of bytes contained in a Cap'n Proto message
 
 use core::ops::{Deref, DerefMut};
-use core::ptr::NonNull;
 
-use crate::ptr::ElementCount;
 use crate::list::ElementSize;
 use crate::internal::Sealed;
 use crate::{ty, IntoFamily, Family};
@@ -149,7 +147,7 @@ impl<'a> Builder<'a> {
     }
 
     #[inline]
-    pub fn as_reader<'b>(&'b self) -> Reader<'b> {
+    pub fn as_reader(&self) -> Reader<'_> {
         Data(unsafe {
             ptr::Reader::new_unchecked(self.0.data(), self.0.len())
         })

@@ -11,8 +11,8 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use recapn::ptr::StructSize;
 
-/// A simple macro that automatically writes a ToTokens implementation based on a function
-/// that returns a TokenStream
+/// A simple macro that automatically writes a `ToTokens` implementation based on a function
+/// that returns a `TokenStream`
 macro_rules! to_tokens {
     ($ty:ty |$self:ident| $block:block) => {
         impl ToTokens for $ty {
@@ -93,9 +93,9 @@ pub enum GeneratedItem {
 impl ToTokens for GeneratedItem {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            GeneratedItem::Struct(s) => s.to_tokens(tokens),
-            GeneratedItem::Enum(e) => e.to_tokens(tokens),
-            GeneratedItem::Const(c) => c.to_tokens(tokens),
+            Self::Struct(s) => s.to_tokens(tokens),
+            Self::Enum(e) => e.to_tokens(tokens),
+            Self::Const(c) => c.to_tokens(tokens),
         }
     }
 }

@@ -70,7 +70,7 @@ pub(crate) mod internal {
         fn copy(reader: &Self::Reader, index: u32, builder: &D::TableBuilder) -> Result<Option<u32>> {
             let cap = reader
                 .extract_cap(index)
-                .ok_or_else(|| ErrorKind::InvalidCapabilityPointer(index))?;
+                .ok_or(ErrorKind::InvalidCapabilityPointer(index))?;
             let new_index = CapTranslator::inject_cap(builder, cap);
             Ok(new_index)
         }

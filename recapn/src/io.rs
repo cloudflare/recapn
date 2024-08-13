@@ -88,7 +88,7 @@ impl<'a> TableSegmentSet<'a> {
 
         // Validate the table and find the end
         let mut total_len = 0usize;
-        for (len, id) in table.segments().into_iter().zip(0u32..) {
+        for (len, id) in table.segments().iter().zip(0u32..) {
             let Some(len) = len.try_get() else {
                 return Err(ReadError::SegmentTooLarge { segment: id, })
             };
@@ -115,7 +115,7 @@ unsafe impl ReadArena for TableSegmentSet<'_> {
             .get(..=(id as usize))?
             .split_last()
             .unwrap();
-        let start = leading_segments.into_iter().map(|l| l.raw() as usize).sum::<usize>();
+        let start = leading_segments.iter().map(|l| l.raw() as usize).sum::<usize>();
         let data = NonNull::from(&self.data[start]);
         let len = segment.try_get().unwrap();
         Some(Segment { data, len })
@@ -161,7 +161,7 @@ impl SegmentSetTable {
         }
 
         let mut start_idxs = Vec::with_capacity(remainder.len());
-        for (len, id) in remainder.into_iter().zip(1u32..) {
+        for (len, id) in remainder.iter().zip(1u32..) {
             let len = segment_len_to_usize(len, id)?;
             let Some(new_pos) = current_pos.checked_add(len).filter(|&new| new <= limit) else {
                 return Err(ReadError::MessageTooLarge)
@@ -319,7 +319,7 @@ impl Default for StreamOptions {
 ///
 /// If the content is incomplete or invalid, this returns Err
 #[cfg(feature = "alloc")]
-pub fn read_from_slice<'a>(slice: &'a [Word]) -> Result<(SegmentSet<&'a [Word]>, &'a [Word]), ReadError> {
+pub fn read_from_slice(slice: &[Word]) -> Result<(SegmentSet<&[Word]>, &[Word]), ReadError> {
     let (table, content) = StreamTableRef::try_read(slice)?;
     let (table, message_len) = SegmentSetTable::from_stream(table, content.len())?;
     if content.len() < message_len {
@@ -520,7 +520,7 @@ pub fn read_packed_from_stream<R: io::BufRead>(stream: &mut PackedStream<R>, opt
         }
     };
 
-    let (table, message_len) = SegmentSetTable::from_stream(table, options.read_limit as usize)
+    let (table, message_len) = SegmentSetTable::from_stream(table, options.read_limit)
         .map_err(map_read_err)?;
 
     let mut data = vec![Word::NULL; message_len].into_boxed_slice();

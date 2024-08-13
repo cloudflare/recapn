@@ -363,12 +363,12 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn read_as_struct<'b, S: ty::Struct>(&'b self) -> <Struct<S> as FromPtr<PtrReader<'b, T>>>::Output {
+    pub fn read_as_struct<S: ty::Struct>(&self) -> <Struct<S> as FromPtr<PtrReader<'_, T>>>::Output {
         self.read_as::<Struct<S>>()
     }
 
     #[inline]
-    pub fn read_as_list_of<'b, V: ty::DynListValue>(&'b self) -> <List<V> as FromPtr<PtrReader<'b, T>>>::Output {
+    pub fn read_as_list_of<V: ty::DynListValue>(&self) -> <List<V> as FromPtr<PtrReader<'_, T>>>::Output {
         self.read_as::<List<V>>()
     }
 

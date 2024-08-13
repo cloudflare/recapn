@@ -29,3 +29,6 @@ bench = false
 
 [build-dependencies]
 recapnc = { path = "../recapnc" }
+
+[lints]
+workspace = true

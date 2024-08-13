@@ -1531,7 +1531,7 @@ pub mod call {
         type Builder<'a, T: _p::rpc::Table> = send_results_to::Builder<'a, T>;
     }
     impl _p::FieldGroup for SendResultsTo {
-        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+        unsafe fn clear<T: _p::rpc::Table>(s: &mut _p::StructBuilder<'_, T>) {
             s.set_field_unchecked(3usize, 0);
             <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
         }
@@ -3048,7 +3048,7 @@ pub mod disembargo {
         type Builder<'a, T: _p::rpc::Table> = context::Builder<'a, T>;
     }
     impl _p::FieldGroup for Context {
-        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
+        unsafe fn clear<T: _p::rpc::Table>(s: &mut _p::StructBuilder<'_, T>) {
             s.set_field_unchecked(2usize, 0);
             <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
         }

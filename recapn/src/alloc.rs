@@ -67,14 +67,14 @@ impl Word {
 
     /// Converts a slice of Words into a slice of bytes
     #[inline]
-    pub fn slice_to_bytes<'a>(slice: &'a [Word]) -> &'a [u8] {
+    pub fn slice_to_bytes(slice: &[Word]) -> &[u8] {
         let (_, bytes, _) = unsafe { slice.align_to() };
         bytes
     }
 
     /// Converts a slice of Words into a slice of bytes
     #[inline]
-    pub fn slice_to_bytes_mut<'a>(slice: &'a mut [Word]) -> &'a mut [u8] {
+    pub fn slice_to_bytes_mut(slice: &mut [Word]) -> &mut [u8] {
         let (_, bytes, _) = unsafe { slice.align_to_mut() };
         bytes
     }

@@ -7,7 +7,7 @@ use std::convert;
 use std::future::Future;
 use std::marker::{PhantomData, PhantomPinned};
 use std::mem;
-use std::pin::{pin, Pin};
+use std::pin::Pin;
 use tokio::task::JoinHandle;
 
 use crate::sync::mpsc::Receiver;
@@ -34,7 +34,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// 
     /// # Panics
     /// 
-    /// This must be called within the context of a LocalSet. Calling this outside a LocalSet
+    /// This must be called within the context of a `LocalSet`. Calling this outside a `LocalSet`
     /// will result in a panic.
     pub async fn run(&mut self) -> Result<()> {
         while self.run_once().await? {}
@@ -48,7 +48,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// 
     /// # Panics
     /// 
-    /// This must be called within the context of a LocalSet. Calling this outside a LocalSet
+    /// This must be called within the context of a `LocalSet`. Calling this outside a `LocalSet`
     /// will result in a panic.
     /// 
     /// # Drop safety
@@ -116,7 +116,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     /// If an error is returned while handling a blocking request, the dispatcher becomes
     /// broken. In this case, this function returns the error and all future requests
     /// return the same error.
-    pub fn broken_err(&self) -> Option<&Error> {
+    pub const fn broken_err(&self) -> Option<&Error> {
         match &self.state {
             Active(_) => None,
             Broken(err) => Some(err),
@@ -124,7 +124,7 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
     }
 
     /// Gets a reference to the underlying server dispatcher
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner
     }
 }
@@ -240,7 +240,7 @@ impl<'a, P> Parameters<'a, P> {
 
 impl<'a, P> Drop for Parameters<'a, P> {
     fn drop(&mut self) {
-        self.inner.as_mut().drop()
+        self.inner.as_mut().drop();
     }
 }
 
@@ -272,7 +272,7 @@ impl<'a, P> Drop for Parameters<'a, P> {
 /// # Cancellation
 /// 
 /// Request cancellation will not automatically cancel spawned futures handling requests. Instead,
-/// Response and ResponseSender have functions that can be used to hook into the cancellation
+/// Response and `ResponseSender` have functions that can be used to hook into the cancellation
 /// future, allowing them to listen for cancellation to occur if the user requests it.
 pub struct Response<'a, R> {
     r: PhantomData<(&'a (), R)>,
@@ -291,10 +291,10 @@ pub struct DispatchRequest {
 
 impl DispatchRequest {
     #[inline]
-    pub fn interface(&self) -> u64 { self.interface }
+    pub const fn interface(&self) -> u64 { self.interface }
 
     #[inline]
-    pub fn method(&self) -> u16 { self.method }
+    pub const fn method(&self) -> u16 { self.method }
 
     pub fn respond_with<P, R, Res>(self, responder: Res) -> DispatchResponse
     where

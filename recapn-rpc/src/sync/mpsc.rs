@@ -118,7 +118,7 @@ impl<C: Chan> Sender<C> {
                 Some(Resolution::Dropped) => (self, Some(MostResolved::Dropped)),
                 Some(Resolution::Error(err)) => (self, Some(MostResolved::Error(err))),
                 Some(Resolution::Forwarded(channel)) => {
-                    self = &channel;
+                    self = channel;
                     continue
                 },
             }
@@ -160,7 +160,7 @@ impl<C: Chan + ?Sized> Eq for Sender<C> {}
 
 impl<C: Chan + ?Sized> Hash for Sender<C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(Arc::as_ptr(&self.shared), state)
+        std::ptr::hash(Arc::as_ptr(&self.shared), state);
     }
 }
 
@@ -221,7 +221,7 @@ impl<C: Chan> Receiver<C> {
         drop(other_lock);
 
         if let Some(w) = waker {
-            w.wake()
+            w.wake();
         }
 
         Ok(())
@@ -229,7 +229,7 @@ impl<C: Chan> Receiver<C> {
 
     /// Await the closing of the channel, without taking any requesting from it.
     pub async fn closed(&mut self) {
-        poll_fn(|cx| self.poll_closed(cx)).await
+        poll_fn(|cx| self.poll_closed(cx)).await;
     }
 
     pub fn poll_closed(&mut self, cx: &mut Context) -> Poll<()> {
@@ -488,8 +488,8 @@ pub fn broken<C: Chan>(chan: C, err: C::Error) -> Sender<C> {
         chan,
     });
     let _ = unsafe { channel.resolution.send(ChannelResolution::Error(err)) };
-    let sender = Sender { shared: channel };
-    sender
+    
+    Sender { shared: channel }
 }
 
 /// A version of Receiver that drops the channel if all the senders are destroyed and the

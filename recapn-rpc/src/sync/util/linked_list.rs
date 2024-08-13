@@ -96,8 +96,8 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 
 impl<T> Pointers<T> {
     /// Create a new set of empty pointers
-    pub(crate) fn new() -> Pointers<T> {
-        Pointers {
+    pub(crate) const fn new() -> Self {
+        Self {
             inner: UnsafeCell::new(PointersInner {
                 prev: None,
                 next: None,
@@ -136,8 +136,8 @@ impl<T> fmt::Debug for Pointers<T> {
 
 impl<L, T> LinkedList<L, T> {
     /// Creates an empty linked list.
-    pub(crate) const fn new() -> LinkedList<L, T> {
-        LinkedList {
+    pub(crate) const fn new() -> Self {
+        Self {
             head: None,
             tail: None,
             _marker: PhantomData,
@@ -213,7 +213,7 @@ impl<L: Link> LinkedList<L, L::Target> {
             if let Some(prev) = L::pointers(last).as_ref().get_prev() {
                 L::pointers(prev).as_mut().set_next(None);
             } else {
-                self.head = None
+                self.head = None;
             }
 
             L::pointers(last).as_mut().set_prev(None);
@@ -233,7 +233,7 @@ impl<L: Link> LinkedList<L, L::Target> {
             if let Some(next) = L::pointers(first).as_ref().get_next() {
                 L::pointers(next).as_mut().set_prev(None);
             } else {
-                self.tail = None
+                self.tail = None;
             }
 
             L::pointers(first).as_mut().set_prev(None);
@@ -448,7 +448,7 @@ pub(crate) mod tests {
         list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
         entries: &[Pin<&'a Entry>],
     ) {
-        for entry in entries.iter() {
+        for entry in entries {
             list.push_front(*entry);
         }
     }
@@ -470,7 +470,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn const_new() {
+    const fn const_new() {
         const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::new();
     }
 

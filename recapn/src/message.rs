@@ -56,7 +56,7 @@ unsafe impl BuildArena for SingleSegmentArena {
         unimplemented!("external segments cannot be inserted, so they can't be removed")
     }
     fn as_read_arena(&self) -> &dyn ReadArena {
-        &*self
+        self
     }
     fn size_in_words(&self) -> usize {
         self.segment().used_len().get() as usize
@@ -109,7 +109,7 @@ impl<'a> SingleSegmentMessage<'a> {
 
     /// Gets the builder for this message.
     #[inline]
-    pub fn builder<'b>(&'b mut self) -> Builder<'b, 'static> {
+    pub fn builder(&mut self) -> Builder<'_, 'static> {
         Builder {
             e: PhantomData,
             root: self.arena.segment(),
@@ -525,7 +525,7 @@ impl<'a> Reader<'a> {
     }
 
     #[inline]
-    pub fn read_as_struct<'b, S: ty::Struct>(&'b self) -> ReaderOf<'b, S> {
+    pub fn read_as_struct<S: ty::Struct>(&self) -> ReaderOf<'_, S> {
         self.root().read_as_struct::<S>()
     }
 

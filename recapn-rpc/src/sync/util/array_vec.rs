@@ -7,7 +7,7 @@ pub(crate) struct ArrayVec<T, const N: usize> {
 }
 
 impl<T, const N: usize> ArrayVec<T, N> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             inner: unsafe {
                 // safety: Create an uninitialized array of `MaybeUninit`. The
@@ -21,7 +21,7 @@ impl<T, const N: usize> ArrayVec<T, N> {
     }
 
     #[inline]
-    pub fn can_push(&self) -> bool {
+    pub const fn can_push(&self) -> bool {
         self.curr < N
     }
 
@@ -45,7 +45,7 @@ impl<T, const N: usize> ArrayVec<T, N> {
 
 impl<T, const N: usize> Drop for ArrayVec<T, N> {
     fn drop(&mut self) {
-        let slice = ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr() as *mut T, self.curr);
+        let slice = ptr::slice_from_raw_parts_mut(self.inner.as_mut_ptr().cast::<T>(), self.curr);
         unsafe { ptr::drop_in_place(slice) };
     }
 }

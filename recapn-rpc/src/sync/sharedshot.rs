@@ -44,7 +44,7 @@ pub(crate) struct Waiter {
 }
 
 impl Waiter {
-    pub fn new(waker: Option<Waker>) -> Self {
+    pub const fn new(waker: Option<Waker>) -> Self {
         Self {
             pointers: Pointers::new(),
             waker: UnsafeCell::new(waker),
@@ -55,8 +55,8 @@ impl Waiter {
 }
 
 unsafe impl Link for Waiter {
-    type Handle = NonNull<Waiter>;
-    type Target = Waiter;
+    type Handle = NonNull<Self>;
+    type Target = Self;
 
     fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
         handle
@@ -151,7 +151,7 @@ impl WaitList {
         // * This wrapper will empty the list on drop. It is critical for safety
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
-        let mut list = RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), &self);
+        let mut list = RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), self);
 
         const NUM_WAKERS: usize = 32;
 
@@ -213,7 +213,7 @@ pub(crate) struct RecvWaiter {
 
 impl RecvWaiter {
     /// Creates a new recv waiter for waiting on the result of a sharedshot.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { waiter: None }
     }
 
@@ -252,7 +252,7 @@ impl RecvWaiter {
                     // so we have exclusive access `waker`.
                     unsafe {
                         let waker = &mut *waiter.waker.get();
-                        drop(waker.take())
+                        drop(waker.take());
                     }
 
                     this.waiter.set(None);
@@ -373,9 +373,9 @@ pub(crate) enum ShotState {
 impl ShotState {
     pub fn map_sent<T>(self, f: impl FnOnce() -> T) -> Result<T, TryRecvError> {
         match self {
-            ShotState::Sent => Ok(f()),
-            ShotState::Empty => Err(TryRecvError::Empty),
-            ShotState::Closed => Err(TryRecvError::Closed),
+            Self::Sent => Ok(f()),
+            Self::Empty => Err(TryRecvError::Empty),
+            Self::Closed => Err(TryRecvError::Closed),
         }
     }
 }
@@ -695,7 +695,7 @@ impl<T> State<T> {
     }
 
     pub unsafe fn get_ref(&self) -> &T {
-        (&*self.value.get()).assume_init_ref()
+        (*self.value.get()).assume_init_ref()
     }
 }
 

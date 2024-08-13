@@ -15,7 +15,7 @@ use std::ptr::{NonNull, addr_of_mut};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed};
 use std::sync::Arc;
-use std::task::{self, Context, Poll};
+use std::task::{Context, Poll};
 
 use hashbrown::{HashMap, Equivalent};
 use hashbrown::hash_map::RawEntryMut;
@@ -45,7 +45,7 @@ pub trait Chan: Sized {
     /// The results associated with this parameter type.
     type Results: PipelineResolver<Self>;
 
-    /// A pipeline that can be configured separately via set_pipeline.
+    /// A pipeline that can be configured separately via `set_pipeline`.
     type Pipeline: PipelineResolver<Self>;
 }
 
@@ -178,8 +178,8 @@ where
 {}
 
 unsafe impl<C: Chan> Link for SharedRequest<C> {
-    type Handle = Arc<SharedRequest<C>>;
-    type Target = SharedRequest<C>;
+    type Handle = Arc<Self>;
+    type Target = Self;
 
     fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
         NonNull::new(Arc::into_raw(handle).cast_mut()).unwrap()
@@ -233,13 +233,13 @@ impl<C: Chan> SharedRequest<C> {
     }
 
     pub unsafe fn request(&self) -> &C::Parameters {
-        &**self.request.get()
+        &*self.request.get()
     }
 
     /// Drop the request value inside the shared request
     pub unsafe fn drop_request(&self) {
         let request = &mut *self.request.get();
-        ManuallyDrop::drop(request)
+        ManuallyDrop::drop(request);
     }
 
     pub unsafe fn take_request(&self) -> C::Parameters {
@@ -285,7 +285,7 @@ impl<C: Chan> SharedRequest<C> {
     pub fn try_remove_from_channel(&self) {
         let Some(parent) = self.parent.lock().clone() else { return };
 
-        let Some(mut most_resolved) = parent.most_unresolved() else {
+        let Some(most_resolved) = parent.most_unresolved() else {
             // If the channel is resolved by dropping or erroring permanently, we assume the
             // channel is actually in the middle of dropping requests, but just hasn't detached us
             // yet. We just return so that the channel can drop us itself.
@@ -527,7 +527,7 @@ pub struct Request<C: Chan> {
 }
 
 impl<C: Chan> Request<C> {
-    pub(crate) fn new(inner: Arc<SharedRequest<C>>) -> Self {
+    pub(crate) const fn new(inner: Arc<SharedRequest<C>>) -> Self {
         Self { shared: Marc::new(inner) }
     }
 
@@ -652,7 +652,7 @@ impl<C: Chan> ResultsSender<C> {
 impl<C: Chan> Drop for ResultsSender<C> {
     fn drop(&mut self) {
         if let Some(shared) = self.shared.try_take() {
-            shared.close_sender()
+            shared.close_sender();
         }
     }
 }
