@@ -1182,14 +1182,20 @@ impl<'b, 'p, T: Table> PtrFieldBuilder<'b, 'p, T, List<AnyStruct>> {
     }
 
     #[inline]
-    pub fn init(self, size: StructSize, count: u32) -> list::Builder<'b, AnyStruct, T> {
-        let count = ElementCount::new(count).expect("too many elements for list");
-        List::new(
-            self.into_raw_build_ptr()
-                .init_list(ElementSize::InlineComposite(size), count),
-        )
+    pub fn try_init(self, size: StructSize, count: u32) -> Result<list::Builder<'b, AnyStruct, T>, TooManyElementsError> {
+        match ElementCount::new(count){
+            None => Err(TooManyElementsError(())),
+            Some(count) =>
+                Ok(List::new(self.into_raw_build_ptr()
+                    .init_list(ElementSize::InlineComposite(size), count))),
+        }
     }
-    
+
+    #[inline]
+    pub fn init(self, size: StructSize, count: u32) -> list::Builder<'b, AnyStruct, T> {
+        self.try_init(size, count).expect("too many elements for list")
+    }
+
     // TODO the rest of the accessors
 }
 

@@ -35,6 +35,7 @@ pub mod ptr {
     };
 }
 
+#[derive(Debug)]
 pub struct TooManyElementsError(pub(crate) ());
 
 pub type Reader<'a, V, T = rpc::Empty> = List<V, ptr::Reader<'a, T>>;
