@@ -39,7 +39,7 @@ macro_rules! fwd_fmt_traits {
                 fmt::$trait::fmt(&self.get(), f)
             }
         }
-    }
+    };
 }
 
 /// A 29 bit integer. It cannot be zero.

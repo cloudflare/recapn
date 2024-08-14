@@ -8,17 +8,15 @@ pub mod prelude {
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
-            self, Accessor, AccessorMut, Descriptor, Enum, FieldGroup, Group, Struct,
-            UnionViewer, Variant, VariantInfo, VariantDescriptor, VariantMut, ViewOf, Viewable,
+            self, Accessor, AccessorMut, Descriptor, Enum, FieldGroup, Group, Struct, UnionViewer,
+            Variant, VariantDescriptor, VariantInfo, VariantMut, ViewOf, Viewable,
         };
         pub use recapn::list::{self, List};
-        pub use recapn::ptr::{
-            StructBuilder, StructReader, StructSize, ListReader, ElementSize,
-        };
+        pub use recapn::ptr::{ElementSize, ListReader, StructBuilder, StructReader, StructSize};
         pub use recapn::rpc::{self, Capable, Table};
         pub use recapn::text::{self, Text};
         pub use recapn::ty;
-        pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
+        pub use recapn::{BuilderOf, Family, IntoFamily, NotInSchema, ReaderOf, Result};
 
         #[inline]
         pub const fn eslpr() -> ListReader<'static> {
@@ -239,7 +237,9 @@ pub mod prelude {
                     type Imbued = T::Imbued;
                     type ImbuedWith<T2: _p::rpc::Table> = $name<T::ImbuedWith<T2>>;
 
-                    fn imbued(&self) -> &Self::Imbued { self.0.imbued() }
+                    fn imbued(&self) -> &Self::Imbued {
+                        self.0.imbued()
+                    }
 
                     fn imbue_release<T2: _p::rpc::Table>(
                         self,
@@ -265,21 +265,27 @@ pub mod prelude {
                     type Ptr = _p::StructReader<'a, T>;
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>> for $modname::Reader<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+                    for $modname::Reader<'a, T>
+                {
                     #[inline]
                     fn from(ptr: _p::StructReader<'a, T>) -> Self {
                         $name(ptr)
                     }
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::From<$modname::Reader<'a, T>> for _p::StructReader<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::From<$modname::Reader<'a, T>>
+                    for _p::StructReader<'a, T>
+                {
                     #[inline]
                     fn from(reader: $modname::Reader<'a, T>) -> Self {
                         reader.0
                     }
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>> for $modname::Reader<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+                    for $modname::Reader<'a, T>
+                {
                     #[inline]
                     fn as_ref(&self) -> &_p::StructReader<'a, T> {
                         &self.0
@@ -292,21 +298,27 @@ pub mod prelude {
                     type Ptr = _p::StructBuilder<'a, T>;
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::From<$modname::Builder<'a, T>> for _p::StructBuilder<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::From<$modname::Builder<'a, T>>
+                    for _p::StructBuilder<'a, T>
+                {
                     #[inline]
                     fn from(reader: $modname::Builder<'a, T>) -> Self {
                         reader.0
                     }
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>> for $modname::Builder<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+                    for $modname::Builder<'a, T>
+                {
                     #[inline]
                     fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
                         &self.0
                     }
                 }
 
-                impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>> for $modname::Builder<'a, T> {
+                impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+                    for $modname::Builder<'a, T>
+                {
                     #[inline]
                     fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
                         &mut self.0
@@ -324,54 +336,67 @@ pub mod prelude {
         #[macro_export]
         macro_rules! def_field {
             (def variant : $fieldty:ty, $descriptor:ident { tag: $tag_slot:literal, case: $case:literal }) => {
-                const $descriptor: _p::VariantDescriptor<$fieldty> = _p::VariantDescriptor::<$fieldty> {
-                    variant: _p::VariantInfo {
-                        slot: $tag_slot,
-                        case: $case,
-                    },
-                    field: (),
-                };
+                const $descriptor: _p::VariantDescriptor<$fieldty> =
+                    _p::VariantDescriptor::<$fieldty> {
+                        variant: _p::VariantInfo {
+                            slot: $tag_slot,
+                            case: $case,
+                        },
+                        field: (),
+                    };
             };
             (def variant : $fieldty:ty, $descriptor:ident { tag: $tag_slot:literal, case: $case:literal, slot: $slot:literal, default: $default:expr }) => {
-                const $descriptor: _p::VariantDescriptor<$fieldty> = _p::VariantDescriptor::<$fieldty> {
-                    variant: _p::VariantInfo {
-                        slot: $tag_slot,
-                        case: $case,
-                    },
-                    field: _p::Descriptor::<$fieldty> {
-                        slot: $slot,
-                        default: $default,
-                    },
-                };
+                const $descriptor: _p::VariantDescriptor<$fieldty> =
+                    _p::VariantDescriptor::<$fieldty> {
+                        variant: _p::VariantInfo {
+                            slot: $tag_slot,
+                            case: $case,
+                        },
+                        field: _p::Descriptor::<$fieldty> {
+                            slot: $slot,
+                            default: $default,
+                        },
+                    };
             };
             (def : $fieldty:ty, $descriptor:ident ()) => {
                 const $descriptor: _p::Descriptor<$fieldty> = ();
             };
             (def : $fieldty:ty, $descriptor:ident { slot: $slot:literal, default: $default:expr }) => {
-                const $descriptor: _p::Descriptor<$fieldty> = _p::Descriptor::<$fieldty> { slot: $slot, default: $default };
+                const $descriptor: _p::Descriptor<$fieldty> = _p::Descriptor::<$fieldty> {
+                    slot: $slot,
+                    default: $default,
+                };
             };
             (read variant : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&self) -> _p::Variant<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::variant(&self.0, &$ty::$descriptor) }
+                    unsafe {
+                        <$fieldty as _p::field::FieldType>::variant(&self.0, &$ty::$descriptor)
+                    }
                 }
             };
             (write variant : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&mut self) -> _p::VariantMut<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::variant(&mut self.0, &$ty::$descriptor) }
+                    unsafe {
+                        <$fieldty as _p::field::FieldType>::variant(&mut self.0, &$ty::$descriptor)
+                    }
                 }
             };
             (read : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&self) -> _p::Accessor<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::accessor(&self.0, &$ty::$descriptor) }
+                    unsafe {
+                        <$fieldty as _p::field::FieldType>::accessor(&self.0, &$ty::$descriptor)
+                    }
                 }
             };
             (write : $fieldty:ty, $ty:ident $descriptor:ident $name:ident) => {
                 #[inline]
                 pub fn $name(&mut self) -> _p::AccessorMut<'_, 'p, T, $fieldty> {
-                    unsafe { <$fieldty as _p::field::FieldType>::accessor(&mut self.0, &$ty::$descriptor) }
+                    unsafe {
+                        <$fieldty as _p::field::FieldType>::accessor(&mut self.0, &$ty::$descriptor)
+                    }
                 }
             };
         }
@@ -380,8 +405,8 @@ pub mod prelude {
     }
 }
 
-pub mod quotes;
 pub mod generator;
+pub mod quotes;
 
 use anyhow::Context;
 use quote::ToTokens;
@@ -389,18 +414,21 @@ use recapn::io::{self, StreamOptions};
 use recapn::message::{Reader, ReaderOptions};
 use recapn::ReaderOf;
 
-use std::{env, fs};
 use std::ffi::{OsStr, OsString};
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::{env, fs};
 
 use gen::capnp_schema_capnp::CodeGeneratorRequest;
 use generator::GeneratorContext;
 use quotes::GeneratedRoot;
 
 /// Read from an existing `CodeGeneratorRequest` and write files based on the given output path.
-pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl AsRef<Path>) -> anyhow::Result<()> {
+pub fn generate_from_request(
+    request: &ReaderOf<CodeGeneratorRequest>,
+    out: impl AsRef<Path>,
+) -> anyhow::Result<()> {
     let out = out.as_ref();
     let context = GeneratorContext::new(request)?;
 
@@ -409,8 +437,8 @@ pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl
     for file in request.requested_files() {
         let (file, root) = context.generate_file(file.id())?;
 
-        let parsed = syn::parse2::<syn::File>(file.to_token_stream())
-            .context("parsing generated file")?;
+        let parsed =
+            syn::parse2::<syn::File>(file.to_token_stream()).context("parsing generated file")?;
         let printable = prettyplease::unparse(&parsed);
 
         let out_path = out.join(Path::new(&root.path));
@@ -423,7 +451,8 @@ pub fn generate_from_request(request: &ReaderOf<CodeGeneratorRequest>, out: impl
         root_mod.files.push(root);
     }
 
-    let parsed = syn::parse2::<syn::File>(root_mod.to_token_stream()).context("parsing generated file")?;
+    let parsed =
+        syn::parse2::<syn::File>(root_mod.to_token_stream()).context("parsing generated file")?;
     let printable = prettyplease::unparse(&parsed);
     fs::write(out.join("mod.rs"), printable)?;
 
@@ -517,21 +546,31 @@ impl CapnpCommand {
     }
 
     pub fn write_to<T: AsRef<Path>>(&self, path: T) {
-        let stat = self.exe_command()
+        let stat = self
+            .exe_command()
             .arg("--version")
             .status()
             .expect("failed to spawn capnp compiler");
 
-        assert!(stat.success(), "`capnp --version` returned an error: {}", stat);
+        assert!(
+            stat.success(),
+            "`capnp --version` returned an error: {}",
+            stat
+        );
 
-        let mut cmd = self.to_command()
+        let mut cmd = self
+            .to_command()
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
             .expect("failed to spawn capnp compiler");
-        let out = cmd.stdout.take().expect("missing stdout in child capnp process");
+        let out = cmd
+            .stdout
+            .take()
+            .expect("missing stdout in child capnp process");
 
-        generate_from_request_stream(out, path.as_ref()).expect("failed to generate code for capnp files");
+        generate_from_request_stream(out, path.as_ref())
+            .expect("failed to generate code for capnp files");
 
         cmd.wait().expect("capnp command failed");
     }

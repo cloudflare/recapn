@@ -2,26 +2,26 @@
 //! requests and responses in recapn-rpc. It supports many operations not found in
 //! other primitives such as tokio mpsc and has many fewer allocations than building one
 //! based on those primitives.
-//! 
+//!
 //! A main benefit to this channel over a normal tokio mpsc channel is that channels of
 //! this type can be forwarded to others at extremely low cost. This allows us to do
 //! promise pipelining without needing to have forwarding tasks between queues. Instead
 //! a pipelining queue can be made and then attached to the resolved queue when the
 //! promise has resolved.
-//! 
+//!
 //! Another benefit is that this channel doesn't need separate allocations for each step
 //! in the request pipeline. Building off of tokio primitives would necessitate having
 //! many allocations for sending requests and returning responses over one-shots, but
 //! this set of types combines the channel queue with the oneshot mechanism and makes it
 //! so one request makes one allocation.
 
-use crate::sync::request::{SharedRequest, Request};
+use crate::sync::request::{Request, SharedRequest};
 use crate::sync::util::array_vec::ArrayVec;
 use std::fmt::{self, Debug};
 use std::future::poll_fn;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Weak};
-use std::task::{Waker, Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 use parking_lot::{Mutex, MutexGuard};
 
@@ -56,7 +56,9 @@ pub struct Sender<C: Chan + ?Sized> {
 
 impl<C: Chan> Clone for Sender<C> {
     fn clone(&self) -> Self {
-        Self { shared: self.shared.clone() }
+        Self {
+            shared: self.shared.clone(),
+        }
     }
 }
 
@@ -64,17 +66,19 @@ impl<C: Chan> Sender<C> {
     pub fn send(&self, req: Request<C>) -> Result<(), Request<C>> {
         if req.is_finished() {
             // Just drop the request nobody wants the result
-            return Ok(())
+            return Ok(());
         }
 
         let (this, mut channel) = match self.shared.resolve_and_lock() {
             Ok(v) => v,
-            Err(r) => return match r {
-                MostResolved::Dropped => Err(req),
-                MostResolved::Error(err) => {
-                    let (_, responder) = req.respond();
-                    responder.respond(err.clone().into_results());
-                    Ok(())
+            Err(r) => {
+                return match r {
+                    MostResolved::Dropped => Err(req),
+                    MostResolved::Error(err) => {
+                        let (_, responder) = req.respond();
+                        responder.respond(err.clone().into_results());
+                        Ok(())
+                    }
                 }
             }
         };
@@ -119,18 +123,18 @@ impl<C: Chan> Sender<C> {
                 Some(Resolution::Error(err)) => (self, Some(MostResolved::Error(err))),
                 Some(Resolution::Forwarded(channel)) => {
                     self = channel;
-                    continue
-                },
-            }
+                    continue;
+                }
+            };
         }
     }
 
     /// Replace this sender with the most resolved sender for this channel.
-    /// 
+    ///
     /// This does not indicate if the channel has been terminated, but can be useful in the
     /// context of RPC. Exports can't be exported already broken, they have to be exported
     /// as a promise that is immediately broken by a resolve.
-    /// 
+    ///
     /// By calling `resolve_in_place` and only checking if the channel isn't a terminal client,
     /// a future can be made to deliver the brokenness later. This future immediately resolves
     /// and puts a event back into the connection, but generally simplifies a lot of the handling
@@ -169,13 +173,9 @@ pub struct Receiver<C: Chan> {
     shared: Arc<SharedChannel<C>>,
 }
 
-unsafe impl<C: Chan> Send for Receiver<C>
-where
-    Request<C>: Send {}
+unsafe impl<C: Chan> Send for Receiver<C> where Request<C>: Send {}
 
-unsafe impl<C: Chan> Sync for Receiver<C>
-where
-    Request<C>: Send {}
+unsafe impl<C: Chan> Sync for Receiver<C> where Request<C>: Send {}
 
 impl<C: Chan> Receiver<C> {
     #[inline]
@@ -187,7 +187,7 @@ impl<C: Chan> Receiver<C> {
     /// while keeping request ordering. After this operation the receiver is consumed,
     /// but senders that were originally associated with this receiver will automatically
     /// begin refering to the channel associated with the forwarded channel.
-    /// 
+    ///
     /// Forwarding to a sender on this same channel will result in the receiver being returned.
     pub fn forward_to(self, other: &Sender<C>) -> Result<(), Self> {
         let (other_shared, mut other_lock) = match other.shared.resolve_and_lock() {
@@ -197,20 +197,23 @@ impl<C: Chan> Receiver<C> {
                     MostResolved::Dropped => drop(self),
                     MostResolved::Error(err) => self.close(err.clone()),
                 }
-                return Ok(())
+                return Ok(());
             }
         };
 
         if Arc::ptr_eq(&self.shared, other_shared) {
-            return Err(self)
+            return Err(self);
         }
 
         let mut self_lock = self.shared.state.lock();
         if self_lock.requests.is_empty() {
             unsafe {
-                let _ = self.shared.resolution.send(ChannelResolution::Forward(other.clone()));
+                let _ = self
+                    .shared
+                    .resolution
+                    .send(ChannelResolution::Forward(other.clone()));
             }
-            return Ok(())
+            return Ok(());
         }
 
         other_lock.requests.append_back(&mut self_lock.requests);
@@ -246,7 +249,7 @@ impl<C: Chan> Receiver<C> {
 
     pub fn poll_recv(&mut self, cx: &mut Context) -> Poll<Option<Request<C>>> {
         if self.is_closed() {
-            return Poll::Ready(None)
+            return Poll::Ready(None);
         }
 
         let waker = cx.waker().clone();
@@ -256,7 +259,7 @@ impl<C: Chan> Receiver<C> {
 
         if let Some(n) = next {
             unsafe { n.take_parent() };
-            return Poll::Ready(Some(Request::new(n)))
+            return Poll::Ready(Some(Request::new(n)));
         }
 
         if let Some(w) = &locked.waker {
@@ -282,7 +285,11 @@ impl<C: Chan> Receiver<C> {
     pub fn close(self, err: C::Error) {
         let mut self_lock = self.shared.state.lock();
         drop(self_lock.waker.take());
-        let _ = unsafe { self.shared.resolution.send(ChannelResolution::Error(err.clone())) };
+        let _ = unsafe {
+            self.shared
+                .resolution
+                .send(ChannelResolution::Error(err.clone()))
+        };
 
         scopeguard::defer_on_unwind! {
             let mut self_lock = self.shared.state.lock();
@@ -304,9 +311,13 @@ impl<C: Chan> Receiver<C> {
 
         'outer: loop {
             while request_array.can_push() {
-                let Some(req) = self_lock.requests.pop_front() else { break 'outer };
+                let Some(req) = self_lock.requests.pop_front() else {
+                    break 'outer;
+                };
 
-                unsafe { req.take_parent(); }
+                unsafe {
+                    req.take_parent();
+                }
 
                 request_array.push(Request::new(req));
             }
@@ -346,11 +357,11 @@ pub(crate) struct SharedChannel<C: Chan + ?Sized> {
     state: Mutex<State<C>>,
 
     /// A sharedshot to track channel resolution.
-    /// 
+    ///
     /// In a channel, all senders and requests in the channel are considered receivers of
     /// the sharedshot result. This prevents the sharedshot from prematurely closing if all
     /// senders are dropped but requests are active in the channel.
-    /// 
+    ///
     /// Instances where all senders have dropped but requests are still active are common
     /// in pipeline clients, where a request is sent on the pipeline, then the sender is
     /// dropped. As long as the request has receivers for its reponse, it should stay active,
@@ -394,13 +405,15 @@ impl<C: Chan> SharedChannel<C> {
                 Some(Resolution::Dropped | Resolution::Error(_)) => None,
                 Some(Resolution::Forwarded(channel)) => {
                     self = &*channel.shared;
-                    continue
+                    continue;
                 }
-            }
+            };
         }
     }
 
-    pub fn most_resolved<'a>(mut self: &'a Arc<Self>) -> (&'a Arc<Self>, Option<MostResolved<'a, C::Error>>) {
+    pub fn most_resolved<'a>(
+        mut self: &'a Arc<Self>,
+    ) -> (&'a Arc<Self>, Option<MostResolved<'a, C::Error>>) {
         loop {
             let resolution = self.try_resolved();
             return match resolution {
@@ -409,32 +422,34 @@ impl<C: Chan> SharedChannel<C> {
                 Some(Resolution::Error(err)) => (self, Some(MostResolved::Error(err))),
                 Some(Resolution::Forwarded(channel)) => {
                     self = &channel.shared;
-                    continue
-                },
-            }
+                    continue;
+                }
+            };
         }
     }
 
     /// Resolve into the inner-most forwarded channel and acquire a lock to the channel
-    pub fn resolve_and_lock<'a>(self: &'a Arc<Self>) -> Result<(&'a Arc<Self>, MutexGuard<'a, State<C>>), MostResolved<'a, C::Error>> {
+    pub fn resolve_and_lock<'a>(
+        self: &'a Arc<Self>,
+    ) -> Result<(&'a Arc<Self>, MutexGuard<'a, State<C>>), MostResolved<'a, C::Error>> {
         // First we need to find the most resolved version of this channel.
         let (mut this, mut resolution) = self.most_resolved();
 
         loop {
             if let Some(res) = resolution {
-                return Err(res)
+                return Err(res);
             }
-    
+
             // Now we have the most resolved channel, lock it.
             let channel = this.state.lock();
-    
+
             // But during that time spent locking it, it might've resolved further, so go through
             // the above steps again...
             (this, resolution) = this.most_resolved();
 
             if resolution.is_none() {
                 // If it hasn't resolved, break from the loop.
-                break Ok((this, channel))
+                break Ok((this, channel));
             }
         }
     }
@@ -470,7 +485,9 @@ pub fn channel<C: Chan>(chan: C) -> (Sender<C>, Receiver<C>) {
         resolution: sharedshot::State::new(1),
         chan,
     });
-    let sender = Sender { shared: channel.clone() };
+    let sender = Sender {
+        shared: channel.clone(),
+    };
     let receiver = Receiver { shared: channel };
     (sender, receiver)
 }
@@ -488,18 +505,18 @@ pub fn broken<C: Chan>(chan: C, err: C::Error) -> Sender<C> {
         chan,
     });
     let _ = unsafe { channel.resolution.send(ChannelResolution::Error(err)) };
-    
+
     Sender { shared: channel }
 }
 
 /// A version of Receiver that drops the channel if all the senders are destroyed and the
 /// channel is empty.
-/// 
+///
 /// This is used for pipeline channels to break circular references, where the channel itself
 /// holds a reference back to the parent request to indicate that the channel is somehow receiving
 /// the response from it, and the request holds the weak channel so that it can send requests to it
 /// for pipelining.
-/// 
+///
 /// When the pipeline is resolved, a weak channel is upgraded into a strong Receiver.
 #[derive(Debug)]
 pub struct WeakChannel<C: Chan> {
@@ -520,7 +537,10 @@ impl<C: Chan> WeakChannel<C> {
     }
 }
 
-pub(crate) fn weak_channel<C: Chan>(chan: C, parent: request::Receiver<C>) -> (Sender<C>, WeakChannel<C>) {
+pub(crate) fn weak_channel<C: Chan>(
+    chan: C,
+    parent: request::Receiver<C>,
+) -> (Sender<C>, WeakChannel<C>) {
     let channel = Arc::new(SharedChannel {
         state: Mutex::new(State {
             parent_request: Some(parent),
@@ -531,12 +551,12 @@ pub(crate) fn weak_channel<C: Chan>(chan: C, parent: request::Receiver<C>) -> (S
         resolution: sharedshot::State::new(1),
         chan,
     });
-    let weak_channel = WeakChannel { shared: Arc::downgrade(&channel) };
+    let weak_channel = WeakChannel {
+        shared: Arc::downgrade(&channel),
+    };
     let sender = Sender { shared: channel };
     (sender, weak_channel)
 }
 
 #[cfg(test)]
-mod test {
-
-}
+mod test {}

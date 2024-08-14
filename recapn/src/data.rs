@@ -2,15 +2,12 @@
 
 use core::ops::{Deref, DerefMut};
 
-use crate::list::ElementSize;
 use crate::internal::Sealed;
-use crate::{ty, IntoFamily, Family};
+use crate::list::ElementSize;
+use crate::{ty, Family, IntoFamily};
 
 pub mod ptr {
-    pub use crate::ptr::{
-        BlobReader as Reader,
-        BlobBuilder as Builder,
-    };
+    pub use crate::ptr::{BlobBuilder as Builder, BlobReader as Reader};
 }
 
 #[derive(Clone, Copy)]
@@ -48,13 +45,16 @@ impl<'a> Reader<'a> {
     }
 
     /// Creates a data reader from a slice of bytes.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If the slice is too large to be in a message, this function panics.
     #[inline]
     pub const fn from_slice(slice: &'a [u8]) -> Self {
-        Self(ptr::Reader::new(slice).expect("slice is too large to be contained within a cap'n proto message"))
+        Self(
+            ptr::Reader::new(slice)
+                .expect("slice is too large to be contained within a cap'n proto message"),
+        )
     }
 
     #[inline]
@@ -148,9 +148,7 @@ impl<'a> Builder<'a> {
 
     #[inline]
     pub fn as_reader(&self) -> Reader<'_> {
-        Data(unsafe {
-            ptr::Reader::new_unchecked(self.0.data(), self.0.len())
-        })
+        Data(unsafe { ptr::Reader::new_unchecked(self.0.data(), self.0.len()) })
     }
 
     #[inline]

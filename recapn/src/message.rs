@@ -1,13 +1,11 @@
 //! An arena of segments containing Cap'n Proto data.
 
-use crate::alloc::{
-    AllocLen, Segment, SegmentOffset, Space, Word
-};
-use crate::arena::{SegmentId, ArenaSegment, BuildArena, ReadArena};
+use crate::alloc::{AllocLen, Segment, SegmentOffset, Space, Word};
+use crate::arena::{ArenaSegment, BuildArena, ReadArena, SegmentId};
 use crate::orphan::Orphanage;
-use crate::{any, ty, ReaderOf};
 use crate::ptr::{ObjectBuilder, PtrBuilder, PtrReader};
 use crate::rpc::{Empty, InsertableInto};
+use crate::{any, ty, ReaderOf};
 use core::cell::{Cell, UnsafeCell};
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -25,9 +23,7 @@ struct SingleSegmentArena {
 impl SingleSegmentArena {
     fn new(segment: Segment) -> Self {
         Self {
-            segment: UnsafeCell::new(unsafe {
-                ArenaSegment::new(segment, AllocLen::ONE, 0)
-            })
+            segment: UnsafeCell::new(unsafe { ArenaSegment::new(segment, AllocLen::ONE, 0) }),
         }
     }
 
@@ -44,7 +40,7 @@ unsafe impl BuildArena for SingleSegmentArena {
     }
     fn segment(&self, id: SegmentId) -> Option<&ArenaSegment> {
         if id != 0 {
-            return None
+            return None;
         }
 
         Some(self.segment())
@@ -61,13 +57,15 @@ unsafe impl BuildArena for SingleSegmentArena {
     fn size_in_words(&self) -> usize {
         self.segment().used_len().get() as usize
     }
-    fn len(&self) -> u32 { 1 }
+    fn len(&self) -> u32 {
+        1
+    }
 }
 
 unsafe impl ReadArena for SingleSegmentArena {
     fn segment(&self, id: SegmentId) -> Option<Segment> {
         if id != 0 {
-            return None
+            return None;
         }
 
         Some(self.segment().used_segment())
@@ -85,12 +83,18 @@ pub struct SingleSegmentMessage<'a> {
 
 impl<'a> SingleSegmentMessage<'a> {
     pub fn with_space<const N: usize>(space: &'a mut Space<N>) -> Self {
-        Self { a: PhantomData, arena: SingleSegmentArena::new(space.segment()) }
+        Self {
+            a: PhantomData,
+            arena: SingleSegmentArena::new(space.segment()),
+        }
     }
 
     #[cfg(feature = "alloc")]
     pub fn with_dyn_space(space: &'a mut DynSpace) -> Self {
-        Self { a: PhantomData, arena: SingleSegmentArena::new(space.segment()) }
+        Self {
+            a: PhantomData,
+            arena: SingleSegmentArena::new(space.segment()),
+        }
     }
 
     /// Creates a new reader for this message. This reader has no limits placed on it.
@@ -211,7 +215,11 @@ impl<'e, A: Alloc + ?Sized> Message<'e, A> {
     #[inline]
     pub fn builder<'b>(&'b mut self) -> Builder<'b, 'e> {
         let (root, arena) = self.arena.root_and_build();
-        Builder { e: PhantomData, root, arena }
+        Builder {
+            e: PhantomData,
+            root,
+            arena,
+        }
     }
 
     /// Clears the message, deallocating all the segments within it.
@@ -370,7 +378,10 @@ impl<'b> IntoIterator for MessageSegments<'b> {
     type Item = MessageSegment<'b>;
 
     fn into_iter(self) -> Self::IntoIter {
-        SegmentsIter { arena: Some(self.arena), curr: 0 }
+        SegmentsIter {
+            arena: Some(self.arena),
+            curr: 0,
+        }
     }
 }
 
@@ -491,7 +502,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Creates a message reader with no limits applied.
-    /// 
+    ///
     /// Note: You should only use this if you trust the source of this data! Untrusted
     /// data can perform amplification attacks and stack overflow DoS attacks while
     /// reading the data, so you should only use this method if you want to read some

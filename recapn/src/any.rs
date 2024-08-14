@@ -1,5 +1,5 @@
 //! Safe wrappers around "any" pointer, struct, or list value
-//! 
+//!
 //! This module is distinct from the [`crate::ptr`] module in that it provides
 //! safe, easy to use abstractions around "any" value, whereas the `ptr` module
 //! provides all operations used by the rest of the library, including many unsafe
@@ -29,10 +29,15 @@
 
 use crate::field::Struct;
 use crate::internal::Sealed;
-use crate::list::{self, List, ElementSize};
+use crate::list::{self, ElementSize, List};
 use crate::orphan::{Orphan, Orphanage};
-use crate::ptr::{ElementCount, CopySize, ErrorHandler, IgnoreErrors, MessageSize, PtrElementSize, StructSize};
-use crate::rpc::{self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, PipelineBuilder, Pipelined, Table};
+use crate::ptr::{
+    CopySize, ElementCount, ErrorHandler, IgnoreErrors, MessageSize, PtrElementSize, StructSize,
+};
+use crate::rpc::{
+    self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, PipelineBuilder, Pipelined,
+    Table,
+};
 use crate::ty::{self, FromPtr, StructReader as _};
 use crate::{data, text, Family, IntoFamily, Result};
 
@@ -42,7 +47,7 @@ pub mod ptr {
     };
 }
 
-pub use crate::ptr::{PtrType, PtrEquality};
+pub use crate::ptr::{PtrEquality, PtrType};
 
 /// A safe wrapper around any pointer type.
 ///
@@ -197,7 +202,9 @@ impl<'a, T: Table> PtrReader<'a, T> {
 
 impl<'a, T: CapTable> PtrReader<'a, T> {
     #[inline]
-    pub fn try_read_option_as_client<C: ty::Capability<Client = T::Cap>>(&self) -> Result<Option<C>> {
+    pub fn try_read_option_as_client<C: ty::Capability<Client = T::Cap>>(
+        &self,
+    ) -> Result<Option<C>> {
         match self.0.try_to_capability() {
             Ok(Some(c)) => Ok(Some(C::from_client(c))),
             Ok(None) => Ok(None),
@@ -358,17 +365,23 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn try_read_option_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(&'b self) -> Result<Option<U::Output>> {
+    pub fn try_read_option_as<'b, U: ty::ReadPtr<PtrReader<'b, T>>>(
+        &'b self,
+    ) -> Result<Option<U::Output>> {
         U::try_get_option(self.as_reader())
     }
 
     #[inline]
-    pub fn read_as_struct<S: ty::Struct>(&self) -> <Struct<S> as FromPtr<PtrReader<'_, T>>>::Output {
+    pub fn read_as_struct<S: ty::Struct>(
+        &self,
+    ) -> <Struct<S> as FromPtr<PtrReader<'_, T>>>::Output {
         self.read_as::<Struct<S>>()
     }
 
     #[inline]
-    pub fn read_as_list_of<V: ty::DynListValue>(&self) -> <List<V> as FromPtr<PtrReader<'_, T>>>::Output {
+    pub fn read_as_list_of<V: ty::DynListValue>(
+        &self,
+    ) -> <List<V> as FromPtr<PtrReader<'_, T>>>::Output {
         self.read_as::<List<V>>()
     }
 
@@ -391,7 +404,11 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn init_any_struct_list(self, size: StructSize, count: u32) -> list::Builder<'a, AnyStruct, T> {
+    pub fn init_any_struct_list(
+        self,
+        size: StructSize,
+        count: u32,
+    ) -> list::Builder<'a, AnyStruct, T> {
         let count = ElementCount::new(count).expect("too many elements for list");
         list::Builder::new(self.0.init_list(ElementSize::InlineComposite(size), count))
     }
@@ -424,7 +441,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         T2: InsertableInto<T>,
         E: ErrorHandler,
     {
-        self.0.try_set_struct(reader.as_ptr(), CopySize::Minimum(S::SIZE), err_handler)
+        self.0
+            .try_set_struct(reader.as_ptr(), CopySize::Minimum(S::SIZE), err_handler)
     }
 
     #[inline]
@@ -437,7 +455,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         T2: InsertableInto<T>,
         E: ErrorHandler,
     {
-        self.0.try_set_struct(reader.as_ptr(), CopySize::FromValue, err_handler)
+        self.0
+            .try_set_struct(reader.as_ptr(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -451,7 +470,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         T2: InsertableInto<T>,
         E: ErrorHandler,
     {
-        self.0.try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
+        self.0
+            .try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -464,7 +484,8 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         T2: InsertableInto<T>,
         E: ErrorHandler,
     {
-        self.0.try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
+        self.0
+            .try_set_list(reader.as_ref(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -482,13 +503,14 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         &mut self,
         reader: &PtrReader<'_, T2>,
         canonical: bool,
-        err_handler: E
+        err_handler: E,
     ) -> Result<(), E::Error>
     where
         T2: InsertableInto<T>,
         E: ErrorHandler,
     {
-        self.0.try_copy_from(reader.as_ref(), canonical, err_handler)
+        self.0
+            .try_copy_from(reader.as_ref(), canonical, err_handler)
     }
 
     #[inline]
@@ -580,7 +602,8 @@ impl<T> IntoFamily for AnyStruct<T> {
 }
 
 impl ty::DynListValue for AnyStruct {
-    const PTR_ELEMENT_SIZE: crate::ptr::PtrElementSize = crate::ptr::PtrElementSize::InlineComposite;
+    const PTR_ELEMENT_SIZE: crate::ptr::PtrElementSize =
+        crate::ptr::PtrElementSize::InlineComposite;
 }
 
 // StructReader impls
@@ -610,7 +633,9 @@ impl<'a, T: Table> ty::FromPtr<StructReader<'a, T>> for AnyStruct {
     type Output = StructReader<'a, T>;
 
     #[inline]
-    fn get(ptr: StructReader<'a, T>) -> Self::Output { ptr }
+    fn get(ptr: StructReader<'a, T>) -> Self::Output {
+        ptr
+    }
 }
 
 impl<'a, T: Table> ty::FromPtr<PtrReader<'a, T>> for AnyStruct {
@@ -923,7 +948,9 @@ impl<'a, T: Table> ty::FromPtr<ListReader<'a, T>> for AnyList {
     type Output = ListReader<'a, T>;
 
     #[inline]
-    fn get(ptr: ListReader<'a, T>) -> Self::Output { ptr }
+    fn get(ptr: ListReader<'a, T>) -> Self::Output {
+        ptr
+    }
 }
 
 impl<'a, T: Table> ty::FromPtr<PtrReader<'a, T>> for AnyList {

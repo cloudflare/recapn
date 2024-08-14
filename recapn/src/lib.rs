@@ -4,8 +4,8 @@
 #![feature(const_option)]
 #![cfg_attr(feature = "std", feature(write_all_vectored))]
 
-use core::fmt::{self, Display};
 use crate::alloc::AllocLen;
+use core::fmt::{self, Display};
 
 #[doc(hidden)]
 extern crate self as recapn;
@@ -23,26 +23,26 @@ mod internal {
 
 // Layer 0 : Messages and segments
 
-pub mod num;
 pub mod alloc;
 pub mod arena;
-pub mod message;
 pub mod io;
+pub mod message;
+pub mod num;
 
 // Layer 1 : Typeless primitives (structs, lists, caps)
 
-pub mod ptr;
-pub mod orphan;
 pub mod data;
-pub mod text;
+pub mod orphan;
+pub mod ptr;
 pub mod rpc;
+pub mod text;
 
 // Layer 2 : Types and abstractions
 
-pub mod ty;
-pub mod list;
 pub mod any;
 pub mod field;
+pub mod list;
+pub mod ty;
 
 // Layer 3 : Extensions
 
@@ -61,18 +61,18 @@ pub mod prelude {
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
-            self, Accessor, AccessorMut, AccessorOwned, Descriptor, Enum, FieldGroup, Group, Struct,
-            UnionViewer, VariantInfo, VariantDescriptor, Variant, VariantMut, VariantOwned,
+            self, Accessor, AccessorMut, AccessorOwned, Descriptor, Enum, FieldGroup, Group,
+            Struct, UnionViewer, Variant, VariantDescriptor, VariantInfo, VariantMut, VariantOwned,
             ViewOf, Viewable,
         };
         pub use recapn::list::{self, List};
         pub use recapn::ptr::{
-            self, StructBuilder, StructReader, StructSize, ListReader, ElementSize, PtrReader
+            self, ElementSize, ListReader, PtrReader, StructBuilder, StructReader, StructSize,
         };
         pub use recapn::rpc::{self, Capable, Table};
         pub use recapn::text::{self, Text};
         pub use recapn::ty::{self, StructView};
-        pub use recapn::{BuilderOf, Family, IntoFamily, ReaderOf, Result, NotInSchema};
+        pub use recapn::{BuilderOf, Family, IntoFamily, NotInSchema, ReaderOf, Result};
     }
 }
 
@@ -140,11 +140,15 @@ impl Display for Error {
             ErrorKind::PointerOutOfBounds => write!(f, "pointer out of bounds"),
             ErrorKind::ReadLimitExceeded => write!(f, "read limit exceeded"),
             ErrorKind::InlineCompositeOverrun => write!(f, "inline composite word count overrun"),
-            ErrorKind::UnsupportedInlineCompositeElementTag => write!(f, "unsupported inline composite element tag"),
+            ErrorKind::UnsupportedInlineCompositeElementTag => {
+                write!(f, "unsupported inline composite element tag")
+            }
             ErrorKind::UnexpectedRead(read) => Display::fmt(read, f),
             ErrorKind::IncompatibleUpgrade(upgrade) => Display::fmt(upgrade, f),
             ErrorKind::CapabilityNotAllowed => write!(f, "capability not allowed in this context"),
-            ErrorKind::InvalidCapabilityPointer(index) => write!(f, "invalid capability pointer ({index})"),
+            ErrorKind::InvalidCapabilityPointer(index) => {
+                write!(f, "invalid capability pointer ({index})")
+            }
             ErrorKind::TextNotNulTerminated => write!(f, "text wasn't NUL terminated"),
             ErrorKind::MissingSegment(id) => write!(f, "missing segment {id}"),
             ErrorKind::WritingNotAllowed => write!(f, "attempted to write to read-only segment"),

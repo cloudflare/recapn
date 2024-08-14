@@ -5,11 +5,11 @@ use std::error::Error;
 use libfuzzer_sys::arbitrary::{self, Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
+use fuzz::TestAllTypes;
 use recapn::alloc::Word;
 use recapn::list::Fallible;
-use recapn::ReaderOf;
-use fuzz::TestAllTypes;
 use recapn::message::{Reader, ReaderOptions};
+use recapn::ReaderOf;
 
 fn traverse(r: &ReaderOf<TestAllTypes>) -> recapn::Result<()> {
     macro_rules! read_data {
@@ -64,7 +64,7 @@ fn traverse(r: &ReaderOf<TestAllTypes>) -> recapn::Result<()> {
     for text in text_list.into_iter_by(Fallible) {
         let _ = text?;
     }
-    
+
     let data_list = r.data_list().try_get()?;
     for data in data_list.into_iter_by(Fallible) {
         let _ = data?;
@@ -80,10 +80,13 @@ fn fuzz(words: &[Word]) -> Result<(), Box<dyn Error>> {
     let (message, remainder) = recapn::io::read_from_slice(words)?;
     assert!(remainder.len() < words.len()); // make sure we actually read something from the slice
 
-    let reader = Reader::new(&message, ReaderOptions {
-        traversal_limit: 4 * 1024,
-        ..ReaderOptions::DEFAULT
-    });
+    let reader = Reader::new(
+        &message,
+        ReaderOptions {
+            traversal_limit: 4 * 1024,
+            ..ReaderOptions::DEFAULT
+        },
+    );
     let root = reader.read_as_struct::<TestAllTypes>();
     root.as_ref().total_size()?;
 

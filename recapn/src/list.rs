@@ -12,26 +12,24 @@
 
 use crate::any::{self, AnyList, AnyPtr, AnyStruct};
 use crate::data::{self, Data};
-use crate::ptr::{CopySize, ErrorHandler, IgnoreErrors};
-use crate::text::{self, Text};
-use crate::field::{Enum, Struct, Capability};
+use crate::field::{Capability, Enum, Struct};
 use crate::internal::Sealed;
+use crate::ptr::{CopySize, ErrorHandler, IgnoreErrors};
 use crate::ptr::{Data as FieldData, PtrElementSize, StructSize};
 use crate::rpc::{self, Capable, InsertableInto, Table};
+use crate::text::{self, Text};
 use crate::ty::{self, EnumResult};
-use crate::{Error, Family, IntoFamily, Result, ErrorKind};
+use crate::{Error, ErrorKind, Family, IntoFamily, Result};
 
 use core::convert::TryFrom;
 use core::marker::PhantomData;
 use core::ops::Range;
 
-pub use crate::ptr::{ElementSize, ElementCount};
+pub use crate::ptr::{ElementCount, ElementSize};
 
 pub mod ptr {
     pub use crate::ptr::{
-        ListBuilder as Builder,
-        ListReader as Reader,
-        PtrElementSize as ElementSize,
+        ListBuilder as Builder, ListReader as Reader, PtrElementSize as ElementSize,
     };
 }
 
@@ -58,7 +56,10 @@ pub struct List<V, T = Family> {
 
 impl<V, T> List<V, T> {
     pub(crate) const fn new(repr: T) -> Self {
-        Self { repr, v: PhantomData }
+        Self {
+            repr,
+            v: PhantomData,
+        }
     }
 }
 
@@ -180,7 +181,7 @@ impl<'a, V, T: Table> Reader<'a, V, T> {
     #[inline]
     pub fn try_at<'b>(&'b self, index: u32) -> Option<ElementReader<'a, 'b, V, T>>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b Self>,
     {
         (index < self.len()).then(|| unsafe { self.at_unchecked(index) })
     }
@@ -189,7 +190,7 @@ impl<'a, V, T: Table> Reader<'a, V, T> {
     #[inline]
     pub fn at<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, V, T>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b Self>,
     {
         self.try_at(index).expect("index out of bounds")
     }
@@ -198,7 +199,7 @@ impl<'a, V, T: Table> Reader<'a, V, T> {
     #[inline]
     pub unsafe fn at_unchecked<'b>(&'b self, index: u32) -> ElementReader<'a, 'b, V, T>
     where
-        V: ListAccessable<&'b Self>
+        V: ListAccessable<&'b Self>,
     {
         V::get(self, index)
     }
@@ -289,7 +290,9 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     where
         V: ListAccessable<Self>,
     {
-        self.try_into_element(index).ok().expect("index out of bounds")
+        self.try_into_element(index)
+            .ok()
+            .expect("index out of bounds")
     }
 
     #[inline]
@@ -307,8 +310,7 @@ pub type ElementReader<'a, 'b, V, T = rpc::Empty> =
 /// An element in a list builder with a mutable borrow
 pub type ElementBuilder<'a, 'b, V, T = rpc::Empty> =
     <V as ListAccessable<&'b mut Builder<'a, V, T>>>::View;
-pub type ElementOwner<'a, V, T = rpc::Empty> =
-    <V as ListAccessable<Builder<'a, V, T>>>::View;
+pub type ElementOwner<'a, V, T = rpc::Empty> = <V as ListAccessable<Builder<'a, V, T>>>::View;
 
 /// A checked index view into a List.
 pub struct DataElement<T> {
@@ -349,14 +351,14 @@ impl<'a, 'b, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for () {
     type View = ();
 
     #[inline]
-    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View {  }
+    unsafe fn get(_: &'b Reader<'a, Self, T>, _: u32) -> Self::View {}
 }
 
 impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for () {
     type View = ();
 
     #[inline]
-    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View {  }
+    unsafe fn get(_: &'b mut Builder<'a, Self, T>, _: u32) -> Self::View {}
 }
 
 impl<'a, 'b, T: Table, V: FieldData> ListAccessable<&'b Reader<'a, Self, T>> for V {
@@ -397,7 +399,11 @@ impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f32, T> {
         const CANONICAL_NAN: u32 = 0x7fc00000u32;
 
         if value.is_nan() {
-            unsafe { self.list.as_mut().set_data_unchecked(self.idx, CANONICAL_NAN) }
+            unsafe {
+                self.list
+                    .as_mut()
+                    .set_data_unchecked(self.idx, CANONICAL_NAN)
+            }
         } else {
             self.set(value)
         }
@@ -411,7 +417,11 @@ impl<'a, 'b, T: Table> DataElementBuilder<'a, 'b, f64, T> {
         const CANONICAL_NAN: u64 = 0x7ff8000000000000u64;
 
         if value.is_nan() {
-            unsafe { self.list.as_mut().set_data_unchecked(self.idx, CANONICAL_NAN) }
+            unsafe {
+                self.list
+                    .as_mut()
+                    .set_data_unchecked(self.idx, CANONICAL_NAN)
+            }
         } else {
             self.set(value)
         }
@@ -450,7 +460,11 @@ where
     #[inline]
     pub fn set(&mut self, value: E) {
         let value = value.into();
-        unsafe { self.list.as_mut().set_data_unchecked::<u16>(self.idx, value) }
+        unsafe {
+            self.list
+                .as_mut()
+                .set_data_unchecked::<u16>(self.idx, value)
+        }
     }
 }
 
@@ -513,7 +527,10 @@ where
     /// If an error occurs while reading the struct, null is written instead. If you want a falible
     /// set, use `try_set_with_caveats`.
     #[inline]
-    pub fn set_with_caveats(self, reader: &S::Reader<'_, impl InsertableInto<T>>) -> S::Builder<'b, T> {
+    pub fn set_with_caveats(
+        self,
+        reader: &S::Reader<'_, impl InsertableInto<T>>,
+    ) -> S::Builder<'b, T> {
         self.try_set_with_caveats(reader, IgnoreErrors).unwrap()
     }
 
@@ -524,7 +541,8 @@ where
         err_handler: E,
     ) -> Result<S::Builder<'b, T>, E::Error> {
         let mut elem = self.get();
-        elem.as_mut().try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
+        elem.as_mut()
+            .try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
         Ok(elem)
     }
 }
@@ -579,7 +597,10 @@ where
     /// If an error occurs while reading the struct, null is written instead. If you want a falible
     /// set, use `try_set_with_caveats`.
     #[inline]
-    pub fn set_with_caveats(self, reader: &any::StructReader<'_, impl InsertableInto<T>>) -> any::StructBuilder<'b, T> {
+    pub fn set_with_caveats(
+        self,
+        reader: &any::StructReader<'_, impl InsertableInto<T>>,
+    ) -> any::StructBuilder<'b, T> {
         self.try_set_with_caveats(reader, IgnoreErrors).unwrap()
     }
 
@@ -590,7 +611,8 @@ where
         err_handler: E,
     ) -> Result<any::StructBuilder<'b, T>, E::Error> {
         let mut elem = self.get();
-        elem.as_mut().try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
+        elem.as_mut()
+            .try_copy_with_caveats(reader.as_ref(), false, err_handler)?;
         Ok(elem)
     }
 }
@@ -660,7 +682,10 @@ where
     /// If an error occurs while reading it is returned.
     #[inline]
     pub fn try_get_option(&self) -> Result<Option<Reader<'a, V, T>>> {
-        match self.ptr_reader().to_list(Some(PtrElementSize::size_of::<V>())) {
+        match self
+            .ptr_reader()
+            .to_list(Some(PtrElementSize::size_of::<V>()))
+        {
             Ok(Some(reader)) => Ok(Some(List::new(reader))),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -747,7 +772,7 @@ where
     }
 
     /// Initialize a new instance with the given element size.
-    /// 
+    ///
     /// The element size must be a valid upgrade from `V::ELEMENT_SIZE`. That is, calling
     /// `V::ELEMENT_SIZE.upgrade_to(size)` must yield `Some(size)`.
     #[inline]
@@ -763,7 +788,11 @@ where
         value: &Reader<V, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.ptr_builder().try_set_list(&value.repr, CopySize::Minimum(V::ELEMENT_SIZE), err_handler)
+        self.ptr_builder().try_set_list(
+            &value.repr,
+            CopySize::Minimum(V::ELEMENT_SIZE),
+            err_handler,
+        )
     }
 
     #[inline]
@@ -796,14 +825,14 @@ where
     #[inline]
     pub fn get(self, expected_size: StructSize) -> Builder<'b, AnyStruct, T> {
         let expected = ElementSize::InlineComposite(expected_size);
-        List::new(
-            self.into_ptr_builder()
-                .to_list_mut_or_empty(Some(expected)),
-        )
+        List::new(self.into_ptr_builder().to_list_mut_or_empty(Some(expected)))
     }
 
     #[inline]
-    pub fn try_get_option(self, expected_size: StructSize) -> Result<Option<Builder<'b, AnyStruct, T>>> {
+    pub fn try_get_option(
+        self,
+        expected_size: StructSize,
+    ) -> Result<Option<Builder<'b, AnyStruct, T>>> {
         let expected = ElementSize::InlineComposite(expected_size);
         match self.into_ptr_builder().to_list_mut(Some(expected)) {
             Ok(ptr) => Ok(Some(List::new(ptr))),
@@ -845,8 +874,10 @@ where
     /// returns an error on failure instead.
     #[inline]
     pub fn init(self, size: StructSize, count: ElementCount) -> Builder<'b, AnyStruct, T> {
-        List::new(self.into_ptr_builder()
-            .init_list(ElementSize::InlineComposite(size), count))
+        List::new(
+            self.into_ptr_builder()
+                .init_list(ElementSize::InlineComposite(size), count),
+        )
     }
 
     /// Initializes the element as a list with the specified element count. This clears any
@@ -878,11 +909,16 @@ where
             None => CopySize::FromValue,
         };
 
-        self.into_ptr_builder().try_set_list(&value.repr, copy_size, err_handler)
+        self.into_ptr_builder()
+            .try_set_list(&value.repr, copy_size, err_handler)
     }
 
     #[inline]
-    pub fn set(self, value: &Reader<AnyStruct, impl InsertableInto<T>>, desired_size: Option<StructSize>) {
+    pub fn set(
+        self,
+        value: &Reader<AnyStruct, impl InsertableInto<T>>,
+        desired_size: Option<StructSize>,
+    ) {
         self.try_set(value, desired_size, IgnoreErrors).unwrap()
     }
 
@@ -1040,8 +1076,11 @@ where
         value: &any::ListReader<impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.into_ptr_builder()
-            .try_set_list(value.as_ref(), CopySize::Minimum(ElementSize::Pointer), err_handler)
+        self.into_ptr_builder().try_set_list(
+            value.as_ref(),
+            CopySize::Minimum(ElementSize::Pointer),
+            err_handler,
+        )
     }
 
     #[inline]
@@ -1304,9 +1343,9 @@ where
     }
 
     /// Set the text element to a copy of the given string.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If the string is too large to fit in a Cap'n Proto message, this function will
     /// panic.
     #[inline]
@@ -1318,10 +1357,10 @@ where
 
     #[inline]
     pub fn try_set_str(self, value: &str) -> Result<text::Builder<'b>, Self> {
-        let len = u32::try_from(value.len() + 1).ok().and_then(text::ByteCount::new);
-        let Some(len) = len else {
-            return Err(self)
-        };
+        let len = u32::try_from(value.len() + 1)
+            .ok()
+            .and_then(text::ByteCount::new);
+        let Some(len) = len else { return Err(self) };
 
         let mut builder = self.init(len);
         builder.as_bytes_mut().copy_from_slice(value.as_bytes());
@@ -1352,7 +1391,9 @@ impl<'a, 'b, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for AnyPtr {
     }
 }
 
-impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b Reader<'a, Self, T>> for Capability<C> {
+impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b Reader<'a, Self, T>>
+    for Capability<C>
+{
     type View = PtrElementReader<'a, 'b, Self, T>;
 
     #[inline]
@@ -1418,7 +1459,9 @@ where
     }
 }
 
-impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>> for Capability<C> {
+impl<'a, 'b, C: ty::Capability, T: Table> ListAccessable<&'b mut Builder<'a, Self, T>>
+    for Capability<C>
+{
     type View = PtrElementBuilder<'a, 'b, Self, T>;
 
     #[inline]
@@ -1481,18 +1524,18 @@ where
 
 /// Describes the conversion from an element reader to a value which isn't dependent
 /// on the reader itself.
-/// 
+///
 /// This is necessary since lending iterators don't exist in Rust yet, so for pointer
 /// fields which would borrow the list for the element reader, we need to provide
 /// a conversion ahead of time that properly reads the value.
-/// 
+///
 /// For an infallible iterator that always returns a value (except for enums), even for
 /// pointer fields that return errors, use the default iterator with the `InfalliblePtrs`
 /// strategy.
-/// 
+///
 /// For a fallible iterator like in capnproto-rust which return a result for errors while
 /// reading, use the `Fallible` strategy.
-/// 
+///
 /// Custom strategies can be used by providing a closure to `into_iter_by` which will be
 /// called for every element in the list.
 pub trait IterStrategy<T, E> {
@@ -1528,35 +1571,45 @@ macro_rules! infallible_strategies {
             type Item = V;
 
             #[inline]
-            fn get(&mut self, element: Self::Item) -> Self::Item { element }
+            fn get(&mut self, element: Self::Item) -> Self::Item {
+                element
+            }
         }
 
         impl<E: ty::Enum> IterStrategy<Enum<E>, EnumResult<E>> for $ty {
             type Item = EnumResult<E>;
 
             #[inline]
-            fn get(&mut self, element: Self::Item) -> Self::Item { element }
+            fn get(&mut self, element: Self::Item) -> Self::Item {
+                element
+            }
         }
 
         impl<S: ty::Struct, R: ty::StructReader> IterStrategy<Struct<S>, R> for $ty {
             type Item = R;
 
             #[inline]
-            fn get(&mut self, element: Self::Item) -> Self::Item { element }
+            fn get(&mut self, element: Self::Item) -> Self::Item {
+                element
+            }
         }
 
         impl<'a, T: Table> IterStrategy<AnyStruct, any::StructReader<'a, T>> for $ty {
             type Item = any::StructReader<'a, T>;
 
             #[inline]
-            fn get(&mut self, element: Self::Item) -> Self::Item { element }
+            fn get(&mut self, element: Self::Item) -> Self::Item {
+                element
+            }
         }
 
         impl<'a, T: Table> IterStrategy<AnyPtr, any::PtrReader<'a, T>> for $ty {
             type Item = any::PtrReader<'a, T>;
 
             #[inline]
-            fn get(&mut self, element: Self::Item) -> Self::Item { element }
+            fn get(&mut self, element: Self::Item) -> Self::Item {
+                element
+            }
         }
     };
 }
@@ -1709,7 +1762,11 @@ where
 {
     pub fn into_iter_by<S>(self, strat: S) -> Iter<'a, V, S, T> {
         let range = 0..self.len();
-        Iter { list: self, range, strategy: strat }
+        Iter {
+            list: self,
+            range,
+            strategy: strat,
+        }
     }
 }
 

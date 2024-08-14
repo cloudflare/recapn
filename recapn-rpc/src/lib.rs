@@ -1,9 +1,9 @@
 //! A multi-threaded Cap'n Proto RPC library.
-//! 
+//!
 //! This implements Cap'n Proto RPC with support for multi-threaded systems. Where other native
 //! implementations of RPC are single-threaded, this implementation has been specifically designed
 //! for splitting apart systems and running on multiple threads.
-//! 
+//!
 //! There are two main components of RPC: Local servers and connection handlers. These expose
 //! handles for communicating with a server or capability in an opaque way using Cap'n Proto
 //! messages. In this library, local servers and connections are primitives you can use to build
@@ -13,11 +13,12 @@
 
 use std::borrow::Cow;
 
+#[rustfmt::skip]
 pub mod gen;
-pub mod table;
-pub mod sync;
-pub mod connection;
 pub mod client;
+pub mod connection;
+pub mod sync;
+pub mod table;
 
 pub use gen::capnp_rpc_capnp::exception::Type as ErrorKind;
 
@@ -32,23 +33,39 @@ impl Error {
         Error { kind, description }
     }
     pub fn failed(description: impl Into<Cow<'static, str>>) -> Self {
-        Error { kind: ErrorKind::Failed, description: description.into() }
+        Error {
+            kind: ErrorKind::Failed,
+            description: description.into(),
+        }
     }
     pub fn overloaded(description: impl Into<Cow<'static, str>>) -> Self {
-        Error { kind: ErrorKind::Overloaded, description: description.into() }
+        Error {
+            kind: ErrorKind::Overloaded,
+            description: description.into(),
+        }
     }
     pub fn disconnected(description: impl Into<Cow<'static, str>>) -> Self {
-        Error { kind: ErrorKind::Disconnected, description: description.into() }
+        Error {
+            kind: ErrorKind::Disconnected,
+            description: description.into(),
+        }
     }
     pub fn unimplemented(description: impl Into<Cow<'static, str>>) -> Self {
-        Error { kind: ErrorKind::Unimplemented, description: description.into() }
+        Error {
+            kind: ErrorKind::Unimplemented,
+            description: description.into(),
+        }
     }
 
     #[inline]
-    pub fn kind(&self) -> ErrorKind { self.kind }
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
 
     #[inline]
-    pub fn description(&self) -> &str { &self.description }
+    pub fn description(&self) -> &str {
+        &self.description
+    }
 }
 
 impl From<recapn::Error> for Error {
