@@ -2,6 +2,8 @@ use std::cell::UnsafeCell;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 
+use crate::Error;
+
 use super::client::Client;
 
 type TableVec = Vec<Option<Client>>;
@@ -53,8 +55,17 @@ pub struct CapTable<'a> {
     a: PhantomData<&'a ()>,
 }
 
-impl<'a> recapn::rpc::CapSystem for CapTable<'a> {
+impl recapn::rpc::CapSystem for CapTable<'_> {
     type Cap = Client;
+}
+
+impl recapn::rpc::BreakableCapSystem for CapTable<'_> {
+    fn broken<T: std::fmt::Display + ?Sized>(reason: &T) -> Self::Cap {
+        Client::broken(Error::disconnected(reason.to_string()))
+    }
+    fn null() -> Self::Cap {
+        Self::broken("tried to read a null capability")
+    }
 }
 
 impl<'a> recapn::rpc::CapTable for CapTable<'a> {

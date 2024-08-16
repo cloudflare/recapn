@@ -311,3 +311,22 @@ impl<P: Pipelined> Pipeline<P> {
         self.0.to_cap()
     }
 }
+
+/// A pipelinable type marker trait. This is primarily implemented for struct types but could be
+/// used in the future for lists and other types.
+pub trait Pipelinable {
+    type Pipeline<P: Pipelined>: TypedPipeline<Pipeline = P>;
+}
+
+pub type PipelineOf<T, P> = <T as Pipelinable>::Pipeline<P>;
+
+/// A typed pipeline wrapping an untyped pipeline builder.
+pub trait TypedPipeline {
+    type Pipeline: Pipelined;
+
+    /// Convert from a typeless pipeline into a pipeline of this type.
+    fn from_pipeline(p: Pipeline<Self::Pipeline>) -> Self;
+
+    /// Unwrap the inner typeless pipeline.
+    fn into_inner(self) -> Pipeline<Self::Pipeline>;
+}

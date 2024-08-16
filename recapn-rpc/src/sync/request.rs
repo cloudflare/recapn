@@ -266,7 +266,7 @@ impl<C: Chan> SharedRequest<C> {
     }
 
     pub fn is_finished(&self) -> bool {
-        !self.state.load(Relaxed).is_recv_closed()
+        self.state.load(Relaxed).is_recv_closed()
     }
 
     pub unsafe fn response(&self) -> &C::Results {
@@ -695,7 +695,6 @@ impl<C: Chan> Drop for ResultsSender<C> {
 }
 
 /// A response receiver that can be used to await the response.
-#[derive(Clone)]
 pub struct ResponseReceiver<C: Chan> {
     shared: Receiver<C>,
 }
@@ -722,6 +721,14 @@ impl<C: Chan> ResponseReceiver<C> {
 
     pub fn recv(self) -> Recv<C> {
         Recv::new(self.shared)
+    }
+}
+
+impl<C: Chan> Clone for ResponseReceiver<C> {
+    fn clone(&self) -> Self {
+        Self {
+            shared: self.shared.clone(),
+        }
     }
 }
 
@@ -836,7 +843,6 @@ impl<C: Chan> Deref for Response<C> {
     }
 }
 
-#[derive(Clone)]
 pub struct PipelineBuilder<C: Chan> {
     shared: Receiver<C>,
 }
@@ -849,6 +855,14 @@ impl<C: Chan> PipelineBuilder<C> {
         F: FnOnce() -> C,
     {
         self.shared.0.pipeline(key, chan)
+    }
+}
+
+impl<C: Chan> Clone for PipelineBuilder<C> {
+    fn clone(&self) -> Self {
+        Self {
+            shared: self.shared.clone(),
+        }
     }
 }
 

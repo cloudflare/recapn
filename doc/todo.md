@@ -84,21 +84,21 @@ This will likely require refactoring to get the types right for field info.
   * [x] You can make clients from futures of clients
   * [x] You can make clients from errors
   * [ ] You can await client resolution
-  * [ ] You can make new requests, build parameters, then send them
-  * [ ] You can await and read responses
-  * [ ] You can make pipelined clients
-* [ ] Server design
+  * [x] You can make new requests, build parameters, then send them
+  * [x] You can await and read responses
+  * [x] You can make pipelined clients
+* [x] Server design
   * We need to design a flexible system for capnp `interface`s that can work with multiple different types of dispatchers.
     On one hand, many users would prefer to opt their servers into work-stealing multi-threading. But also, users might want
     to be more flexible and do async operations while reading parameters or writing responses. However, readers and builders
     have interior mutability, so they can't be used with work-stealing multi-threading. We don't know what kind of interface
     users want, so why not support both? Somehow... with generics!
-  * [ ] Work-stealing interface
+  * [x] Work-stealing interface
     * For work-stealing we need to parse the parameters into some other type. Perform checks, do validation (sync), return
       data. This is then passed to another user provided function which does the work required. This can return a future
       which is then awaited. The result of this is then passed to another function which can do things like, make tail calls,
       write results, etc.
-  * [ ] Single-threaded interface
+  * [x] Single-threaded interface
     * Work-stealing can't do everything Cap'n Proto has to offer. For the rest, we need an interface with a different set of
       trade-offs. In this one, request handling is done through a local set on a single thread. Of course, users can choose
       to spawn work on the work-stealing pool through tokio::spawn, but request handling must be done locally.
