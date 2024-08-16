@@ -13,10 +13,13 @@
 
 use std::borrow::Cow;
 
-#[rustfmt::skip]
-pub mod gen;
+pub(crate) mod chan;
 pub mod client;
 pub mod connection;
+#[rustfmt::skip]
+pub mod gen;
+pub mod pipeline;
+pub mod server;
 pub mod sync;
 pub mod table;
 
@@ -75,14 +78,3 @@ impl From<recapn::Error> for Error {
 }
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum PipelineOp {
-    // We don't include PipelineOp::None because it's pointless and a waste of space.
-    PtrField(u16),
-}
-
-pub struct ClientOptions {
-    #[cfg(any(unix, target_os = "wasi"))]
-    pub fd: Option<std::os::fd::RawFd>,
-}

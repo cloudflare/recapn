@@ -63,7 +63,7 @@ impl<C: Chan> Clone for Sender<C> {
 }
 
 impl<C: Chan> Sender<C> {
-    pub fn send(&self, req: Request<C>) -> Result<(), Request<C>> {
+    pub fn send(&self, req: Request<C>) -> Result<(), (Request<C>, Option<&C::Error>)> {
         if req.is_finished() {
             // Just drop the request nobody wants the result
             return Ok(());
@@ -73,12 +73,8 @@ impl<C: Chan> Sender<C> {
             Ok(v) => v,
             Err(r) => {
                 return match r {
-                    MostResolved::Dropped => Err(req),
-                    MostResolved::Error(err) => {
-                        let (_, responder) = req.respond();
-                        responder.respond(err.clone().into_results());
-                        Ok(())
-                    }
+                    MostResolved::Dropped => Err((req, None)),
+                    MostResolved::Error(err) => return Err((req, Some(err))),
                 }
             }
         };

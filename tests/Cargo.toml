@@ -5,6 +5,11 @@ edition = "2021"
 
 [dependencies]
 recapn = { path = "../recapn" }
+recapn-rpc = { path = "../recapn-rpc" }
+tokio = { version = "1.35", default-features = false, features = ["full"] }
 
 [build-dependencies]
 recapnc = { path = "../recapnc" }
+
+[dev-dependencies]
+tokio-test = "0.4"
