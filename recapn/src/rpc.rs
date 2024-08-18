@@ -12,7 +12,7 @@ pub(crate) mod internal {
     use super::{
         CapSystem, CapTable, CapTableBuilder, CapTableReader, CapTranslator, Empty, Table,
     };
-    use crate::{ErrorKind, Result};
+    use crate::{Error, Result};
     use core::convert::Infallible;
 
     pub trait CapPtrReader: Clone {
@@ -36,7 +36,7 @@ pub(crate) mod internal {
 
     impl CapPtrBuilder for Empty {
         fn clear_cap(&self, _: u32) -> Result<()> {
-            Err(ErrorKind::CapabilityNotAllowed.into())
+            Err(Error::CapabilityNotAllowed)
         }
         fn as_reader(&self) -> Self {
             Self
@@ -46,7 +46,7 @@ pub(crate) mod internal {
     impl<T: Table> InsertableInto<T> for Empty {
         #[inline]
         fn copy(_: &Self::Reader, _: u32, _: &T::Builder) -> Result<Option<u32>> {
-            Err(ErrorKind::CapabilityNotAllowed.into())
+            Err(Error::CapabilityNotAllowed)
         }
     }
 
@@ -56,7 +56,7 @@ pub(crate) mod internal {
     impl<C: CapTable> InsertableInto<Empty> for C {
         #[inline]
         fn copy(_: &Self::Reader, _: u32, _: &Empty) -> Result<Option<u32>> {
-            Err(ErrorKind::CapabilityNotAllowed.into())
+            Err(Error::CapabilityNotAllowed)
         }
     }
 
@@ -74,7 +74,7 @@ pub(crate) mod internal {
         ) -> Result<Option<u32>> {
             let cap = reader
                 .extract_cap(index)
-                .ok_or(ErrorKind::InvalidCapabilityPointer(index))?;
+                .ok_or(Error::InvalidCapabilityPointer(index))?;
             let new_index = CapTranslator::inject_cap(builder, cap);
             Ok(new_index)
         }

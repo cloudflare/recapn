@@ -15,7 +15,7 @@ use crate::rpc::{
     Table,
 };
 use crate::ty;
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, Result};
 use core::convert::Infallible;
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -436,7 +436,7 @@ impl Parts {
 
 #[inline]
 fn fail_upgrade(from: PtrElementSize, to: PtrElementSize) -> Error {
-    ErrorKind::IncompatibleUpgrade(IncompatibleUpgrade { from, to }).into()
+    Error::IncompatibleUpgrade(IncompatibleUpgrade { from, to })
 }
 
 #[derive(Clone, Copy)]
@@ -455,7 +455,7 @@ impl WirePtr {
     /// Creates a failed read error based on the expected data we intended to read
     #[cold]
     fn fail_read(&self, expected: Option<ExpectedRead>) -> Error {
-        ErrorKind::UnexpectedRead(FailedRead {
+        Error::UnexpectedRead(FailedRead {
             expected,
             actual: {
                 if self.is_null() {
@@ -1328,7 +1328,7 @@ impl From<CapabilityPtr> for WirePtr {
 }
 
 #[derive(Debug)]
-pub(crate) enum ExpectedRead {
+pub enum ExpectedRead {
     Struct,
     List,
     Far,
@@ -1336,7 +1336,7 @@ pub(crate) enum ExpectedRead {
 }
 
 #[derive(Debug)]
-pub(crate) enum ActualRead {
+pub enum ActualRead {
     Null,
     Struct,
     List,
@@ -1345,7 +1345,7 @@ pub(crate) enum ActualRead {
 }
 
 #[derive(Debug)]
-pub(crate) struct FailedRead {
+pub struct FailedRead {
     /// The thing we expected to read from the pointer.
     pub expected: Option<ExpectedRead>,
     /// The actual pointer value.
@@ -1666,15 +1666,15 @@ impl<'a> ObjectReader<'a> {
             .segment
             .as_ref()
             .and_then(|r| r.segment(segment))
-            .ok_or(ErrorKind::MissingSegment(segment))?;
+            .ok_or(Error::MissingSegment(segment))?;
 
         let ptr = reader
             .try_get_section_offset(offset, len)
-            .ok_or(ErrorKind::PointerOutOfBounds)?;
+            .ok_or(Error::PointerOutOfBounds)?;
 
         if let Some(limiter) = self.limiter {
             if !limiter.try_read(len.get().into()) {
-                return Err(ErrorKind::ReadLimitExceeded.into());
+                return Err(Error::ReadLimitExceeded.into());
             }
         }
 
@@ -1693,7 +1693,7 @@ impl<'a> ObjectReader<'a> {
         let new_ptr = if let Some(segment) = &self.segment {
             segment
                 .try_get_section(start, len)
-                .ok_or(ErrorKind::PointerOutOfBounds)?
+                .ok_or(Error::PointerOutOfBounds)?
         } else {
             // SAFETY: the pointer is unchecked, which is unsafe to make anyway, so whoever made
             // the pointer originally upholds safety here
@@ -1702,7 +1702,7 @@ impl<'a> ObjectReader<'a> {
 
         if let Some(limiter) = self.limiter {
             if !limiter.try_read(len.get().into()) {
-                return Err(ErrorKind::ReadLimitExceeded.into());
+                return Err(Error::ReadLimitExceeded.into());
             }
         }
 
@@ -1823,7 +1823,7 @@ impl<'a> ObjectReader<'a> {
             let word_count = list_ptr.element_count().get();
             // add one for the tag pointer, because this could overflow the size of a segment,
             // we just assume on overflow the bounds check fails and is out of bounds.
-            let len = ObjectLen::new(word_count + 1).ok_or(ErrorKind::PointerOutOfBounds)?;
+            let len = ObjectLen::new(word_count + 1).ok_or(Error::PointerOutOfBounds)?;
 
             let tag_ptr = match location {
                 Location::Near { origin } | Location::Far { origin } => {
@@ -1837,7 +1837,7 @@ impl<'a> ObjectReader<'a> {
             let tag = tag_ptr
                 .as_wire_ptr()
                 .struct_ptr()
-                .ok_or(ErrorKind::UnsupportedInlineCompositeElementTag)?;
+                .ok_or(Error::UnsupportedInlineCompositeElementTag)?;
 
             // move past the tag pointer to get the start of the list
             let first = unsafe { tag_ptr.offset(1.into()).as_ref_unchecked() };
@@ -1856,14 +1856,14 @@ impl<'a> ObjectReader<'a> {
 
             if u64::from(element_count.get()) * u64::from(words_per_element) > word_count.into() {
                 // Make sure the tag reports a struct size that matches the reported word count
-                return Err(ErrorKind::InlineCompositeOverrun.into());
+                return Err(Error::InlineCompositeOverrun.into());
             }
 
             if words_per_element == 0 {
                 // watch out for zero-sized structs, which can claim to be arbitrarily
                 // large without having sent actual data.
                 if !self.try_amplified_read(u64::from(element_count.get())) {
-                    return Err(ErrorKind::ReadLimitExceeded.into());
+                    return Err(Error::ReadLimitExceeded.into());
                 }
             }
 
@@ -1885,7 +1885,7 @@ impl<'a> ObjectReader<'a> {
             if element_size == ElementSize::Void
                 && self.try_amplified_read(element_count.get() as u64)
             {
-                return Err(ErrorKind::ReadLimitExceeded.into());
+                return Err(Error::ReadLimitExceeded.into());
             }
 
             let element_bits = element_size.bits();
@@ -2011,7 +2011,7 @@ fn target_size(reader: &ObjectReader<'_>, ptr: SegmentRef<'_>, nesting_limit: u3
         TypedContent::Struct(content) => {
             let nesting_limit = nesting_limit
                 .checked_sub(1)
-                .ok_or_else(|| Error::from(ErrorKind::NestingLimitExceeded))?;
+                .ok_or_else(|| Error::from(Error::NestingLimitExceeded))?;
 
             total_struct_size(&reader, content, nesting_limit)?
         }
@@ -2028,7 +2028,7 @@ fn target_size(reader: &ObjectReader<'_>, ptr: SegmentRef<'_>, nesting_limit: u3
                 ElementSize::InlineComposite(size) => {
                     let nesting_limit = nesting_limit
                         .checked_sub(1)
-                        .ok_or_else(|| Error::from(ErrorKind::NestingLimitExceeded))?;
+                        .ok_or_else(|| Error::from(Error::NestingLimitExceeded))?;
 
                     let mut composites = total_inline_composites_targets_size(
                         &reader,
@@ -2043,7 +2043,7 @@ fn target_size(reader: &ObjectReader<'_>, ptr: SegmentRef<'_>, nesting_limit: u3
                 ElementSize::Pointer => {
                     let nesting_limit = nesting_limit
                         .checked_sub(1)
-                        .ok_or_else(|| Error::from(ErrorKind::NestingLimitExceeded))?;
+                        .ok_or_else(|| Error::from(Error::NestingLimitExceeded))?;
 
                     total_ptrs_size(&reader, start, element_count, nesting_limit)?
                 }
@@ -2201,7 +2201,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         let nesting_limit = self
             .nesting_limit
             .checked_sub(1)
-            .ok_or(ErrorKind::NestingLimitExceeded)?;
+            .ok_or(Error::NestingLimitExceeded)?;
 
         target_size(&self.reader, self.ptr, nesting_limit)
     }
@@ -2244,7 +2244,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         let nesting_limit = self
             .nesting_limit
             .checked_sub(1)
-            .ok_or(ErrorKind::NestingLimitExceeded)?;
+            .ok_or(Error::NestingLimitExceeded)?;
 
         let mut reader = self.reader.clone();
         let content = reader.try_read_struct(self.ptr)?;
@@ -2271,7 +2271,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
         }
 
         let Some(nesting_limit) = self.nesting_limit.checked_sub(1) else {
-            return Err(ErrorKind::NestingLimitExceeded.into());
+            return Err(Error::NestingLimitExceeded.into());
         };
 
         let mut reader = self.reader.clone();
@@ -2377,7 +2377,7 @@ impl<T: CapTable> PtrReader<'_, T> {
             Ok(Some(i)) => self
                 .table
                 .extract_cap(i)
-                .ok_or_else(|| ErrorKind::InvalidCapabilityPointer(i).into())
+                .ok_or_else(|| Error::InvalidCapabilityPointer(i).into())
                 .map(Some),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -3378,7 +3378,7 @@ impl<'a> ObjectBuilder<'a> {
             let len_with_pad = AllocLen::new(size.total() + 1).unwrap();
             let (pad, object_segment) = self
                 .alloc_in_arena(len_with_pad)
-                .ok_or(ErrorKind::AllocFailed(len_with_pad))?;
+                .ok_or(Error::AllocFailed(len_with_pad))?;
             let start = unsafe { pad.offset(1u16.into()).as_ref_unchecked() };
 
             // our pad is the actual pointer to the content
@@ -3402,7 +3402,7 @@ impl<'a> ObjectBuilder<'a> {
             return Ok((object, self.clone()));
         };
 
-        let (start, segment) = self.alloc(len).ok_or(ErrorKind::AllocFailed(len))?;
+        let (start, segment) = self.alloc(len).ok_or(Error::AllocFailed(len))?;
         Ok((
             OrphanObject::Struct {
                 location: start,
@@ -3424,7 +3424,7 @@ impl<'a> ObjectBuilder<'a> {
             Location::DoubleFar { segment, offset } => {
                 match builder.build_object_in(segment, offset) {
                     Some(b) => b,
-                    None => return Err(ErrorKind::WritingNotAllowed.into()),
+                    None => return Err(Error::WritingNotAllowed.into()),
                 }
             }
         };
@@ -3467,7 +3467,7 @@ impl<'a> ObjectBuilder<'a> {
                 self.clone(),
             ));
         }
-        let len = AllocLen::new(total_size).ok_or(ErrorKind::AllocTooLarge)?;
+        let len = AllocLen::new(total_size).ok_or(Error::AllocTooLarge)?;
 
         let list_ptr_element_count = if is_struct_list {
             SegmentOffset::new(size).unwrap()
@@ -3490,7 +3490,7 @@ impl<'a> ObjectBuilder<'a> {
 
             let (pad, segment) = self
                 .alloc_in_arena(len_with_landing_pad)
-                .ok_or(ErrorKind::AllocFailed(len_with_landing_pad))?;
+                .ok_or(Error::AllocFailed(len_with_landing_pad))?;
             let start = unsafe { pad.offset(1u16.into()).as_ref_unchecked() };
             let offset_to_pad = segment.offset_from_start(pad.into());
 
@@ -3536,12 +3536,12 @@ impl<'a> ObjectBuilder<'a> {
         // segment, which is just a waste of space.
 
         let Some((pad, tag, pad_builder)) = self.alloc_double_far_landing_pad() else {
-            return Err(ErrorKind::AllocFailed(LANDING_PAD_LEN).into());
+            return Err(Error::AllocFailed(LANDING_PAD_LEN).into());
         };
 
         let (start, list_segment) = self
             .alloc_in_arena(AllocLen::MAX)
-            .ok_or(ErrorKind::AllocFailed(AllocLen::MAX))?;
+            .ok_or(Error::AllocFailed(AllocLen::MAX))?;
 
         let offset_to_pad = pad_builder.offset_from_start(pad.into());
         self.set_ptr(ptr, FarPtr::new(pad_builder.id(), offset_to_pad, true));
@@ -3581,8 +3581,8 @@ impl<'a> ObjectBuilder<'a> {
             return Ok((object, self.clone()));
         }
 
-        let len = AllocLen::new(total_size).ok_or(ErrorKind::AllocTooLarge)?;
-        let (alloc_start, segment) = self.alloc(len).ok_or(ErrorKind::AllocFailed(len))?;
+        let len = AllocLen::new(total_size).ok_or(Error::AllocTooLarge)?;
+        let (alloc_start, segment) = self.alloc(len).ok_or(Error::AllocFailed(len))?;
         if let ElementSize::InlineComposite(size) = element_size {
             segment.set_ptr(
                 alloc_start,
@@ -3610,7 +3610,7 @@ impl<'a> ObjectBuilder<'a> {
             Location::DoubleFar { segment, offset } => {
                 match builder.build_object_in(segment, offset) {
                     Some(b) => b,
-                    None => return Err(ErrorKind::WritingNotAllowed.into()),
+                    None => return Err(Error::WritingNotAllowed.into()),
                 }
             }
         };
@@ -4064,7 +4064,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
                         from: existing_size.into(),
                         to: expected.into(),
                     };
-                    return Err(ErrorKind::IncompatibleUpgrade(failed_upgrade).into());
+                    return Err(Error::IncompatibleUpgrade(failed_upgrade).into());
                 }
             },
             None => None,
@@ -4183,7 +4183,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         let size = match size.builder_size(value) {
             Ok(size) => size,
             Err(err) => {
-                return match err_handler.handle_err(ErrorKind::IncompatibleUpgrade(err).into()) {
+                return match err_handler.handle_err(Error::IncompatibleUpgrade(err).into()) {
                     ControlFlow::Continue(WriteNull) => Ok(()),
                     ControlFlow::Break(err) => Err(err),
                 }
@@ -4250,7 +4250,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         ) = self.builder.build_list(self.ptr)?;
 
         if element_size != ElementSize::Byte {
-            return Err(ErrorKind::IncompatibleUpgrade(IncompatibleUpgrade {
+            return Err(Error::IncompatibleUpgrade(IncompatibleUpgrade {
                 from: element_size.into(),
                 to: PtrElementSize::Byte,
             })
@@ -4387,7 +4387,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
         orphan: OrphanBuilder<'b, T>,
     ) -> BuildResult<(), OrphanBuilder<'b, T>, Error> {
         if !orphan.builder.is_same_message(&self.builder) {
-            return Err((ErrorKind::OrphanFromDifferentMessage.into(), orphan));
+            return Err((Error::OrphanFromDifferentMessage.into(), orphan));
         }
 
         self.clear();
@@ -4456,7 +4456,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
             self.builder
                 .set_ptr(self.ptr, FarPtr::new(pad_builder.id(), pad_offset, true));
         } else {
-            return Err((ErrorKind::AllocFailed(LANDING_PAD_LEN).into(), orphan));
+            return Err((Error::AllocFailed(LANDING_PAD_LEN).into(), orphan));
         }
 
         Ok(())
@@ -5923,7 +5923,7 @@ fn transfer_ptr(
 
                 new_dst_ptr
             } else {
-                return Err(ErrorKind::AllocFailed(LANDING_PAD_LEN).into());
+                return Err(Error::AllocFailed(LANDING_PAD_LEN).into());
             }
         }
         WireKind::Far | WireKind::Other => *ptr,
@@ -6118,7 +6118,7 @@ where
                 Err(err) => self.handle_err(err),
             },
             TypedContent::Capability(_) if self.canonical => {
-                self.handle_err(Error::from(ErrorKind::CapabilityNotAllowed))
+                self.handle_err(Error::from(Error::CapabilityNotAllowed))
             }
             TypedContent::Capability(cap) => match U::copy(self.src_table, cap, self.dst_table) {
                 Ok(Some(new_idx)) => {
