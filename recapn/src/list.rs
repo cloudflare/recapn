@@ -19,7 +19,7 @@ use crate::ptr::{Data as FieldData, PtrElementSize, StructSize};
 use crate::rpc::{self, Capable, InsertableInto, Table};
 use crate::text::{self, Text};
 use crate::ty::{self, EnumResult};
-use crate::{Error, ErrorKind, Family, IntoFamily, Result};
+use crate::{Error, Family, IntoFamily, Result};
 
 use core::convert::TryFrom;
 use core::marker::PhantomData;
@@ -1278,7 +1278,7 @@ where
     pub fn try_get_option(&self) -> Result<Option<text::Reader<'a>>> {
         match self.ptr_reader().to_blob() {
             Ok(Some(b)) => text::Reader::new(b)
-                .ok_or_else(|| Error::from(ErrorKind::TextNotNulTerminated))
+                .ok_or_else(|| Error::from(Error::TextNotNulTerminated))
                 .map(Some),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -1322,7 +1322,7 @@ where
         match self.into_ptr_builder().to_blob_mut() {
             Ok(blob) => match text::Builder::new(blob) {
                 Some(text) => Ok(Some(text)),
-                None => Err(ErrorKind::TextNotNulTerminated.into()),
+                None => Err(Error::TextNotNulTerminated.into()),
             },
             Err((None, _)) => Ok(None),
             Err((Some(err), _)) => Err(err),

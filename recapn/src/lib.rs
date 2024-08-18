@@ -89,7 +89,7 @@ pub trait IntoFamily {
 /// Errors that can occur while reading and writing in Cap'n Proto serialization format.
 #[non_exhaustive]
 #[derive(Debug)]
-pub(crate) enum ErrorKind {
+pub enum Error {
     /// The nesting limit has been exceeded, either because the message is too deeply-nested or
     /// it contains cycles. See [message::ReaderOptions].
     NestingLimitExceeded,
@@ -128,41 +128,29 @@ pub(crate) enum ErrorKind {
     OrphanFromDifferentMessage,
 }
 
-#[derive(Debug)]
-pub struct Error {
-    kind: ErrorKind,
-}
-
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            ErrorKind::NestingLimitExceeded => write!(f, "nesting limit exceeded"),
-            ErrorKind::PointerOutOfBounds => write!(f, "pointer out of bounds"),
-            ErrorKind::ReadLimitExceeded => write!(f, "read limit exceeded"),
-            ErrorKind::InlineCompositeOverrun => write!(f, "inline composite word count overrun"),
-            ErrorKind::UnsupportedInlineCompositeElementTag => {
+        match self {
+            Self::NestingLimitExceeded => write!(f, "nesting limit exceeded"),
+            Self::PointerOutOfBounds => write!(f, "pointer out of bounds"),
+            Self::ReadLimitExceeded => write!(f, "read limit exceeded"),
+            Self::InlineCompositeOverrun => write!(f, "inline composite word count overrun"),
+            Self::UnsupportedInlineCompositeElementTag => {
                 write!(f, "unsupported inline composite element tag")
             }
-            ErrorKind::UnexpectedRead(read) => Display::fmt(read, f),
-            ErrorKind::IncompatibleUpgrade(upgrade) => Display::fmt(upgrade, f),
-            ErrorKind::CapabilityNotAllowed => write!(f, "capability not allowed in this context"),
-            ErrorKind::InvalidCapabilityPointer(index) => {
+            Self::UnexpectedRead(read) => Display::fmt(read, f),
+            Self::IncompatibleUpgrade(upgrade) => Display::fmt(upgrade, f),
+            Self::CapabilityNotAllowed => write!(f, "capability not allowed in this context"),
+            Self::InvalidCapabilityPointer(index) => {
                 write!(f, "invalid capability pointer ({index})")
             }
-            ErrorKind::TextNotNulTerminated => write!(f, "text wasn't NUL terminated"),
-            ErrorKind::MissingSegment(id) => write!(f, "missing segment {id}"),
-            ErrorKind::WritingNotAllowed => write!(f, "attempted to write to read-only segment"),
-            ErrorKind::AllocTooLarge => write!(f, "allocation too large"),
-            ErrorKind::AllocFailed(size) => write!(f, "failed to allocate {size} words in message"),
-            ErrorKind::OrphanFromDifferentMessage => write!(f, "orphan from different message"),
+            Self::TextNotNulTerminated => write!(f, "text wasn't NUL terminated"),
+            Self::MissingSegment(id) => write!(f, "missing segment {id}"),
+            Self::WritingNotAllowed => write!(f, "attempted to write to read-only segment"),
+            Self::AllocTooLarge => write!(f, "allocation too large"),
+            Self::AllocFailed(size) => write!(f, "failed to allocate {size} words in message"),
+            Self::OrphanFromDifferentMessage => write!(f, "orphan from different message"),
         }
-    }
-}
-
-impl From<ErrorKind> for Error {
-    #[cold]
-    fn from(kind: ErrorKind) -> Self {
-        Error { kind }
     }
 }
 

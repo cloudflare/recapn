@@ -50,7 +50,7 @@ use crate::ptr::{
 };
 use crate::rpc::{Capable, Empty, InsertableInto, Table};
 use crate::ty::{self, EnumResult, ListValue, StructReader as _};
-use crate::{any, data, text, Error, ErrorKind, Family, NotInSchema, Result};
+use crate::{any, data, text, Error, Family, NotInSchema, Result};
 
 mod internal {
     use super::*;
@@ -1641,7 +1641,7 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, text::Text> {
         match self.raw_ptr().to_blob() {
             Ok(Some(ptr)) => {
                 let text =
-                    text::Reader::new(ptr).ok_or(Error::from(ErrorKind::TextNotNulTerminated))?;
+                    text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
 
                 Ok(Some(text))
             }
