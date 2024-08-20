@@ -39,7 +39,7 @@ impl<'b, T: Table> Capable for Orphanage<'b, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -201,7 +201,7 @@ impl<'a, T, Table: rpc::Table> Capable for Orphan<'a, T, Table> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<Table>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<Table>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,

@@ -8,6 +8,10 @@ members = [
 ]
 resolver = "2"
 
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+elided_lifetimes_in_paths = "warn"
+
 [workspace.lints.clippy]
 collapsible_if = "allow"
 enum_glob_use = "allow"
@@ -22,3 +26,4 @@ multiple_bound_locations = "warn"
 needless_lifetimes = "warn"
 extra_unused_lifetimes = "deny"
 mut_from_ref = "deny"
+bool_assert_comparison = "allow" # type inference

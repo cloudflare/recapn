@@ -2357,7 +2357,7 @@ impl<'a, T: Table> Capable for PtrReader<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -2690,7 +2690,7 @@ impl<'a, T: Table> Capable for StructReader<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -2978,7 +2978,7 @@ impl<'a, T: Table> Capable for ListReader<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -4582,7 +4582,7 @@ impl<'a, T: Table> Capable for PtrBuilder<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -4623,7 +4623,7 @@ impl<'a, T: Table> Capable for OrphanBuilder<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -4696,7 +4696,7 @@ impl<'a, T: Table> Capable for StructBuilder<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
@@ -5414,7 +5414,7 @@ impl<'a, T: Table> Capable for ListBuilder<'a, T> {
     }
 
     #[inline]
-    fn imbue_release_into<U: Capable>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
+    fn imbue_release_into<U>(&self, other: U) -> (U::ImbuedWith<T>, U::Imbued)
     where
         U: Capable,
         U::ImbuedWith<Self::Table>: Capable<Imbued = Self::Imbued>,
