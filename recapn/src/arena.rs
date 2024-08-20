@@ -299,12 +299,21 @@ pub(crate) mod growing {
                 Some(ArenaSegment::new(segment, min_size, id))
             }
         }
+
         fn tail(&self) -> &Vec<NonNull<ArenaSegment>> {
             unsafe { &*addr_of!((*self.segments.get()).tail) }
         }
-        fn tail_mut(&self) -> &mut Vec<NonNull<ArenaSegment>> {
-            unsafe { &mut *addr_of_mut!((*self.segments.get()).tail) }
+
+        fn push_tail_segment(&self, segment: NonNull<ArenaSegment>) {
+            // safety of this depends on Arena being !Sync
+            // and this function never calling other self methods that could re-enter this function
+            unsafe {
+                let tail = &mut *addr_of_mut!((*self.segments.get()).tail);
+                debug_assert!(tail.len() < Self::MAX_SEGMENTS);
+                tail.push(segment);
+            }
         }
+
         fn segment(&self, id: SegmentId) -> Option<&ArenaSegment> {
             if id == 0 {
                 self.root()
@@ -386,16 +395,16 @@ pub(crate) mod growing {
                 return Some((rf, last_owned));
             }
 
-            let tail = self.tail_mut();
-            if tail.len() >= Self::MAX_SEGMENTS {
+            let tail_len = self.tail().len();
+            if tail_len >= Self::MAX_SEGMENTS {
                 return None;
             }
 
-            let id = tail.len() as SegmentId + 1;
+            let id = tail_len as SegmentId + 1; // +1 because the first one is inlined
             let segment = self.alloc(min_size, id)?;
             let ptr = box_to_nonnull(Box::new(segment));
             let segment = unsafe { ptr.as_ref() };
-            tail.push(ptr);
+            self.push_tail_segment(ptr);
             self.last_owned.set(id);
             Some((0u16.into(), segment))
         }
@@ -404,17 +413,18 @@ pub(crate) mod growing {
         }
 
         fn insert_external_segment(&self, segment: Segment) -> Option<SegmentId> {
-            let tail = self.tail_mut();
-            if tail.len() >= Self::MAX_SEGMENTS {
+            let tail_len = self.tail().len();
+            if tail_len >= Self::MAX_SEGMENTS {
                 return None;
             }
 
-            let id = tail.len() as SegmentId;
+            let id = tail_len as SegmentId;
             let segment = unsafe { ArenaSegment::external(segment, id) };
             let ptr = box_to_nonnull(Box::new(segment));
-            tail.push(ptr);
+            self.push_tail_segment(ptr);
             Some(id)
         }
+
         fn remove_external_segment(&self, id: SegmentId) {
             self.segment(id)
                 .expect("cannot remove segment that doesn't exist")
