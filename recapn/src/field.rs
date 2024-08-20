@@ -795,12 +795,12 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrFieldBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    fn raw_read_ptr(&self) -> ptr::PtrReader<T> {
+    fn raw_read_ptr(&self) -> ptr::PtrReader<'_, T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
     }
 
     #[inline]
-    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<T> {
+    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<'_, T> {
         unsafe {
             self.repr
                 .ptr_field_mut_unchecked(self.descriptor.slot as u16)
@@ -827,7 +827,7 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrFieldBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
         self.raw_build_ptr().adopt(orphan.into_inner());
     }
 
@@ -859,12 +859,12 @@ impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
     }
 
     #[inline]
-    fn raw_read_ptr(&self) -> ptr::PtrReader<T> {
+    fn raw_read_ptr(&self) -> ptr::PtrReader<'_, T> {
         unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
     }
 
     #[inline]
-    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<T> {
+    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<'_, T> {
         unsafe {
             self.repr
                 .ptr_field_mut_unchecked(self.descriptor.slot as u16)
@@ -891,7 +891,7 @@ impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
         self.raw_build_ptr().adopt(orphan.into_inner());
     }
 
@@ -977,13 +977,13 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    fn raw_read_ptr(&self) -> Option<ptr::PtrReader<T>> {
+    fn raw_read_ptr(&self) -> Option<ptr::PtrReader<'_, T>> {
         self.is_set()
             .then(|| unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) })
     }
 
     #[inline]
-    fn raw_build_ptr(&mut self) -> Option<ptr::PtrBuilder<T>> {
+    fn raw_build_ptr(&mut self) -> Option<ptr::PtrBuilder<'_, T>> {
         self.is_set().then(|| unsafe {
             self.repr
                 .ptr_field_mut_unchecked(self.descriptor.slot as u16)
@@ -1025,7 +1025,7 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
         if !self.is_set() {
             let &VariantInfo { slot, case } = self.variant;
             unsafe {
@@ -1256,7 +1256,7 @@ impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
     #[inline]
     pub fn try_set<E>(
         &mut self,
-        value: &list::Reader<V, impl InsertableInto<T>>,
+        value: &list::Reader<'_, V, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error>
     where
@@ -1270,7 +1270,7 @@ impl<'b, 'p, T: Table, V: ty::ListValue> PtrFieldBuilder<'b, 'p, T, List<V>> {
     }
 
     #[inline]
-    pub fn set(&mut self, value: &list::Reader<V, impl InsertableInto<T>>) {
+    pub fn set(&mut self, value: &list::Reader<'_, V, impl InsertableInto<T>>) {
         self.try_set(value, IgnoreErrors).unwrap()
     }
 
@@ -1682,7 +1682,7 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, text::Text> {
     }
 
     #[inline]
-    pub fn set(self, value: text::Reader) -> text::Builder<'b> {
+    pub fn set(self, value: text::Reader<'_>) -> text::Builder<'b> {
         text::Builder::new_unchecked(self.into_raw_build_ptr().set_blob(value.into()))
     }
 
@@ -1780,7 +1780,7 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldBuilder<'b, 'p, T, data::Data> {
     }
 
     #[inline]
-    pub fn set(self, value: data::Reader) -> data::Builder<'b> {
+    pub fn set(self, value: data::Reader<'_>) -> data::Builder<'b> {
         self.into_raw_build_ptr().set_blob(value.into()).into()
     }
 

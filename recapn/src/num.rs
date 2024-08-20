@@ -35,7 +35,7 @@ macro_rules! fwd_fmt_traits {
     };
     ($trait:ident, $ty:ty) => {
         impl fmt::$trait for $ty {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::$trait::fmt(&self.get(), f)
             }
         }

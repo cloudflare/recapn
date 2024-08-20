@@ -2005,7 +2005,7 @@ unsafe fn step_by_unchecked(
     })
 }
 
-fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Result<MessageSize> {
+fn target_size(reader: &ObjectReader<'_>, ptr: SegmentRef<'_>, nesting_limit: u32) -> Result<MessageSize> {
     let mut reader = reader.clone();
     let target_size = match reader.try_read_typed(ptr)? {
         TypedContent::Struct(content) => {
@@ -2057,8 +2057,8 @@ fn target_size(reader: &ObjectReader, ptr: SegmentRef, nesting_limit: u32) -> Re
 }
 
 fn total_struct_size(
-    reader: &ObjectReader,
-    content: StructContent,
+    reader: &ObjectReader<'_>,
+    content: StructContent<'_>,
     nesting_limit: u32,
 ) -> Result<MessageSize> {
     let struct_size = MessageSize {
@@ -2076,8 +2076,8 @@ fn total_struct_size(
 }
 
 fn total_inline_composites_targets_size(
-    reader: &ObjectReader,
-    start: SegmentRef,
+    reader: &ObjectReader<'_>,
+    start: SegmentRef<'_>,
     len: ElementCount,
     size: StructSize,
     nesting_limit: u32,
@@ -2093,8 +2093,8 @@ fn total_inline_composites_targets_size(
 
 /// Calculate the sizes of pointer targets in a set
 fn total_ptrs_size(
-    reader: &ObjectReader,
-    start: SegmentRef,
+    reader: &ObjectReader<'_>,
+    start: SegmentRef<'_>,
     len: SegmentOffset,
     nesting_limit: u32,
 ) -> Result<MessageSize> {
@@ -2226,7 +2226,7 @@ impl<'a, T: Table> PtrReader<'a, T> {
     }
 
     #[inline]
-    pub fn equality<T2: Table>(&self, other: &PtrReader<T2>) -> Result<PtrEquality> {
+    pub fn equality<T2: Table>(&self, other: &PtrReader<'_, T2>) -> Result<PtrEquality> {
         cmp_ptr(self.ptr, &self.reader, other.ptr, &other.reader)
     }
 
@@ -2541,7 +2541,7 @@ impl<'a, T: Table> StructReader<'a, T> {
     }
 
     #[inline]
-    pub fn equality<T2: Table>(&self, other: &StructReader<T2>) -> Result<PtrEquality> {
+    pub fn equality<T2: Table>(&self, other: &StructReader<'_, T2>) -> Result<PtrEquality> {
         let our_data = trim_end_null_bytes(self.data_section());
         let their_data = trim_end_null_bytes(other.data_section());
         if our_data != their_data {
@@ -2819,7 +2819,7 @@ impl<'a, T: Table> ListReader<'a, T> {
     }
 
     #[inline]
-    pub fn equality<T2: Table>(&self, other: &ListReader<T2>) -> Result<PtrEquality> {
+    pub fn equality<T2: Table>(&self, other: &ListReader<'_, T2>) -> Result<PtrEquality> {
         cmp_list(
             &ListContent {
                 ptr: self.ptr,
@@ -3184,12 +3184,12 @@ impl<'a> ObjectBuilder<'a> {
     }
 
     #[inline]
-    pub fn is_same_message(&self, other: &ObjectBuilder) -> bool {
+    pub fn is_same_message(&self, other: &ObjectBuilder<'_>) -> bool {
         ptr::addr_eq(self.arena, other.arena)
     }
 
     #[inline]
-    pub fn is_same_segment(&self, other: &ObjectBuilder) -> bool {
+    pub fn is_same_segment(&self, other: &ObjectBuilder<'_>) -> bool {
         self.id() == other.id()
     }
 
@@ -3843,7 +3843,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn to_struct(&self) -> Result<Option<StructReader<T>>> {
+    pub fn to_struct(&self) -> Result<Option<StructReader<'_, T>>> {
         self.as_reader().to_struct()
     }
 
@@ -3984,7 +3984,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     #[inline]
     pub fn try_set_struct<E, U>(
         &mut self,
-        value: &StructReader<U>,
+        value: &StructReader<'_, U>,
         size: CopySize<StructSize>,
         mut err_handler: E,
     ) -> Result<(), E::Error>
@@ -4008,7 +4008,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     #[inline]
     pub fn set_struct(
         &mut self,
-        value: &StructReader<impl InsertableInto<T>>,
+        value: &StructReader<'_, impl InsertableInto<T>>,
         size: CopySize<StructSize>,
     ) {
         self.try_set_struct(value, size, IgnoreErrors).unwrap()
@@ -4018,7 +4018,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     pub fn to_list(
         &self,
         expected_element_size: Option<PtrElementSize>,
-    ) -> Result<Option<ListReader<T>>> {
+    ) -> Result<Option<ListReader<'_, T>>> {
         self.as_reader().to_list(expected_element_size)
     }
 
@@ -4169,7 +4169,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     /// to the specified size, this clears the pointer and passes the error to the error handler.
     pub fn try_set_list<E, U>(
         &mut self,
-        value: &ListReader<U>,
+        value: &ListReader<'_, U>,
         size: CopySize<ElementSize>,
         mut err_handler: E,
     ) -> Result<(), E::Error>
@@ -4223,7 +4223,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn to_blob(&self) -> Result<Option<BlobReader>> {
+    pub fn to_blob(&self) -> Result<Option<BlobReader<'_>>> {
         self.as_reader().to_blob()
     }
 
@@ -4284,7 +4284,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn set_blob(self, value: BlobReader) -> BlobBuilder<'a> {
+    pub fn set_blob(self, value: BlobReader<'_>) -> BlobBuilder<'a> {
         let len = value.len();
         let mut builder = self.init_blob(len);
         builder.copy_from(value);
@@ -4517,7 +4517,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     #[inline]
     pub fn try_copy_from<E, U>(
         &mut self,
-        other: &PtrReader<U>,
+        other: &PtrReader<'_, U>,
         canonical: bool,
         err_handler: E,
     ) -> Result<(), E::Error>
@@ -4541,7 +4541,7 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     /// If any errors occur while copying, this writes null. If you want a fallible copy or want
     /// to customize error handling behavior, use `try_copy_from`.
     #[inline]
-    pub fn copy_from(&mut self, other: &PtrReader<impl InsertableInto<T>>, canonical: bool) {
+    pub fn copy_from(&mut self, other: &PtrReader<'_, impl InsertableInto<T>>, canonical: bool) {
         self.try_copy_from(other, canonical, IgnoreErrors).unwrap()
     }
 }
@@ -4999,7 +4999,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn as_reader(&self) -> ListReader<T> {
+    pub fn as_reader(&self) -> ListReader<'_, T> {
         ListReader {
             ptr: self.ptr,
             reader: self.builder.as_reader(),
@@ -5459,12 +5459,12 @@ impl BlobBuilder<'_> {
     }
 
     #[inline]
-    pub const fn as_reader(&self) -> BlobReader {
+    pub const fn as_reader(&self) -> BlobReader<'_> {
         unsafe { BlobReader::new_unchecked(self.ptr, self.len) }
     }
 
     #[inline]
-    pub(crate) fn copy_from(&mut self, other: BlobReader) {
+    pub(crate) fn copy_from(&mut self, other: BlobReader<'_>) {
         assert_eq!(self.len, other.len());
 
         let dst = self.ptr.as_ptr();
@@ -5628,10 +5628,10 @@ pub enum PtrEquality {
 }
 
 fn cmp_ptr(
-    our_ptr: SegmentRef,
-    our_reader: &ObjectReader,
-    their_ptr: SegmentRef,
-    their_reader: &ObjectReader,
+    our_ptr: SegmentRef<'_>,
+    our_reader: &ObjectReader<'_>,
+    their_ptr: SegmentRef<'_>,
+    their_reader: &ObjectReader<'_>,
 ) -> Result<PtrEquality> {
     if our_ptr.as_ref().is_null() && their_ptr.as_ref().is_null() {
         return Ok(PtrEquality::Equal);
@@ -5655,12 +5655,12 @@ fn cmp_ptr(
 }
 
 fn cmp_ptr_sections(
-    our_ptrs: SegmentRef,
+    our_ptrs: SegmentRef<'_>,
     our_len: SegmentOffset,
-    our_reader: &ObjectReader,
-    their_ptrs: SegmentRef,
+    our_reader: &ObjectReader<'_>,
+    their_ptrs: SegmentRef<'_>,
     their_len: SegmentOffset,
-    their_reader: &ObjectReader,
+    their_reader: &ObjectReader<'_>,
 ) -> Result<PtrEquality> {
     let ptrs = unsafe {
         let our_len = our_reader.trim_end_null_section(our_ptrs, our_len);
@@ -5688,10 +5688,10 @@ fn cmp_ptr_sections(
 }
 
 fn cmp_struct(
-    our_struct: StructContent,
-    our_reader: &ObjectReader,
-    their_struct: StructContent,
-    their_reader: &ObjectReader,
+    our_struct: StructContent<'_>,
+    our_reader: &ObjectReader<'_>,
+    their_struct: StructContent<'_>,
+    their_reader: &ObjectReader<'_>,
 ) -> Result<PtrEquality> {
     unsafe {
         let our_data = our_reader.section_slice(our_struct.ptr, our_struct.size.data.into());
@@ -5723,10 +5723,10 @@ fn cmp_struct(
 }
 
 fn cmp_list(
-    our_list: &ListContent,
-    our_reader: &ObjectReader,
-    their_list: &ListContent,
-    their_reader: &ObjectReader,
+    our_list: &ListContent<'_>,
+    our_reader: &ObjectReader<'_>,
+    their_list: &ListContent<'_>,
+    their_reader: &ObjectReader<'_>,
 ) -> Result<PtrEquality> {
     if our_list.element_count != their_list.element_count {
         return Ok(PtrEquality::NotEqual);
@@ -5845,10 +5845,10 @@ fn cmp_list(
 }
 
 fn transfer_ptr(
-    src: SegmentRef,
-    src_builder: &ObjectBuilder,
-    dst: SegmentRef,
-    dst_builder: &ObjectBuilder,
+    src: SegmentRef<'_>,
+    src_builder: &ObjectBuilder<'_>,
+    dst: SegmentRef<'_>,
+    dst_builder: &ObjectBuilder<'_>,
 ) -> Result<()> {
     debug_assert!(dst.as_ref().is_null());
 
@@ -5934,10 +5934,10 @@ fn transfer_ptr(
 }
 
 fn transfer_ptr_section(
-    src: SegmentRef,
-    src_builder: &ObjectBuilder,
-    dst: SegmentRef,
-    dst_builder: &ObjectBuilder,
+    src: SegmentRef<'_>,
+    src_builder: &ObjectBuilder<'_>,
+    dst: SegmentRef<'_>,
+    dst_builder: &ObjectBuilder<'_>,
     len: SegmentOffset,
 ) -> Result<()> {
     let src_ptrs = unsafe { iter_unchecked(src, len) };
@@ -5953,12 +5953,12 @@ fn transfer_ptr_section(
 /// Promote a struct to a new larger size. The destination struct must be at least as large as the
 /// source struct.
 fn promote_struct(
-    src: SegmentRef,
+    src: SegmentRef<'_>,
     src_size: StructSize,
-    src_builder: &ObjectBuilder,
-    dst_data: SegmentRef,
-    dst_ptrs: SegmentRef,
-    dst_builder: &ObjectBuilder,
+    src_builder: &ObjectBuilder<'_>,
+    dst_data: SegmentRef<'_>,
+    dst_ptrs: SegmentRef<'_>,
+    dst_builder: &ObjectBuilder<'_>,
 ) -> Result<()> {
     let src_data = unsafe { src_builder.section_slice_mut(src, src_size.data.into()) };
     let dst_data = unsafe { dst_builder.section_slice_mut(dst_data, src_size.data.into()) };
@@ -5975,12 +5975,12 @@ fn promote_struct(
 }
 
 fn promote_list(
-    src: SegmentRef,
+    src: SegmentRef<'_>,
     src_size: ElementSize,
-    src_builder: &ObjectBuilder,
-    dst: SegmentRef,
+    src_builder: &ObjectBuilder<'_>,
+    dst: SegmentRef<'_>,
     dst_size: StructSize,
-    dst_builder: &ObjectBuilder,
+    dst_builder: &ObjectBuilder<'_>,
     len: ElementCount,
 ) -> Result<()> {
     let dst_structs = unsafe { step_by_unchecked(dst, dst_size.len(), len) };
@@ -6041,10 +6041,10 @@ where
 {
     fn copy_ptr(
         &mut self,
-        src: SegmentRef,
-        reader: &ObjectReader,
-        dst: SegmentRef,
-        builder: &ObjectBuilder,
+        src: SegmentRef<'_>,
+        reader: &ObjectReader<'_>,
+        dst: SegmentRef<'_>,
+        builder: &ObjectBuilder<'_>,
     ) -> Result<(), E::Error> {
         let mut reader = reader.clone();
         let content = match reader.try_read_typed(src) {
@@ -6140,8 +6140,8 @@ where
 
     fn copy_list<'b>(
         &mut self,
-        src: SegmentRef,
-        reader: &ObjectReader,
+        src: SegmentRef<'_>,
+        reader: &ObjectReader<'_>,
         dst: SegmentRef<'b>,
         builder: &ObjectBuilder<'b>,
         size: ElementSize,
@@ -6177,8 +6177,8 @@ where
     /// valid upgrade from the source size.
     fn copy_to_upgraded_list<'b>(
         &mut self,
-        src: SegmentRef,
-        reader: &ObjectReader,
+        src: SegmentRef<'_>,
+        reader: &ObjectReader<'_>,
         src_size: ElementSize,
         dst: SegmentRef<'b>,
         builder: &ObjectBuilder<'b>,
@@ -6270,8 +6270,8 @@ where
     /// possible except in the case of bits which are pain.
     fn copy_to_upgraded_list_at<'b>(
         &mut self,
-        src: SegmentRef,
-        reader: &ObjectReader,
+        src: SegmentRef<'_>,
+        reader: &ObjectReader<'_>,
         src_size: ElementSize,
         src_start: ElementCount,
         dst: SegmentRef<'b>,
@@ -6403,9 +6403,9 @@ where
     /// allowed to be different.
     fn copy_inline_composites<'b>(
         &mut self,
-        src: SegmentRef,
+        src: SegmentRef<'_>,
         src_size: StructSize,
-        reader: &ObjectReader,
+        reader: &ObjectReader<'_>,
         dst: SegmentRef<'b>,
         dst_size: StructSize,
         builder: &ObjectBuilder<'b>,
@@ -6424,9 +6424,9 @@ where
     /// sizes.
     fn copy_struct<'b>(
         &mut self,
-        src: SegmentRef,
+        src: SegmentRef<'_>,
         src_size: StructSize,
-        reader: &ObjectReader,
+        reader: &ObjectReader<'_>,
         dst: SegmentRef<'b>,
         dst_size: StructSize,
         builder: &ObjectBuilder<'b>,
@@ -6444,8 +6444,8 @@ where
 
     fn copy_ptr_section<'b>(
         &mut self,
-        src: SegmentRef,
-        reader: &ObjectReader,
+        src: SegmentRef<'_>,
+        reader: &ObjectReader<'_>,
         dst: SegmentRef<'b>,
         builder: &ObjectBuilder<'b>,
         len: SegmentOffset,
@@ -6465,8 +6465,8 @@ where
 }
 
 fn calculate_canonical_struct_size(
-    reader: &ObjectReader,
-    src: SegmentRef,
+    reader: &ObjectReader<'_>,
+    src: SegmentRef<'_>,
     size: StructSize,
 ) -> StructSize {
     let mut dst_size = size;
@@ -6484,10 +6484,10 @@ fn calculate_canonical_struct_size(
 /// Returns an iterator over a set of inline composites, yielding the start
 /// of the data and ptr sections.
 fn iter_inline_composites(
-    src: SegmentRef,
+    src: SegmentRef<'_>,
     size: StructSize,
     count: ElementCount,
-) -> impl Iterator<Item = (SegmentRef, SegmentRef)> {
+) -> impl Iterator<Item = (SegmentRef<'_>, SegmentRef<'_>)> {
     unsafe {
         step_by_unchecked(src, size.len(), count).map(move |src_data| {
             let src_ptrs = src_data.offset(size.data.into()).as_ref_unchecked();
@@ -6497,8 +6497,8 @@ fn iter_inline_composites(
 }
 
 fn calculate_canonical_inline_composite_size(
-    reader: &ObjectReader,
-    src: SegmentRef,
+    reader: &ObjectReader<'_>,
+    src: SegmentRef<'_>,
     size: StructSize,
     count: ElementCount,
 ) -> StructSize {
@@ -6620,7 +6620,7 @@ mod tests {
         assert_eq!(true, reader.data_field_with_default(64, true));
     }
 
-    fn setup_struct(builder: &mut StructBuilder<Empty>) {
+    fn setup_struct(builder: &mut StructBuilder<'_, Empty>) {
         builder.set_field::<u64>(0, 0x1011121314151617);
         builder.set_field::<u32>(2, 0x20212223);
         builder.set_field::<u16>(6, 0x3031);
@@ -6692,7 +6692,7 @@ mod tests {
         }
     }
 
-    fn check_struct_reader(reader: &StructReader<Empty>) {
+    fn check_struct_reader(reader: &StructReader<'_, Empty>) {
         assert_eq!(0x1011121314151617, reader.data_field::<u64>(0));
         assert_eq!(0x20212223, reader.data_field::<u32>(2));
         assert_eq!(0x3031, reader.data_field::<u16>(6));
@@ -6764,7 +6764,7 @@ mod tests {
         }
     }
 
-    fn check_struct_builder(builder: &mut StructBuilder<Empty>) {
+    fn check_struct_builder(builder: &mut StructBuilder<'_, Empty>) {
         assert_eq!(0x1011121314151617, builder.data_field::<u64>(0));
         assert_eq!(0x20212223, builder.data_field::<u32>(2));
         assert_eq!(0x3031, builder.data_field::<u16>(6));
@@ -6842,9 +6842,9 @@ mod tests {
         }
     }
 
-    fn struct_round_trip(message: &mut Message<impl Alloc>) {
+    fn struct_round_trip(message: &mut Message<'_, impl Alloc>) {
         {
-            let ptr: PtrBuilder = message.builder().into_root().into();
+            let ptr: PtrBuilder<'_> = message.builder().into_root().into();
             let mut builder = ptr.init_struct(StructSize { data: 2, ptrs: 4 });
             setup_struct(&mut builder);
 

@@ -16,7 +16,7 @@ use rustalloc::{
 
 /// Returns the size of the streaming table in [`Word`]s
 #[inline]
-pub fn table_size_of(segments: &MessageSegments) -> u32 {
+pub fn table_size_of(segments: &MessageSegments<'_>) -> u32 {
     table_size_from_count(segments.len())
 }
 
@@ -51,7 +51,7 @@ pub const fn max_table_size_from_len(len: usize) -> u32 {
 ///
 /// The slice size must match the table size returned by [`size_of`].
 #[inline]
-pub fn write_table(segments: &MessageSegments, slice: &mut [Word]) {
+pub fn write_table(segments: &MessageSegments<'_>, slice: &mut [Word]) {
     assert!(
         slice.len() == table_size_of(segments) as usize,
         "provided slice does not match segment table size"
@@ -151,7 +151,7 @@ impl StreamTable {
     }
 
     #[inline]
-    pub fn from_segments(segments: &MessageSegments) -> Self {
+    pub fn from_segments(segments: &MessageSegments<'_>) -> Self {
         let mut table = Self::new();
         table.write_segments(segments);
         table
@@ -160,7 +160,7 @@ impl StreamTable {
     /// Writes a new segments table to this instance, reusing the existing allocation, or
     /// reallocating if required.
     #[inline]
-    pub fn write_segments(&mut self, segments: &MessageSegments) {
+    pub fn write_segments(&mut self, segments: &MessageSegments<'_>) {
         let size = table_size_of(segments) as usize;
         self.table.resize_to(size);
 

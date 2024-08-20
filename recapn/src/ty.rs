@@ -88,7 +88,7 @@ pub trait TotalSize {
     fn total_size(&self) -> Result<MessageSize>;
 }
 
-impl<'a, Type> TotalSize for Type
+impl<Type> TotalSize for Type
 where
     Type: TypedPtr + AsRef<Type::Ptr>,
     Type::Ptr: TotalSize,

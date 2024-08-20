@@ -145,7 +145,7 @@ impl ArenaSegment {
     }
 
     #[inline]
-    pub(crate) fn start(&self) -> SegmentRef {
+    pub(crate) fn start(&self) -> SegmentRef<'_> {
         unsafe { SegmentRef::new_unchecked(self.segment.data) }
     }
 
