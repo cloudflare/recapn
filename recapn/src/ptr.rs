@@ -1883,7 +1883,7 @@ impl<'a> ObjectReader<'a> {
 
             let element_count = list_ptr.element_count();
             if element_size == ElementSize::Void
-                && self.try_amplified_read(element_count.get() as u64)
+                && !self.try_amplified_read(element_count.get() as u64)
             {
                 return Err(Error::ReadLimitExceeded.into());
             }
