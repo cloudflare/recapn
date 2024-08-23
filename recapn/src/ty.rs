@@ -1,8 +1,11 @@
 //! Types and traits implemented by foreign generated user types like enums and structs.
 
 use core::convert::TryFrom;
+use core::marker::PhantomData;
+use core::ptr::NonNull;
 
-use crate::any;
+use crate::alloc::Word;
+use crate::any::{self, PtrReader};
 use crate::field;
 use crate::internal::Sealed;
 use crate::list::{self, ElementSize, List};
@@ -217,6 +220,51 @@ pub trait DynListValue: 'static {
 }
 impl<T: ListValue> DynListValue for T {
     const PTR_ELEMENT_SIZE: ptr::PtrElementSize = T::ELEMENT_SIZE.as_ptr_size();
+}
+
+/// A constant of some Cap'n Proto value.
+pub struct ConstPtr<T> {
+    t: PhantomData<fn() -> T>,
+    inner: Option<NonNull<Word>>,
+}
+
+impl<T> ConstPtr<T> {
+    /// Create a new constant value backed by the given static array of words.
+    /// 
+    /// This is normally used by the code generator to create constant pointer values.
+    /// 
+    /// # Safety
+    /// 
+    /// This must be a valid Cap'n Proto message contained within a single segment. The message is
+    /// not checked for validity and as such an invalid message can cause Undefined Behavior.
+    pub const unsafe fn new(w: &'static [Word]) -> Self {
+        Self { t: PhantomData, inner: Some(NonNull::new_unchecked(w.as_ptr().cast_mut())) }
+    }
+
+    /// Create a constant value to a null pointer.
+    /// 
+    /// This will return the value's default when you `get()` its value.
+    pub const fn null() -> Self {
+        Self { t: PhantomData, inner: None }
+    }
+}
+
+impl<T: FromPtr<PtrReader<'static>>> ConstPtr<T> {
+    /// Get the value of the constant as an untyped pointer.
+    #[inline]
+    pub fn root(&self) -> PtrReader<'static> {
+        let ptr = match self.inner {
+            Some(ptr) => unsafe { ptr::PtrReader::new_unchecked(ptr) },
+            None => ptr::PtrReader::null(),
+        };
+        any::PtrReader::from(ptr)
+    }
+
+    /// Get the value of the constant.
+    #[inline]
+    pub fn get(&self) -> T::Output {
+        self.root().read_as::<T>()
+    }
 }
 
 pub type Void = ();
