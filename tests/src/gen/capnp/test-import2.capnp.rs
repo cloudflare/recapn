@@ -100,13 +100,13 @@ impl TestImport2 {
         _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const BAR: _p::Descriptor<
         _p::Struct<__imports::capnp_test_import_capnp::TestImport>,
     > = _p::Descriptor::<_p::Struct<__imports::capnp_test_import_capnp::TestImport>> {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> test_import2::Reader<'p, T> {
