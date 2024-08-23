@@ -1396,7 +1396,7 @@ where
     }
 
     #[inline]
-    pub fn get(&self) -> S::Reader<'b, T> {
+    pub fn get(&self) -> S::Reader<'p, T> {
         ty::StructReader::from_ptr(match self.raw_ptr().to_struct() {
             Ok(Some(ptr)) => ptr,
             _ => self.default_imbued_ptr(),
@@ -1404,12 +1404,12 @@ where
     }
 
     #[inline]
-    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+    pub fn get_option(&self) -> Option<S::Reader<'p, T>> {
         self.try_get_option().ok().flatten()
     }
 
     #[inline]
-    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+    pub fn try_get(&self) -> Result<S::Reader<'p, T>> {
         Ok(ty::StructReader::from_ptr(
             match self.raw_ptr().to_struct() {
                 Ok(Some(ptr)) => ptr,
@@ -1420,7 +1420,7 @@ where
     }
 
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+    pub fn try_get_option(&self) -> Result<Option<S::Reader<'p, T>>> {
         match self.raw_ptr().to_struct() {
             Ok(Some(ptr)) => Ok(Some(ty::StructReader::from_ptr(ptr))),
             Ok(None) => Ok(None),
