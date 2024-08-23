@@ -1,5 +1,6 @@
 //! UTF-8 encoded data with a null terminator
 
+use core::fmt;
 use core::ptr::NonNull;
 use core::slice;
 use core::str::Utf8Error;
@@ -115,6 +116,12 @@ impl<'a> Reader<'a> {
     #[inline]
     pub const unsafe fn as_str_unchecked(&self) -> &'a str {
         core::str::from_utf8_unchecked(self.as_bytes())
+    }
+}
+
+impl fmt::Debug for Reader<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_bytes_with_nul().fmt(f)
     }
 }
 
