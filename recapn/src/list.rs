@@ -1756,6 +1756,17 @@ where
     }
 }
 
+impl<'a, V, S, T, Item> ExactSizeIterator for Iter<'a, V, S, T>
+where
+    V: for<'b> ListAccessable<&'b Reader<'a, V, T>>,
+    S: for<'b> IterStrategy<V, ElementReader<'a, 'b, V, T>, Item = Item>,
+    T: Table,
+{
+    fn len(&self) -> usize {
+        self.range.len()
+    }
+}
+
 impl<'a, V, T> Reader<'a, V, T>
 where
     T: Table,
