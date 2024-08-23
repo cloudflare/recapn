@@ -407,28 +407,48 @@ pub mod prelude {
 
 pub mod generator;
 pub mod quotes;
+pub mod schema;
 
-use anyhow::Context;
+
+use std::ffi::{OsStr, OsString};
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::{env, fs};
+use thiserror::Error;
 use quote::ToTokens;
 use recapn::io::{self, StreamOptions};
 use recapn::message::{Reader, ReaderOptions};
 use recapn::ReaderOf;
 
-use std::ffi::{OsStr, OsString};
-use std::io::Read;
-use std::path::Path;
-use std::process::{Command, Stdio};
-use std::{env, fs};
-
 use gen::capnp_schema_capnp::CodeGeneratorRequest;
 use generator::GeneratorContext;
 use quotes::GeneratedRoot;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("invalid cap'n proto data")]
+    Recapn(#[from] recapn::Error),
+    #[error("invalid cap'n proto message stream")]
+    Stream(#[from] recapn::io::StreamError),
+    #[error("invalid schema")]
+    Schema(#[from] schema::SchemaError),
+    #[error(transparent)]
+    Generator(#[from] generator::GeneratorError),
+    #[error("failed to write file at {}: {}", .path.display(), .error)]
+    FileWrite {
+        path: PathBuf,
+        error: std::io::Error,
+    },
+}
+
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Read from an existing `CodeGeneratorRequest` and write files based on the given output path.
 pub fn generate_from_request(
     request: &ReaderOf<CodeGeneratorRequest>,
     out: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let out = out.as_ref();
     let context = GeneratorContext::new(request)?;
 
@@ -437,30 +457,37 @@ pub fn generate_from_request(
     for file in request.requested_files() {
         let (file, root) = context.generate_file(file.id())?;
 
-        let parsed =
-            syn::parse2::<syn::File>(file.to_token_stream()).context("parsing generated file")?;
+        let parsed = syn::parse2::<syn::File>(file.to_token_stream())
+            .expect("generated code is valid syn file");
         let printable = prettyplease::unparse(&parsed);
 
         let out_path = out.join(Path::new(&root.path));
         if let Some(parent) = out_path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        fs::write(&out_path, printable)
-            .with_context(|| format!("failed to write to path: {}", out_path.display()))?;
+
+        if let Err(err) = fs::write(&out_path, printable) {
+            return Err(Error::FileWrite { path: out_path, error: err })
+        }
 
         root_mod.files.push(root);
     }
 
-    let parsed =
-        syn::parse2::<syn::File>(root_mod.to_token_stream()).context("parsing generated file")?;
+    let parsed = syn::parse2::<syn::File>(root_mod.to_token_stream())
+        .expect("generated code is valid syn file");
+
     let printable = prettyplease::unparse(&parsed);
-    fs::write(out.join("mod.rs"), printable)?;
+
+    let mod_path = out.join("mod.rs");
+    if let Err(error) = fs::write(&mod_path, printable) {
+        return Err(Error::FileWrite { path: mod_path, error })
+    }
 
     Ok(())
 }
 
 /// Read a `CodeGeneratorRequest` capnp message from a stream and write files based on the given output path.
-pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> anyhow::Result<()> {
+pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> Result<()> {
     let message = io::read_from_stream(r, StreamOptions::default())?;
     let reader = Reader::new(&message, ReaderOptions::default());
     let request = reader.root().read_as_struct::<CodeGeneratorRequest>();
