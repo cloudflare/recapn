@@ -441,7 +441,7 @@ pub struct GeneratedField {
 
 pub struct FieldDescriptor {
     pub slot: u32,
-    pub default: TokenStream,
+    pub default: Box<syn::Expr>,
 }
 
 impl GeneratedField {
@@ -729,7 +729,7 @@ to_tokens!(
 pub struct GeneratedConst {
     pub ident: syn::Ident,
     pub const_type: Box<syn::Type>,
-    pub value: TokenStream,
+    pub value: Box<syn::Expr>,
 }
 
 to_tokens!(
