@@ -105,7 +105,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Message>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const ABORT: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
@@ -117,7 +117,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Exception>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const CALL: _p::VariantDescriptor<_p::Struct<Call>> = _p::VariantDescriptor::<
@@ -129,7 +129,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Call>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const RETURN: _p::VariantDescriptor<_p::Struct<Return>> = _p::VariantDescriptor::<
@@ -141,7 +141,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Return>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const FINISH: _p::VariantDescriptor<_p::Struct<Finish>> = _p::VariantDescriptor::<
@@ -153,7 +153,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Finish>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const RESOLVE: _p::VariantDescriptor<_p::Struct<Resolve>> = _p::VariantDescriptor::<
@@ -165,7 +165,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Resolve>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const RELEASE: _p::VariantDescriptor<_p::Struct<Release>> = _p::VariantDescriptor::<
@@ -177,7 +177,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Release>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const OBSOLETE_SAVE: _p::VariantDescriptor<_p::AnyPtr> = _p::VariantDescriptor::<
@@ -189,7 +189,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const BOOTSTRAP: _p::VariantDescriptor<_p::Struct<Bootstrap>> = _p::VariantDescriptor::<
@@ -201,7 +201,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Bootstrap>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const OBSOLETE_DELETE: _p::VariantDescriptor<_p::AnyPtr> = _p::VariantDescriptor::<
@@ -213,7 +213,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const PROVIDE: _p::VariantDescriptor<_p::Struct<Provide>> = _p::VariantDescriptor::<
@@ -225,7 +225,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Provide>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const ACCEPT: _p::VariantDescriptor<_p::Struct<Accept>> = _p::VariantDescriptor::<
@@ -237,7 +237,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Accept>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const JOIN: _p::VariantDescriptor<_p::Struct<Join>> = _p::VariantDescriptor::<
@@ -249,7 +249,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Join>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const DISEMBARGO: _p::VariantDescriptor<_p::Struct<Disembargo>> = _p::VariantDescriptor::<
@@ -261,7 +261,7 @@ impl Message {
         },
         field: _p::Descriptor::<_p::Struct<Disembargo>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
 }
@@ -1084,7 +1084,7 @@ impl Bootstrap {
         _p::AnyPtr,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> bootstrap::Reader<'p, T> {
@@ -1240,7 +1240,7 @@ impl Call {
         _p::Struct<MessageTarget>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const INTERFACE_ID: _p::Descriptor<u64> = _p::Descriptor::<u64> {
         slot: 1u32,
@@ -1254,7 +1254,7 @@ impl Call {
         _p::Struct<Payload>,
     > {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const SEND_RESULTS_TO: _p::Descriptor<_p::Group<call::SendResultsTo>> = ();
     const ALLOW_THIRD_PARTY_TAIL_CALL: _p::Descriptor<bool> = _p::Descriptor::<bool> {
@@ -1531,7 +1531,7 @@ pub mod call {
         type Builder<'a, T: _p::rpc::Table> = send_results_to::Builder<'a, T>;
     }
     impl _p::FieldGroup for SendResultsTo {
-        unsafe fn clear<T: _p::rpc::Table>(s: &mut _p::StructBuilder<'_, T>) {
+        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
             s.set_field_unchecked(3usize, 0);
             <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
         }
@@ -1560,7 +1560,7 @@ pub mod call {
             },
             field: _p::Descriptor::<_p::AnyPtr> {
                 slot: 2u32,
-                default: None,
+                default: ::core::option::Option::None,
             },
         };
     }
@@ -1850,7 +1850,7 @@ impl Return {
         },
         field: _p::Descriptor::<_p::Struct<Payload>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const EXCEPTION: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
@@ -1862,7 +1862,7 @@ impl Return {
         },
         field: _p::Descriptor::<_p::Struct<Exception>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const CANCELED: _p::VariantDescriptor<()> = _p::VariantDescriptor::<()> {
@@ -1902,7 +1902,7 @@ impl Return {
         },
         field: _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
 }
@@ -2491,7 +2491,7 @@ impl Resolve {
         },
         field: _p::Descriptor::<_p::Struct<CapDescriptor>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const EXCEPTION: _p::VariantDescriptor<_p::Struct<Exception>> = _p::VariantDescriptor::<
@@ -2503,7 +2503,7 @@ impl Resolve {
         },
         field: _p::Descriptor::<_p::Struct<Exception>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
 }
@@ -2890,7 +2890,7 @@ impl Disembargo {
         _p::Struct<MessageTarget>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const CONTEXT: _p::Descriptor<_p::Group<disembargo::Context>> = ();
 }
@@ -3048,7 +3048,7 @@ pub mod disembargo {
         type Builder<'a, T: _p::rpc::Table> = context::Builder<'a, T>;
     }
     impl _p::FieldGroup for Context {
-        unsafe fn clear<T: _p::rpc::Table>(s: &mut _p::StructBuilder<'_, T>) {
+        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
             s.set_field_unchecked(2usize, 0);
             <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
         }
@@ -3387,11 +3387,11 @@ impl Provide {
         _p::Struct<MessageTarget>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const RECIPIENT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> provide::Reader<'p, T> {
@@ -3561,7 +3561,7 @@ impl Accept {
     };
     const PROVISION: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const EMBARGO: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 32u32,
@@ -3721,11 +3721,11 @@ impl Join {
         _p::Struct<MessageTarget>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const KEY_PART: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> join::Reader<'p, T> {
@@ -3903,7 +3903,7 @@ impl MessageTarget {
         },
         field: _p::Descriptor::<_p::Struct<PromisedAnswer>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
 }
@@ -4142,13 +4142,13 @@ impl _p::ty::Struct for Payload {
 impl Payload {
     const CONTENT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const CAP_TABLE: _p::Descriptor<_p::List<_p::Struct<CapDescriptor>>> = _p::Descriptor::<
         _p::List<_p::Struct<CapDescriptor>>,
     > {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> payload::Reader<'p, T> {
@@ -4356,7 +4356,7 @@ impl CapDescriptor {
         },
         field: _p::Descriptor::<_p::Struct<PromisedAnswer>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
     const THIRD_PARTY_HOSTED: _p::VariantDescriptor<
@@ -4368,7 +4368,7 @@ impl CapDescriptor {
         },
         field: _p::Descriptor::<_p::Struct<ThirdPartyCapDescriptor>> {
             slot: 0u32,
-            default: None,
+            default: ::core::option::Option::None,
         },
     };
 }
@@ -4804,7 +4804,7 @@ impl PromisedAnswer {
         _p::List<_p::Struct<promised_answer::Op>>,
     > {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> promised_answer::Reader<'p, T> {
@@ -5201,7 +5201,7 @@ impl _p::ty::Struct for ThirdPartyCapDescriptor {
 impl ThirdPartyCapDescriptor {
     const ID: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const VINE_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -5363,7 +5363,7 @@ impl _p::ty::Struct for Exception {
 impl Exception {
     const REASON: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
     const OBSOLETE_IS_CALLERS_FAULT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 0u32,
@@ -5381,7 +5381,7 @@ impl Exception {
     };
     const TRACE: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 1u32,
-        default: None,
+        default: ::core::option::Option::None,
     };
 }
 impl<'p, T: _p::rpc::Table + 'p> exception::Reader<'p, T> {

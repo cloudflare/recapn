@@ -8,4 +8,4 @@ files=(
     "capnp/test-import2.capnp"
 )
 
-capnp compile ${files[*]} -o- | cargo run -p recapnc --bin capnpc-rust
+capnp compile ${files[*]} -I. --no-standard-import -o- | cargo run -p recapnc --bin capnpc-rust
