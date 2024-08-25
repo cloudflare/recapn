@@ -5,7 +5,9 @@ members = [
     "recapn-rpc",
     "tests",
     "fuzz",
+    "examples/addressbook"
 ]
+
 resolver = "2"
 
 [workspace.lints.clippy]
