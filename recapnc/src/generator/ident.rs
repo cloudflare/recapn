@@ -40,6 +40,7 @@ fn make_ident_str(s: &str) -> Result<String> {
     Ok(output)
 }
 
+#[derive(Clone, Debug)]
 pub struct IdentifierSet {
     idents: HashSet<syn::Ident>,
 }

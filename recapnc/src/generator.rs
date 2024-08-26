@@ -116,9 +116,25 @@ struct FileInfo {
     pub path: String,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct GenericParam {
+    pub field_name: syn::Ident,
+    pub type_name: syn::Ident,
+}
+
 #[derive(Debug)]
 struct StructInfo {
     pub type_info: TypeInfo,
+    pub repr_type: syn::Ident,
+    pub repr_field: syn::Ident,
+    pub table_type: syn::Ident,
+    pub free_type: syn::Ident,
+    /// The generic type identifier used with Which types for their "view".
+    pub view_type: syn::Ident,
+    pub generic_params: Vec<GenericParam>,
+    /// All the generic type parameters used by the Which. This is a subset of
+    /// the struct's generic parameters.
+    pub which_generic_idents: Vec<syn::Ident>,
     pub mod_ident: syn::Ident,
 }
 
@@ -197,6 +213,10 @@ pub enum NameContext {
         type_id: Id,
         index: u32,
     },
+    Parameter {
+        type_id: Id,
+        index: u16,
+    },
 }
 
 impl fmt::Display for NameContext {
@@ -207,6 +227,8 @@ impl fmt::Display for NameContext {
                 write!(f, "field @{} in struct @{:0<#16x}", index, type_id),
             Self::Enumerant { type_id, index } =>
                 write!(f, "enumerant @{} in enum @{:0<#16x}", index, type_id),
+            Self::Parameter { type_id, index } =>
+                write!(f, "parameter {} in node @{}", index, type_id),
         }
     }
 }
@@ -286,11 +308,59 @@ fn validate_struct(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        unreachable!("struct node already has associated data")
     };
 
     let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
     let mod_ident = identifiers.make_unique(Some(scope.clone()), AsSnakeCase(name))?;
+
+    let mut generic_idents = IdentifierSet::new();
+    let mut struct_fields = IdentifierSet::new();
+    let mut generic_params = Vec::new();
+    let generics = schema.gather_parameters()?;
+    for p in generics {
+        let name = p.name.as_str().map_err(|error| GeneratorError::InvalidName {
+            context: NameContext::Parameter { type_id: p.scope, index: p.index }, error
+        })?;
+
+        let type_name = generic_idents.make_unique(AsPascalCase(name))?;
+        let field_name = struct_fields.make_unique(AsSnakeCase(name))?;
+        generic_params.push(GenericParam { type_name, field_name })
+    }
+
+    let repr_type = generic_idents.make_unique("Repr")?;
+    let repr_field = struct_fields.make_unique("repr")?;
+    let table_type = generic_idents.make_unique("Table")?;
+    let free_type = generic_idents.make_unique("T2")?;
+    let view_type = generic_idents.make_unique("View")?;
+
+    let mut which_generic_idents = Vec::new();
+    for field in schema.fields() {
+        if field.discriminant().is_none() {
+            continue
+        }
+
+        match field.field_type()? {
+            // Groups are assumed to always use the same generic parameters, even when the group's
+            // fields don't use any.
+            //
+            // TODO: limit number of generic parameters used by groups? types in general?
+            // This could introduce odd behavior when referencing types. But this problem already
+            // exists with Which so should we bother?
+            FieldType::Group(_) => which_generic_idents = generic_params
+                .iter()
+                .map(|p| p.type_name.clone())
+                .collect(),
+            FieldType::Slot { field_type, .. } => {
+                match field_type.kind {
+                    TypeKind::Struct { schema, parameters } => todo!(),
+                    TypeKind::Interface { schema, parameters } => todo!(),
+                    TypeKind::ScopeBound { scope, index } => todo!(),
+                    TypeKind::ImplicitMethodParameter { index } => todo!(),
+                }
+            }
+        }
+    }
 
     let node_info = StructInfo {
         type_info: TypeInfo {
@@ -298,6 +368,13 @@ fn validate_struct(
             scope: scope.clone(),
         },
         mod_ident: mod_ident.clone(),
+        repr_type,
+        repr_field,
+        table_type,
+        free_type,
+        view_type,
+        generic_params,
+        which_generic_idents,
     };
 
     entry.insert(NodeInfo::Struct(node_info));
@@ -338,7 +415,7 @@ fn validate_enum(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        unreachable!("enum node already has associated data")
     };
 
     let type_ident =
@@ -379,7 +456,7 @@ fn validate_interface(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        unreachable!("interface node already has associated data")
     };
 
     entry.insert(NodeInfo::Interface(InterfaceInfo {}));
@@ -398,7 +475,7 @@ fn validate_const(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        unreachable!("const node already has associated data")
     };
 
     entry.insert(NodeInfo::Const(ConstInfo {
@@ -418,7 +495,7 @@ fn validate_annotation(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        unreachable!("annotation node already has associated data")
     };
 
     entry.insert(NodeInfo::Annotation(AnnotationInfo {}));
@@ -470,7 +547,6 @@ impl GeneratorContext {
 
         let mut file = GeneratedFile {
             items: Vec::new(),
-            ident: info.mod_ident.clone(),
         };
 
         let mut ctx = FileContext { required_imports: BTreeSet::new() };
@@ -539,7 +615,11 @@ impl GeneratorContext {
         let mut generated = GeneratedStruct {
             ident: info.type_info.type_ident.clone(),
             mod_ident: info.mod_ident.clone(),
-            type_params: Vec::new(),
+            repr_type_param: info.repr_type.clone(),
+            repr_field_ident: info.repr_field.clone(),
+            free_type_param: info.free_type.clone(),
+            table_type_param: info.table_type.clone(),
+            generic_params: info.generic_params.clone(),
             size,
             fields: Vec::new(),
             which: None,
@@ -576,7 +656,8 @@ impl GeneratorContext {
             let which = generated.which.insert(GeneratedWhich {
                 tag_slot: schema.info.discriminant_offset(),
                 fields: Vec::new(),
-                type_params: Vec::new(),
+                view_param: info.view_type.clone(),
+                generic_params: info.which_generic_idents.clone(),
             });
             // Create a scope used for resolving types from within the struct's mod scope.
             let struct_mod_scope = {
@@ -710,9 +791,10 @@ impl GeneratorContext {
     ) -> Result<Box<syn::Type>> {
         Ok(match field_type {
             FieldType::Group(group) => {
-                let group_type = &self.find_info(group.node.id())?.unwrap_struct().type_info;
-                let path = group_type.resolve_path(scope);
-                Box::new(syn::parse_quote!(_p::Group<#path>))
+                let group_type = self.find_info(group.node.id())?.unwrap_struct();
+                let path = group_type.type_info.resolve_path(scope);
+                let generic_types = group_type.generic_params.iter().map(|p| &p.type_name);
+                Box::new(syn::parse_quote!(_p::Group<#path<#(#generic_types,)*>>))
             },
             FieldType::Slot { field_type, .. } => {
                 self.resolve_type(scope, &field_type, ctx)?
@@ -764,7 +846,7 @@ impl GeneratorContext {
             },
             TypeKind::Data => syn::parse_quote!(_p::Data),
             TypeKind::Text => syn::parse_quote!(_p::Text),
-            TypeKind::Struct { schema, .. } => {
+            TypeKind::Struct { schema, parameters } => {
                 let type_info = &self.find_info(schema.node.id())?.unwrap_struct().type_info;
                 if type_info.scope.file != scope.file {
                     ctx.required_imports.insert(type_info.scope.file.id);

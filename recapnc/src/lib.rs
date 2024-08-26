@@ -405,10 +405,9 @@ pub mod prelude {
     }
 }
 
-pub mod generator;
-pub mod quotes;
+mod generator;
+mod quotes;
 pub mod schema;
-
 
 use std::ffi::{OsStr, OsString};
 use std::io::Read;

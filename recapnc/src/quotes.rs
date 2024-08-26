@@ -76,7 +76,6 @@ to_tokens!(
 );
 
 pub struct GeneratedFile {
-    pub ident: syn::Ident,
     pub items: Vec<GeneratedItem>,
 }
 
@@ -110,66 +109,47 @@ impl ToTokens for GeneratedItem {
     }
 }
 
+use crate::generator::GenericParam;
+
 pub struct GeneratedStruct {
     pub ident: syn::Ident,
     pub mod_ident: syn::Ident,
-    pub type_params: Vec<syn::TypeParam>,
+    pub repr_type_param: syn::Ident,
+    pub repr_field_ident: syn::Ident,
+    /// A second type param used in cases where
+    /// 
+    /// * The repr type is used
+    /// * It doesn't make sense to use the table type
+    pub free_type_param: syn::Ident,
+    pub table_type_param: syn::Ident,
+    pub generic_params: Vec<GenericParam>,
     pub size: Option<StructSize>,
     pub fields: Vec<GeneratedField>,
     pub which: Option<GeneratedWhich>,
     pub nested_items: Vec<GeneratedItem>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum FieldItem {
+    Descriptor,
+    RefAccessor,
+    MutAccessor,
+    OwnAccessor,
+    Clear,
+}
+
 impl GeneratedStruct {
-    pub fn descriptors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let fields = self.fields.iter().map(GeneratedField::descriptor);
+    pub fn generate_field_items(&self, item: FieldItem) -> impl Iterator<Item = TokenStream> + '_ {
+        let fields = self.fields.iter().map(move |f| f.generate_item(item, self));
         let variants = self
             .which
             .as_ref()
-            .map(GeneratedWhich::descriptors)
-            .into_iter()
-            .flatten();
+            .map(move |w| w
+                .fields
+                .iter()
+                .map(move |v| v.generate_item(item, w, self))
+            ).into_iter().flatten();
         fields.chain(variants)
-    }
-    pub fn ref_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let fields = self.fields.iter().map(GeneratedField::ref_accessor);
-        let variants = self
-            .which
-            .as_ref()
-            .map(GeneratedWhich::ref_accessors)
-            .into_iter()
-            .flatten();
-        fields.chain(variants)
-    }
-    pub fn mut_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let fields = self.fields.iter().map(GeneratedField::mut_accessor);
-        let variants = self
-            .which
-            .as_ref()
-            .map(GeneratedWhich::mut_accessors)
-            .into_iter()
-            .flatten();
-        fields.chain(variants)
-    }
-    pub fn own_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let fields = self.fields.iter().map(GeneratedField::own_accessor);
-        let variants = self
-            .which
-            .as_ref()
-            .map(GeneratedWhich::own_accessors)
-            .into_iter()
-            .flatten();
-        fields.chain(variants)
-    }
-    pub fn clear_all(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        let fields = self.fields.iter().map(GeneratedField::call_clear);
-        let variant_clear = self
-            .which
-            .as_ref()
-            .map(GeneratedWhich::call_clear)
-            .into_iter()
-            .flatten();
-        fields.chain(variant_clear)
     }
     pub fn which_accessors(&self) -> Option<(TokenStream, TokenStream)> {
         let _ = self.which.as_ref()?;
@@ -188,243 +168,218 @@ impl GeneratedStruct {
         };
         Some((ref_accessor, mut_accessor))
     }
-    pub fn which_type(&self) -> Option<TokenStream> {
-        let Self {
-            ident: struct_name,
-            which,
-            ..
-        } = self;
-        let GeneratedWhich {
-            tag_slot,
-            fields,
-            type_params,
-        } = which.as_ref()?;
-        let tag_slot = *tag_slot as usize;
-        let disciminants = fields.iter().map(
-            |GeneratedVariant {
-                 discriminant_ident: name,
-                 discriminant_field_type: field_type,
-                 ..
-             }| quote!(#name(_p::ViewOf<T, #field_type>)),
-        );
-        let disciminant_ref_matches = fields.iter()
-            .map(|GeneratedVariant {
-                discriminant_ident: name,
-                discriminant_field_type: field_type,
-                field: GeneratedField { descriptor_ident, .. },
-                case,
-            }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&repr.0, &super::#struct_name::#descriptor_ident.field))))
-            });
-        let disciminant_mut_matches = fields.iter()
-            .map(|GeneratedVariant {
-                discriminant_ident: name,
-                discriminant_field_type: field_type,
-                field: GeneratedField { descriptor_ident, .. },
-                case,
-            }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&mut repr.0, &super::#struct_name::#descriptor_ident.field))))
-            });
-
-        Some(quote! {
-            pub enum Which<#(#type_params,)* T: _p::Viewable = _p::Family> {
-                #(#disciminants),*
-            }
-
-            impl<'b, 'p: 'b, #(#type_params,)* T: _p::Table + 'p> _p::UnionViewer<&'b Reader<'p, T>> for Which<#(#type_params,)*> {
-                type View = Which<#(#type_params,)* &'b Reader<'p, T>>;
-
-                unsafe fn get(repr: &'b Reader<'p, T>) -> Result<Self::View, _p::NotInSchema> {
-                    let tag = repr.0.data_field::<u16>(#tag_slot);
-                    match tag {
-                        #(#disciminant_ref_matches,)*
-                        unknown => Err(_p::NotInSchema(unknown)),
-                    }
-                }
-            }
-
-            impl<'b, 'p: 'b, #(#type_params,)* T: _p::Table + 'p> _p::UnionViewer<&'b mut Builder<'p, T>> for Which<#(#type_params,)*> {
-                type View = Which<#(#type_params,)* &'b mut Builder<'p, T>>;
-
-                unsafe fn get(repr: &'b mut Builder<'p, T>) -> Result<Self::View, _p::NotInSchema> {
-                    let tag = repr.0.data_field::<u16>(#tag_slot);
-                    match tag {
-                        #(#disciminant_mut_matches,)*
-                        unknown => Err(_p::NotInSchema(unknown)),
-                    }
-                }
-            }
-        })
-    }
 }
 
-to_tokens!(
-    GeneratedStruct
-        | self
-        | {
-            let Self {
-                ident: name,
-                mod_ident: modname,
-                nested_items: nested,
-                size,
-                ..
-            } = self;
-            let descriptors = self.descriptors();
-            let ref_accessors = self.ref_accessors();
-            let mut_accessors = self.mut_accessors();
-            let own_accessors = self.own_accessors();
-            let (which_ref_accessor, which_mut_accessor) = self.which_accessors().unzip();
-            let which_type = self.which_type();
-            let struct_view = quote! {
-                impl _p::StructView for #name {
-                    type Reader<'a, T: _p::rpc::Table> = #modname::Reader<'a, T>;
-                    type Builder<'a, T: _p::rpc::Table> = #modname::Builder<'a, T>;
-                }
-            };
-            let struct_group_marker = if let Some(StructSize { data, ptrs }) = size {
-                quote! {
-                    impl _p::ty::Struct for #name {
-                        const SIZE: _p::StructSize = _p::StructSize { data: #data, ptrs: #ptrs };
-                    }
-                }
-            } else {
-                let clears = self.clear_all();
-                quote! {
-                    impl _p::FieldGroup for #name {
-                        unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-                            #(#clears)*
-                        }
-                    }
-                }
-            };
-            quote! {
-                #[derive(Clone)]
-                pub struct #name<T = _p::Family>(T);
+to_tokens!(GeneratedStruct |self| {
+    let Self {
+        ident: name,
+        mod_ident: modname,
+        repr_type_param,
+        repr_field_ident,
+        free_type_param,
+        table_type_param,
+        generic_params,
+        nested_items: nested,
+        size,
+        which,
+        ..
+    } = self;
+    let descriptors = self.generate_field_items(FieldItem::Descriptor);
+    let ref_accessors = self.generate_field_items(FieldItem::RefAccessor);
+    let mut_accessors = self.generate_field_items(FieldItem::MutAccessor);
+    let own_accessors = self.generate_field_items(FieldItem::OwnAccessor);
+    let (which_ref_accessor, which_mut_accessor) = self.which_accessors().unzip();
+    let which_type = which.as_ref().map(|w| w.generate_type(self));
 
-                impl<T> _p::IntoFamily for #name<T> {
-                    type Family = #name;
-                }
+    let type_field_idents = generic_params.iter().map(|p| &p.field_name).collect::<Vec<_>>();
+    let type_idents = generic_params.iter().map(|p| &p.type_name).collect::<Vec<_>>();
 
-                impl<T: _p::Capable> _p::Capable for #name<T> {
-                    type Table = T::Table;
+    let generic_params_list = quote!(#(#type_idents,)*);
+    let generic_constrained_params = quote!(#(#type_idents: _p::FieldType,)*);
+    let generic_constrained_params_default = quote!(#(#type_idents: _p::FieldType = _p::AnyPtr,)*);
+    let generic_phantom_fields = generic_params.iter().map(
+        |GenericParam { field_name, type_name }| quote! {
+            #field_name: ::core::marker::PhantomData<fn() -> #type_name>
+        }
+    );
 
-                    type Imbued = T::Imbued;
-                    type ImbuedWith<T2: _p::rpc::Table> = #name<T::ImbuedWith<T2>>;
+    let impl_a_table = quote!(impl<'a, #generic_constrained_params #table_type_param: _p::rpc::Table>);
+    let struct_reader_a = quote!(_p::StructReader<'a, #table_type_param>);
+    let reader_with_a = quote!(#modname::Reader<'a, #generic_params_list #table_type_param>);
+    let struct_builder_a = quote!(_p::StructReader<'a, #table_type_param>);
+    let builder_with_a = quote!(#modname::Builder<'a, #generic_params_list #table_type_param>);
 
-                    #[inline]
-                    fn imbued(&self) -> &Self::Imbued { self.0.imbued() }
+    let table_constrained_param = quote!(#table_type_param: _p::rpc::Table,);
 
-                    #[inline]
-                    fn imbue_release<T2: _p::rpc::Table>(
-                        self,
-                        new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
-                    ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
-                        let (imbued, old) = self.0.imbue_release(new_table);
-                        (#name(imbued), old)
-                    }
-
-                    #[inline]
-                    fn imbue_release_into<U>(
-                        &self,
-                        other: U,
-                    ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
-                    where
-                        U: _p::Capable,
-                        U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
-                    {
-                        self.0.imbue_release_into(other)
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for #modname::Reader<'a, T> {
-                    type Ptr = _p::StructReader<'a, T>;
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>> for #modname::Reader<'a, T> {
-                    #[inline]
-                    fn from(ptr: _p::StructReader<'a, T>) -> Self {
-                        #name(ptr)
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::From<#modname::Reader<'a, T>> for _p::StructReader<'a, T> {
-                    #[inline]
-                    fn from(reader: #modname::Reader<'a, T>) -> Self {
-                        reader.0
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>> for #modname::Reader<'a, T> {
-                    #[inline]
-                    fn as_ref(&self) -> &_p::StructReader<'a, T> {
-                        &self.0
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> _p::ty::StructReader for #modname::Reader<'a, T> {}
-
-                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for #modname::Builder<'a, T> {
-                    type Ptr = _p::StructBuilder<'a, T>;
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::From<#modname::Builder<'a, T>> for _p::StructBuilder<'a, T> {
-                    #[inline]
-                    fn from(reader: #modname::Builder<'a, T>) -> Self {
-                        reader.0
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>> for #modname::Builder<'a, T> {
-                    #[inline]
-                    fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
-                        &self.0
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>> for #modname::Builder<'a, T> {
-                    #[inline]
-                    fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
-                        &mut self.0
-                    }
-                }
-
-                impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for #modname::Builder<'a, T> {
-                    unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
-                        Self(ptr)
-                    }
-                }
-
-                #struct_view
-                #struct_group_marker
-
-                impl #name {
-                    #(#descriptors)*
-                }
-
-                impl<'p, T: _p::rpc::Table + 'p> #modname::Reader<'p, T> {
-                    #(#ref_accessors)*
-                    #which_ref_accessor
-                }
-
-                impl<'p, T: _p::rpc::Table + 'p> #modname::Builder<'p, T> {
-                    #(#mut_accessors)*
-                    #(#own_accessors)*
-                    #which_mut_accessor
-                }
-
-                pub mod #modname {
-                    use super::{__file, __imports, _p};
-
-                    pub type Reader<'a, T = _p::rpc::Empty> = super::#name<_p::StructReader<'a, T>>;
-                    pub type Builder<'a, T = _p::rpc::Empty> = super::#name<_p::StructBuilder<'a, T>>;
-
-                    #which_type
-
-                    #(#nested)*
+    let struct_group_marker = if let Some(StructSize { data, ptrs }) = size {
+        quote! {
+            impl<#generic_constrained_params> _p::ty::Struct for #name<#generic_params_list> {
+                const SIZE: _p::StructSize = _p::StructSize { data: #data, ptrs: #ptrs };
+            }
+        }
+    } else {
+        let clears = self.generate_field_items(FieldItem::Clear);
+        quote! {
+            impl<#generic_constrained_params> _p::FieldGroup for #name<#generic_params_list> {
+                unsafe fn clear<'a, 'b, #table_constrained_param>(s: &'a mut _p::StructBuilder<'b, #table_type_param>) {
+                    #(#clears)*
                 }
             }
         }
-);
+    };
+
+    quote! {
+        #[derive(Clone)]
+        pub struct #name<#generic_constrained_params_default #repr_type_param = _p::Family> {
+            #(#generic_phantom_fields,)*
+            #repr_field_ident: #repr_type_param,
+        }
+
+        impl<#generic_constrained_params #repr_type_param> #name<#generic_params_list #repr_type_param> {
+            fn wrap(#repr_field_ident: #repr_type_param) -> Self {
+                Self {
+                    #(#type_field_idents: ::core::marker::PhantomData,)*
+                    #repr_field_ident,
+                }
+            }
+        }
+
+        impl<#generic_constrained_params #repr_type_param>
+            _p::IntoFamily for
+            #name<#generic_params_list #repr_type_param>
+        {
+            type Family = #name<#generic_params_list>;
+        }
+
+        impl<#generic_constrained_params #repr_type_param: _p::Capable>
+            _p::Capable for
+            #name<#generic_params_list #repr_type_param>
+        {
+            type Table = #repr_type_param::Table;
+
+            type Imbued = #repr_type_param::Imbued;
+            type ImbuedWith<#free_type_param: _p::rpc::Table> =
+                #name<#generic_params_list #repr_type_param::ImbuedWith<#free_type_param>>;
+
+            #[inline]
+            fn imbued(&self) -> &Self::Imbued { self.#repr_field_ident.imbued() }
+
+            #[inline]
+            fn imbue_release<#free_type_param: _p::rpc::Table>(
+                self,
+                new_table: <Self::ImbuedWith<#free_type_param> as _p::Capable>::Imbued,
+            ) -> (Self::ImbuedWith<#free_type_param>, Self::Imbued) {
+                let (imbued, old) = self.#repr_field_ident.imbue_release(new_table);
+                (#name::wrap(imbued), old)
+            }
+
+            #[inline]
+            fn imbue_release_into<#free_type_param>(
+                &self,
+                other: #free_type_param,
+            ) -> (#free_type_param::ImbuedWith<Self::Table>, #free_type_param::Imbued)
+            where
+                #free_type_param: _p::Capable,
+                #free_type_param::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+            {
+                self.#repr_field_ident.imbue_release_into(other)
+            }
+        }
+
+        impl<#generic_constrained_params> _p::StructView for #name<#generic_params_list> {
+            type Reader<'a, #table_type_param: _p::rpc::Table> = #reader_with_a;
+            type Builder<'a, #table_type_param: _p::rpc::Table> = #builder_with_a;
+        }
+
+        #struct_group_marker
+
+        impl<#generic_constrained_params> #name<#generic_params_list> {
+            #(#descriptors)*
+        }
+
+        #impl_a_table _p::ty::TypedPtr for #reader_with_a {
+            type Ptr = #struct_reader_a;
+        }
+
+        #impl_a_table ::core::convert::From<#struct_reader_a> for #reader_with_a {
+            #[inline]
+            fn from(ptr: #struct_reader_a) -> Self {
+                Self::wrap(ptr)
+            }
+        }
+
+        #impl_a_table ::core::convert::From<#reader_with_a> for #struct_reader_a {
+            #[inline]
+            fn from(reader: #reader_with_a) -> Self {
+                reader.#repr_field_ident
+            }
+        }
+
+        #impl_a_table ::core::convert::AsRef<#struct_reader_a> for #reader_with_a {
+            #[inline]
+            fn as_ref(&self) -> &#struct_reader_a {
+                &self.#repr_field_ident
+            }
+        }
+
+        #impl_a_table _p::ty::StructReader for #reader_with_a {}
+
+        #impl_a_table #reader_with_a {
+            #(#ref_accessors)*
+            #which_ref_accessor
+        }
+
+        #impl_a_table _p::ty::TypedPtr for #builder_with_a {
+            type Ptr = #struct_builder_a;
+        }
+
+        #impl_a_table ::core::convert::From<#builder_with_a> for #struct_builder_a {
+            #[inline]
+            fn from(reader: #builder_with_a) -> Self {
+                reader.#repr_field_ident
+            }
+        }
+
+        #impl_a_table ::core::convert::AsRef<#struct_builder_a> for #builder_with_a {
+            #[inline]
+            fn as_ref(&self) -> &#struct_builder_a {
+                &self.#repr_field_ident
+            }
+        }
+
+        #impl_a_table ::core::convert::AsMut<#struct_builder_a> for #builder_with_a {
+            #[inline]
+            fn as_mut(&mut self) -> &mut #struct_builder_a {
+                &mut self.#repr_field_ident
+            }
+        }
+
+        #impl_a_table _p::ty::StructBuilder for #builder_with_a {
+            unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                Self::wrap(ptr)
+            }
+        }
+
+        #impl_a_table #builder_with_a {
+            #(#mut_accessors)*
+            #(#own_accessors)*
+            #which_mut_accessor
+        }
+
+        pub mod #modname {
+            use super::{__file, __imports, _p};
+
+            pub type Reader<'a, #(#type_idents = _p::AnyPtr,)* #table_type_param = _p::rpc::Empty>
+                = super::#name<#generic_params_list #struct_reader_a>;
+            pub type Builder<'a, #(#type_idents = _p::AnyPtr,)* #table_type_param = _p::rpc::Empty>
+                = super::#name<#generic_params_list #struct_builder_a>;
+
+            #which_type
+
+            #(#nested)*
+        }
+    }
+});
 
 pub struct GeneratedField {
     pub type_name: syn::Ident,
@@ -450,7 +405,7 @@ impl GeneratedField {
         self.descriptor
             .as_ref()
             .map(|FieldDescriptor { slot, default }| {
-                quote!(_p::Descriptor::<#field_type> {
+                quote!(_p::FieldInfo<#field_type> {
                     slot: #slot,
                     default: #default,
                 })
@@ -458,109 +413,80 @@ impl GeneratedField {
             .unwrap_or(quote!(()))
     }
 
-    pub fn descriptor(&self) -> TokenStream {
+    pub fn generate_item(&self, item: FieldItem, ty: &GeneratedStruct) -> TokenStream {
+        let GeneratedStruct { table_type_param, generic_params, .. } = ty;
         let Self {
-            descriptor_ident: name,
-            field_type,
-            ..
-        } = self;
-        let descriptor_value = self.descriptor_value();
-
-        quote!(const #name: _p::Descriptor<#field_type> = #descriptor_value;)
-    }
-
-    pub fn ref_accessor(&self) -> TokenStream {
-        let Self {
-            accessor_ident: name,
+            accessor_ident,
+            own_accessor_ident,
             field_type,
             type_name,
-            descriptor_ident: descriptor,
+            descriptor_ident,
             ..
         } = self;
-        quote! {
-            #[inline]
-            pub fn #name(&self) -> _p::Accessor<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::accessor(&self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
 
-    pub fn mut_accessor(&self) -> TokenStream {
-        let GeneratedField {
-            accessor_ident: name,
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = self;
-        quote! {
-            #[inline]
-            pub fn #name(&mut self) -> _p::AccessorMut<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::accessor(&mut self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
+        let struct_generic_idents = generic_params.iter().map(|p| &p.type_name);
+        let type_ref = quote!(#type_name::<#(#struct_generic_idents,)*>);
 
-    pub fn own_accessor(&self) -> TokenStream {
-        let GeneratedField {
-            own_accessor_ident: Some(name),
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = self
-        else {
-            return TokenStream::new();
-        };
-        quote! {
-            #[inline]
-            pub fn #name(self) -> _p::AccessorOwned<'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::accessor(self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
+        match item {
+            FieldItem::Descriptor => {
+                let descriptor_value = self.descriptor_value();
+                quote!(const #descriptor_ident: _p::Descriptor<#field_type> = #descriptor_value;)
+            },
+            FieldItem::RefAccessor => quote! {
+                #[inline]
+                pub fn #accessor_ident(&self) -> _p::Accessor<'_, 'a, #table_type_param, #field_type> {
+                    unsafe { self.0.field::<#field_type>(&#type_ref::#descriptor_ident) }
+                }
+            },
+            FieldItem::MutAccessor => quote! {
+                #[inline]
+                pub fn #accessor_ident(&mut self) -> _p::AccessorMut<'_, 'a, #table_type_param, #field_type> {
+                    unsafe { self.0.field::<#field_type>(&#type_ref::#descriptor_ident) }
+                }
+            },
+            FieldItem::OwnAccessor => {
+                let Some(own_accessor_ident) = own_accessor_ident else {
+                    return TokenStream::new()
+                };
 
-    pub fn call_clear(&self) -> TokenStream {
-        let Self {
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = self;
-        quote! {
-            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor);
+                quote! {
+                    #[inline]
+                    pub fn #own_accessor_ident(self) -> _p::AccessorOwned<'a, #table_type_param, #field_type> {
+                        unsafe { self.0.into_field::<#field_type>(&#type_ref::#descriptor_ident) }
+                    }
+                }
+            },
+            FieldItem::Clear => quote! {
+                s.clear_field::<#field_type>(&#type_ref::#descriptor_ident);
+            },
         }
     }
 }
 
 pub struct GeneratedWhich {
     pub tag_slot: u32,
-    pub type_params: Vec<syn::TypeParam>,
+    /// The type parameter name used for the "view" type. For example, in
+    /// 
+    /// ```ignore
+    /// pub enum Which<View: Viewable> {
+    ///     Foo(ViewOf<i32>),
+    ///     Bar(ViewOf<u64>),
+    /// }
+    /// ```
+    /// 
+    /// the parameter `View` is the view type.
+    pub view_param: syn::Ident,
+    /// Generic parameters scoped to this type. This is not the same as the generic parameters of
+    /// the parent type, since this only includes parameters used by the union itself.
+    /// 
+    /// The names used here are re-used from the parent type, so they can be used when referring to
+    /// the Which type in the parent's scope.
+    pub generic_params: Vec<syn::Ident>,
     pub fields: Vec<GeneratedVariant>,
 }
 
 impl GeneratedWhich {
-    pub fn descriptors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        self.fields
-            .iter()
-            .map(move |variant| variant.descriptor(self.tag_slot))
-    }
-    pub fn ref_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        self.fields
-            .iter()
-            .map(move |variant| variant.ref_accessor())
-    }
-    pub fn mut_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        self.fields
-            .iter()
-            .map(move |variant| variant.mut_accessor())
-    }
-    pub fn own_accessors(&self) -> impl Iterator<Item = TokenStream> + '_ {
-        self.fields
-            .iter()
-            .map(move |variant| variant.own_accessor())
-    }
-    pub fn call_clear(&self) -> impl Iterator<Item = TokenStream> + '_ {
+    pub fn call_clear(&self, ty: &GeneratedStruct) -> impl Iterator<Item = TokenStream> + '_ {
         let tag_slot = self.tag_slot as usize;
         let clear_tag = quote! {
             s.set_field_unchecked(#tag_slot, 0);
@@ -571,9 +497,93 @@ impl GeneratedWhich {
             .iter()
             .find(|variant| variant.case == 0)
             .expect("no variant has case 0!")
-            .call_clear();
+            .generate_item(FieldItem::Clear, self, ty);
 
         [clear_tag, clear_first].into_iter()
+    }
+
+    pub fn generate_type(&self, ty: &GeneratedStruct) -> TokenStream {
+        let GeneratedStruct {
+            ident: struct_name,
+            repr_field_ident,
+            table_type_param,
+            generic_params: struct_generic_params,
+            ..
+        } = ty;
+        let GeneratedWhich {
+            tag_slot,
+            fields,
+            view_param,
+            generic_params,
+        } = self;
+
+        let struct_generic_idents = struct_generic_params
+            .iter()
+            .map(|p| &p.type_name)
+            .collect::<Vec<_>>();
+        let struct_generics = quote!(#(#struct_generic_idents,)*);
+        let struct_generics_bounds = quote!(#(#struct_generic_idents: _p::field::FieldType,)*);
+
+        let tag_slot = *tag_slot as usize;
+        let disciminants = fields.iter().map(
+            |GeneratedVariant {
+                 discriminant_ident: name,
+                 discriminant_field_type: field_type,
+                 ..
+             }| quote!(#name(_p::ViewOf<#view_param, #field_type>)),
+        );
+        let disciminant_matches = fields.iter()
+            .map(|GeneratedVariant {
+                discriminant_ident: name,
+                discriminant_field_type: field_type,
+                field: GeneratedField { descriptor_ident, .. },
+                case,
+            }| {
+                quote!(#case => Ok(Which::#name(s.#repr_field_ident.field::<#field_type>(
+                    &super::#struct_name::<#struct_generics>::#descriptor_ident.field
+                ))))
+            })
+            .collect::<Vec<_>>();
+
+        let table_bound = quote!(#table_type_param: _p::Table);
+        let which_generic_defs = quote!(#(#generic_params: _p::field::FieldType = _p::AnyPtr,)*);
+
+        let type_reader = quote!(&'b self::Reader<'a, #struct_generics #table_type_param>);
+        let type_builder = quote!(&'b mut self::Builder<'a, #struct_generics #table_type_param>);
+
+        quote! {
+            pub enum Which<#which_generic_defs #view_param: _p::Viewable = _p::Family> {
+                #(#disciminants),*
+            }
+
+            impl<'a, 'b, #struct_generics_bounds #table_bound>
+                _p::UnionViewer<#type_reader> for Which<#(#generic_params,)*>
+            {
+                type View = Which<#(#generic_params,)* &'b _p::StructReader<'a, #table_type_param>>;
+
+                unsafe fn get(s: #type_reader) -> Result<Self::View, _p::NotInSchema> {
+                    let tag = s.#repr_field_ident.data_field::<u16>(#tag_slot);
+                    match tag {
+                        #(#disciminant_matches,)*
+                        unknown => Err(_p::NotInSchema(unknown)),
+                    }
+                }
+            }
+
+            impl<'a, 'b, #struct_generics_bounds #table_bound>
+                _p::UnionViewer<#type_builder> for Which<#(#generic_params,)*>
+            {
+                type View = Which<#(#generic_params,)* &'b mut _p::StructBuilder<'a, #table_type_param>>;
+
+                unsafe fn get(s: #type_builder) -> Result<Self::View, _p::NotInSchema> {
+                    let tag = s.#repr_field_ident.data_field::<u16>(#tag_slot);
+                    match tag {
+                        #(#disciminant_matches,)*
+                        unknown => Err(_p::NotInSchema(unknown)),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -593,90 +603,71 @@ pub struct GeneratedVariant {
 }
 
 impl GeneratedVariant {
-    pub fn descriptor(&self, tag_slot: u32) -> TokenStream {
+    pub fn generate_item(
+        &self,
+        item: FieldItem,
+        which: &GeneratedWhich,
+        ty: &GeneratedStruct,
+    ) -> TokenStream {
+        let GeneratedWhich { tag_slot, .. } = which;
+        let GeneratedStruct { table_type_param, generic_params, .. } = ty;
         let Self {
             case,
-            field:
-                field @ GeneratedField {
-                    descriptor_ident: name,
-                    field_type,
-                    ..
-                },
+            field: field @ GeneratedField {
+                accessor_ident,
+                own_accessor_ident,
+                field_type,
+                type_name,
+                descriptor_ident,
+                ..
+            },
             ..
         } = self;
-        let descriptor_value = field.descriptor_value();
 
-        quote! {
-            const #name: _p::VariantDescriptor<#field_type>
-                = _p::VariantDescriptor::<#field_type> {
-                    variant: _p::VariantInfo {
-                        slot: #tag_slot,
-                        case: #case,
-                    },
-                    field: #descriptor_value,
+        let struct_generic_idents = generic_params.iter().map(|p| &p.type_name);
+        let type_ref = quote!(#type_name::<#(#struct_generic_idents,)*>);
+
+        match item {
+            FieldItem::Descriptor => {
+                let descriptor_value = field.descriptor_value();
+                quote! {
+                    const #descriptor_ident: _p::VariantDescriptor<#field_type>
+                        = _p::VariantDescriptor::<#field_type> {
+                            variant: _p::VariantInfo {
+                                slot: #tag_slot,
+                                case: #case,
+                            },
+                            field: #descriptor_value,
+                        };
+                }
+            },
+            FieldItem::RefAccessor => quote! {
+                #[inline]
+                pub fn #accessor_ident(&self) -> _p::Variant<'_, 'a, #table_type_param, #field_type> {
+                    unsafe { self.0.variant::<#field_type>(&#type_ref::#descriptor_ident) }
+                }
+            },
+            FieldItem::MutAccessor => quote! {
+                #[inline]
+                pub fn #accessor_ident(&mut self) -> _p::VariantMut<'_, 'a, #table_type_param, #field_type> {
+                    unsafe { self.0.variant::<#field_type>(&#type_ref::#descriptor_ident) }
+                }
+            },
+            FieldItem::OwnAccessor => {
+                let Some(own_accessor_ident) = own_accessor_ident else {
+                    return TokenStream::new()
                 };
-        }
-    }
-    pub fn ref_accessor(&self) -> TokenStream {
-        let GeneratedField {
-            accessor_ident: name,
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = &self.field;
-        quote! {
-            #[inline]
-            pub fn #name(&self) -> _p::Variant<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::variant(&self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
 
-    pub fn mut_accessor(&self) -> TokenStream {
-        let GeneratedField {
-            accessor_ident: name,
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = &self.field;
-        quote! {
-            #[inline]
-            pub fn #name(&mut self) -> _p::VariantMut<'_, 'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::variant(&mut self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
-
-    pub fn own_accessor(&self) -> TokenStream {
-        let GeneratedField {
-            own_accessor_ident: Some(name),
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = &self.field
-        else {
-            return TokenStream::new();
-        };
-        quote! {
-            #[inline]
-            pub fn #name(self) -> _p::VariantOwned<'p, T, #field_type> {
-                unsafe { <#field_type as _p::field::FieldType>::variant(self.0, &#type_name::#descriptor) }
-            }
-        }
-    }
-
-    pub fn call_clear(&self) -> TokenStream {
-        let GeneratedField {
-            field_type,
-            type_name,
-            descriptor_ident: descriptor,
-            ..
-        } = &self.field;
-        quote! {
-            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor.field);
+                quote! {
+                    #[inline]
+                    pub fn #own_accessor_ident(self) -> _p::VariantOwned<'a, #table_type_param, #field_type> {
+                        unsafe { self.0.into_variant::<#field_type>(&#type_ref::#descriptor_ident) }
+                    }
+                }
+            },
+            FieldItem::Clear => quote! {
+                s.clear_field::<#field_type>(&#type_ref::#descriptor_ident.field);
+            },
         }
     }
 }
@@ -687,7 +678,7 @@ pub struct GeneratedEnum {
 }
 
 to_tokens!(
-    GeneratedEnum | self | {
+    GeneratedEnum |self| {
         let (name, enumerants) = (&self.name, &self.enumerants);
         let enum_matches = self.enumerants.iter().enumerate().map(|(value, ident)| {
             let value = value as u16;
@@ -733,7 +724,7 @@ pub struct GeneratedConst {
 }
 
 to_tokens!(
-    GeneratedConst | self | {
+    GeneratedConst |self| {
         let Self {
             ident,
             const_type,
