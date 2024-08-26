@@ -2647,6 +2647,22 @@ impl<'a, T: Table> StructReader<'a, T> {
         self.ptr_field_option(index)
             .unwrap_or_else(|| PtrReader::null().imbue(self.table.clone()))
     }
+
+    #[inline]
+    pub unsafe fn field<'b, V: field::FieldType>(
+        &'b self,
+        descriptor: &'static V::Descriptor,
+    ) -> V::Accessor<&'b Self> {
+        unsafe { V::accessor(self, descriptor) }
+    }
+
+    #[inline]
+    pub unsafe fn variant<'b, V: field::FieldType>(
+        &'b self,
+        descriptor: &'static field::VariantDescriptor<V>,
+    ) -> V::VariantAccessor<&'b Self> {
+        unsafe { V::variant(self, descriptor) }
+    }
 }
 
 impl<'a, T: Table> Clone for StructReader<'a, T> {
@@ -4907,6 +4923,43 @@ impl<'a, T: Table> StructBuilder<'a, T> {
             builder: self.builder,
             table: self.table,
         }
+    }
+
+    #[inline]
+    pub unsafe fn field<'b, V: field::FieldType>(
+        &'b mut self,
+        descriptor: &'static V::Descriptor,
+    ) -> V::Accessor<&'b mut Self> {
+        unsafe { V::accessor(self, descriptor) }
+    }
+
+    #[inline]
+    pub unsafe fn variant<'b, V: field::FieldType>(
+        &'b mut self,
+        descriptor: &'static field::VariantDescriptor<V>,
+    ) -> V::VariantAccessor<&'b mut Self> {
+        unsafe { V::variant(self, descriptor) }
+    }
+
+    #[inline]
+    pub unsafe fn into_field<V: field::FieldType>(
+        self,
+        descriptor: &'static V::Descriptor,
+    ) -> V::Accessor<Self> {
+        unsafe { V::accessor(self, descriptor) }
+    }
+
+    #[inline]
+    pub unsafe fn into_variant<'b, V: field::FieldType>(
+        self,
+        descriptor: &'static field::VariantDescriptor<V>,
+    ) -> V::VariantAccessor<Self> {
+        unsafe { V::variant(self, descriptor) }
+    }
+
+    #[inline]
+    pub unsafe fn clear_field<V: field::FieldType>(&mut self, descriptor: &'static V::Descriptor) {
+        unsafe { V::clear(self, descriptor) }
     }
 
     /// Mostly behaves like you'd expect a copy to behave, but with a caveat originating from
