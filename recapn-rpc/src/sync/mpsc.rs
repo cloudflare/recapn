@@ -17,18 +17,25 @@
 
 use crate::sync::request::{Request, SharedRequest};
 use crate::sync::util::array_vec::ArrayVec;
+use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::future::poll_fn;
 use std::hash::{Hash, Hasher};
+use std::mem::MaybeUninit;
+use std::process::abort;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
 use parking_lot::{Mutex, MutexGuard};
 
 use super::request::{self, Chan, IntoResults};
-use super::sharedshot::{self, ShotState};
+use super::util::atomic_state::{AtomicState, ShotState};
+use super::util::closed_task::ClosedTask;
 use super::util::linked_list::LinkedList;
 
+use super::util::wait_list::WaitList;
 pub use super::TryRecvError;
 
 #[derive(Clone, Copy)]
@@ -204,10 +211,7 @@ impl<C: Chan> Receiver<C> {
         let mut self_lock = self.shared.state.lock();
         if self_lock.requests.is_empty() {
             unsafe {
-                let _ = self
-                    .shared
-                    .resolution
-                    .send(ChannelResolution::Forward(other.clone()));
+                self.shared.resolution.resolve(ChannelResolution::Forward(other.clone()));
             }
             return Ok(());
         }
@@ -281,11 +285,9 @@ impl<C: Chan> Receiver<C> {
     pub fn close(self, err: C::Error) {
         let mut self_lock = self.shared.state.lock();
         drop(self_lock.waker.take());
-        let _ = unsafe {
-            self.shared
-                .resolution
-                .send(ChannelResolution::Error(err.clone()))
-        };
+        unsafe {
+            self.shared.resolution.resolve(ChannelResolution::Error(err.clone()))
+        }
 
         scopeguard::defer_on_unwind! {
             let mut self_lock = self.shared.state.lock();
@@ -348,21 +350,129 @@ enum ChannelResolution<C: Chan> {
     Error(C::Error),
 }
 
+struct ResolutionState<C: Chan + ?Sized> {
+    /// The state of the shot.
+    state: AtomicState,
+
+    /// A set of waiters waiting to receive the value.
+    waiters: WaitList,
+
+    /// The number of receivers waiting for the response. When this value reaches zero,
+    /// the channel is closed and the closed task is woken up.
+    receivers_count: AtomicUsize,
+
+    /// Tracks the receiver waiting for the channel to close (without pulling a value
+    /// from the channel)
+    closed_task: ClosedTask,
+
+    /// The value in the shot.
+    value: UnsafeCell<MaybeUninit<ChannelResolution<C>>>,
+}
+
+impl<C: Chan + ?Sized> ResolutionState<C> {
+    fn new(recvs: usize) -> Self {
+        Self {
+            state: AtomicState::new(),
+            waiters: WaitList::new(),
+            receivers_count: AtomicUsize::new(recvs),
+            closed_task: ClosedTask::new(),
+            value: UnsafeCell::new(MaybeUninit::uninit()),
+        }
+    }
+
+    fn resolved(recvs: usize, resolution: ChannelResolution<C>) -> Self {
+        Self {
+            state: AtomicState::new_set(),
+            waiters: WaitList::new(),
+            receivers_count: AtomicUsize::new(recvs),
+            closed_task: ClosedTask::new(),
+            value: UnsafeCell::new(MaybeUninit::new(resolution)),
+        }
+    }
+
+    fn state(&self) -> ShotState {
+        self.state.state()
+    }
+
+    pub fn is_receivers_closed(&self) -> bool {
+        self.state.load(Relaxed).is_recv_closed()
+    }
+
+    pub unsafe fn add_receiver(&self) {
+        let old = self.receivers_count.fetch_add(1, Relaxed);
+
+        if old == usize::MAX {
+            abort();
+        }
+
+        // Make sure I don't accidentally attempt to re-open the channel.
+        debug_assert_ne!(old, 0);
+    }
+
+    pub fn sender_poll_closed(&self, cx: &mut Context<'_>) -> Poll<()> {
+        self.closed_task.poll(&self.state, cx)
+    }
+
+    /// Remove a tracked receiver from the receiver count.
+    ///
+    /// If this is the last receiver (and the receiver count is zero), this closes the channel on
+    /// the receiving side.
+    ///
+    /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
+    pub unsafe fn remove_receiver(&self) {
+        let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
+        if last_receiver {
+            self.closed_task.close(&self.state)
+        }
+    }
+
+    /// Close the send half of the channel.
+    pub unsafe fn close_sender(&self) {
+        self.state.set_send_closed();
+        self.waiters.wake_all();
+    }
+
+    unsafe fn get_ref_unchecked(&self) -> &ChannelResolution<C> {
+        (&*self.value.get()).assume_init_ref()
+    }
+
+    unsafe fn resolve(&self, value: ChannelResolution<C>) {
+        let value_store = &mut *self.value.get();
+        value_store.write(value);
+
+        let prev = self.state.try_set_value();
+        if prev.is_recv_closed() {
+            value_store.assume_init_drop();
+            return
+        }
+
+        self.waiters.wake_all();
+    }
+}
+
+impl<C: Chan + ?Sized> Drop for ResolutionState<C> {
+    fn drop(&mut self) {
+        let state = self.state.get();
+
+        if state.is_set() {
+            unsafe { self.value.get_mut().assume_init_drop() }
+        }
+    }
+}
+
 /// The shared state behind a request queue
 pub(crate) struct SharedChannel<C: Chan + ?Sized> {
     state: Mutex<State<C>>,
 
-    /// A sharedshot to track channel resolution.
-    ///
     /// In a channel, all senders and requests in the channel are considered receivers of
-    /// the sharedshot result. This prevents the sharedshot from prematurely closing if all
+    /// the resolution result. This prevents the sharedshot from prematurely closing if all
     /// senders are dropped but requests are active in the channel.
     ///
     /// Instances where all senders have dropped but requests are still active are common
     /// in pipeline clients, where a request is sent on the pipeline, then the sender is
     /// dropped. As long as the request has receivers for its reponse, it should stay active,
     /// instead of getting canceled because the channel closed and was dropped.
-    resolution: sharedshot::State<ChannelResolution<C>>,
+    resolution: ResolutionState<C>,
 
     chan: C,
 }
@@ -383,7 +493,7 @@ impl<C: Chan> SharedChannel<C> {
             ShotState::Closed => Some(Resolution::Dropped),
             ShotState::Empty => None,
             ShotState::Sent => {
-                let res = unsafe { self.resolution.get_ref() };
+                let res = unsafe { self.resolution.get_ref_unchecked() };
                 Some(match res {
                     ChannelResolution::Forward(channel) => Resolution::Forwarded(channel),
                     ChannelResolution::Error(err) => Resolution::Error(err),
@@ -455,21 +565,6 @@ impl<C: Chan> SharedChannel<C> {
     }
 }
 
-pub(crate) struct ResolutionReceiver<C: Chan>(Arc<SharedChannel<C>>);
-
-impl<C: Chan> ResolutionReceiver<C> {
-    pub fn track(s: Arc<SharedChannel<C>>) -> Self {
-        unsafe { s.resolution.add_receiver() }
-        Self(s)
-    }
-}
-
-impl<C: Chan> Drop for ResolutionReceiver<C> {
-    fn drop(&mut self) {
-        unsafe { self.0.resolution.remove_receiver() }
-    }
-}
-
 pub fn channel<C: Chan>(chan: C) -> (Sender<C>, Receiver<C>) {
     let channel = Arc::new(SharedChannel {
         state: Mutex::new(State {
@@ -478,7 +573,7 @@ pub fn channel<C: Chan>(chan: C) -> (Sender<C>, Receiver<C>) {
             waker: None,
         }),
         // 1 receiver for the sender
-        resolution: sharedshot::State::new(1),
+        resolution: ResolutionState::new(1),
         chan,
     });
     let sender = Sender {
@@ -497,10 +592,9 @@ pub fn broken<C: Chan>(chan: C, err: C::Error) -> Sender<C> {
             waker: None,
         }),
         // 1 receiver for the sender
-        resolution: sharedshot::State::new(1),
+        resolution: ResolutionState::resolved(1, ChannelResolution::Error(err)),
         chan,
     });
-    let _ = unsafe { channel.resolution.send(ChannelResolution::Error(err)) };
 
     Sender { shared: channel }
 }
@@ -544,7 +638,7 @@ pub(crate) fn weak_channel<C: Chan>(
             waker: None,
         }),
         // 1 receiver for the sender
-        resolution: sharedshot::State::new(1),
+        resolution: ResolutionState::new(1),
         chan,
     });
     let weak_channel = WeakChannel {

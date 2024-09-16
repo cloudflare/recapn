@@ -265,7 +265,7 @@ impl PipelineResolver<RpcChannel> for SetPipeline {
     }
 }
 
-impl request::IntoResults<RpcChannel> for Error {
+impl IntoResults<RpcChannel> for Error {
     fn into_results(self) -> <RpcChannel as request::Chan>::Results {
         RpcResults::Owned(Err(self))
     }
