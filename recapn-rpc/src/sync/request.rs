@@ -22,12 +22,12 @@ use hashbrown::{Equivalent, HashMap};
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
-use crate::sync::mpsc::{weak_channel, Sender};
-use crate::sync::sharedshot::{self, RecvWaiter, ShotState, TryRecvError};
-use crate::sync::util::Marc;
-
-use super::mpsc::{self, SharedChannel, WeakChannel};
-use super::sharedshot::Waiter;
+use super::TryRecvError;
+use super::mpsc::{self, weak_channel, Sender, SharedChannel, WeakChannel};
+use super::util::Marc;
+use super::util::atomic_state::{AtomicState, ShotState};
+use super::util::closed_task::ClosedTask;
+use super::util::wait_list::{RecvWaiter, WaitList, Waiter};
 use super::util::linked_list::{Link, Pointers};
 
 /// An abstract channel. This is associated data stored in a mpsc channel that
@@ -137,7 +137,7 @@ pub(crate) struct SharedRequest<C: Chan> {
     usage: RequestUsage,
 
     /// The state of the request.
-    state: sharedshot::AtomicState,
+    state: AtomicState,
 
     /// The number of receivers waiting for the response. When this value reaches zero,
     /// the channel is closed and the closed task is woken up.
@@ -148,11 +148,11 @@ pub(crate) struct SharedRequest<C: Chan> {
 
     /// A set of waiters waiting to receive the value. Pipelined requests
     /// are not included here since they're fulfilled separately.
-    waiters: sharedshot::WaitList,
+    waiters: WaitList,
 
     /// The close task, woken up when all the receivers have been dropped and the channel
     /// has been marked closed.
-    closed_task: sharedshot::ClosedTask,
+    closed_task: ClosedTask,
 
     /// The response value.
     response: UnsafeCell<MaybeUninit<C::Results>>,
@@ -231,10 +231,10 @@ impl<C: Chan> SharedRequest<C> {
             pointers: Pointers::new(),
             request: UnsafeCell::new(ManuallyDrop::new(request)),
             usage,
-            state: sharedshot::AtomicState::new(),
-            waiters: sharedshot::WaitList::new(),
+            state: AtomicState::new(),
+            waiters: WaitList::new(),
             receivers_count: AtomicUsize::new(receivers),
-            closed_task: sharedshot::ClosedTask::new(),
+            closed_task: ClosedTask::new(),
             response: UnsafeCell::new(MaybeUninit::uninit()),
             pipeline_map: Mutex::new(HashMap::new()),
             pipeline_dest: UnsafeCell::new(MaybeUninit::uninit()),
