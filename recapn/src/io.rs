@@ -545,7 +545,7 @@ pub fn read_packed_from_stream<R: io::BufRead>(
 }
 
 #[cfg(feature = "std")]
-pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments) -> Result<(), io::Error> {
+pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments<'_>) -> Result<(), io::Error> {
     let stream_table = StreamTable::from_segments(segments);
     let message_segment_bytes = segments.clone().into_iter().map(|s| s.as_bytes());
     let mut io_slice_box = iter::once(stream_table.as_bytes())
@@ -559,7 +559,7 @@ pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments) -> Resu
 #[cfg(feature = "std")]
 pub fn write_message_packed<W: io::Write>(
     mut w: W,
-    segments: &MessageSegments,
+    segments: &MessageSegments<'_>,
 ) -> Result<(), io::Error> {
     let mut buffer = [0u8; 256];
 

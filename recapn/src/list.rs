@@ -227,7 +227,7 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
     }
 
     #[inline]
-    pub fn as_reader(&self) -> Reader<V, T> {
+    pub fn as_reader(&self) -> Reader<'_, V, T> {
         List {
             v: PhantomData,
             repr: self.repr.as_reader(),
@@ -708,7 +708,7 @@ where
     V: ty::ListValue,
 {
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 
@@ -785,7 +785,7 @@ where
     #[inline]
     pub fn try_set<E: ErrorHandler>(
         &mut self,
-        value: &Reader<V, impl InsertableInto<T>>,
+        value: &Reader<'_, V, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
         self.ptr_builder().try_set_list(
@@ -796,7 +796,7 @@ where
     }
 
     #[inline]
-    pub fn set(&mut self, value: &Reader<V, impl InsertableInto<T>>) {
+    pub fn set(&mut self, value: &Reader<'_, V, impl InsertableInto<T>>) {
         self.try_set(value, IgnoreErrors).unwrap()
     }
 
@@ -811,7 +811,7 @@ where
     T: Table,
 {
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 
@@ -900,7 +900,7 @@ where
     #[inline]
     pub fn try_set<E: ErrorHandler>(
         self,
-        value: &Reader<AnyStruct, impl InsertableInto<T>>,
+        value: &Reader<'_, AnyStruct, impl InsertableInto<T>>,
         desired_size: Option<StructSize>,
         err_handler: E,
     ) -> Result<(), E::Error> {
@@ -916,7 +916,7 @@ where
     #[inline]
     pub fn set(
         self,
-        value: &Reader<AnyStruct, impl InsertableInto<T>>,
+        value: &Reader<'_, AnyStruct, impl InsertableInto<T>>,
         desired_size: Option<StructSize>,
     ) {
         self.try_set(value, desired_size, IgnoreErrors).unwrap()
@@ -1014,7 +1014,7 @@ where
     T: Table,
 {
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 
@@ -1073,7 +1073,7 @@ where
     #[inline]
     pub fn try_set<E: ErrorHandler>(
         self,
-        value: &any::ListReader<impl InsertableInto<T>>,
+        value: &any::ListReader<'_, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
         self.into_ptr_builder().try_set_list(
@@ -1084,7 +1084,7 @@ where
     }
 
     #[inline]
-    pub fn set(self, value: &any::ListReader<impl InsertableInto<T>>) {
+    pub fn set(self, value: &any::ListReader<'_, impl InsertableInto<T>>) {
         self.try_set(value, IgnoreErrors).unwrap()
     }
 
@@ -1175,7 +1175,7 @@ where
     T: Table,
 {
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 
@@ -1207,7 +1207,7 @@ where
     }
 
     #[inline]
-    pub fn set(self, value: data::Reader) -> data::Builder<'b> {
+    pub fn set(self, value: data::Reader<'_>) -> data::Builder<'b> {
         self.into_ptr_builder().set_blob(value.into()).into()
     }
 
@@ -1300,7 +1300,7 @@ where
     T: Table,
 {
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 
@@ -1336,7 +1336,7 @@ where
     }
 
     #[inline]
-    pub fn set(self, value: &text::Reader) -> text::Builder<'b> {
+    pub fn set(self, value: &text::Reader<'_>) -> text::Builder<'b> {
         let mut new = self.init(value.byte_count());
         new.as_bytes_mut().copy_from_slice(value.as_bytes());
         new
@@ -1476,12 +1476,12 @@ where
     T: rpc::CapTable<Cap = Client>,
 {
     #[inline]
-    fn ptr_reader(&self) -> crate::ptr::PtrReader<T> {
+    fn ptr_reader(&self) -> crate::ptr::PtrReader<'_, T> {
         unsafe { self.list.as_ref().ptr_unchecked(self.idx) }
     }
 
     #[inline]
-    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<T> {
+    fn ptr_builder(&mut self) -> crate::ptr::PtrBuilder<'_, T> {
         unsafe { self.list.as_mut().ptr_mut_unchecked(self.idx) }
     }
 

@@ -300,12 +300,12 @@ impl<'a, 'b, T: Table> From<&'b PtrBuilder<'a, T>> for PtrReader<'b, T> {
 
 impl<'a, T: Table> PtrBuilder<'a, T> {
     #[inline]
-    pub fn as_reader(&self) -> PtrReader<T> {
+    pub fn as_reader(&self) -> PtrReader<'_, T> {
         AnyPtr(self.0.as_reader())
     }
 
     #[inline]
-    pub fn by_ref(&mut self) -> PtrBuilder<T> {
+    pub fn by_ref(&mut self) -> PtrBuilder<'_, T> {
         AnyPtr(self.0.by_ref())
     }
 
@@ -489,12 +489,12 @@ impl<'a, T: Table> PtrBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn set_data(self, value: data::Reader) -> data::Builder<'a> {
+    pub fn set_data(self, value: data::Reader<'_>) -> data::Builder<'a> {
         self.0.set_blob(value.into()).into()
     }
 
     #[inline]
-    pub fn set_text(self, value: text::Reader) -> text::Builder<'a> {
+    pub fn set_text(self, value: text::Reader<'_>) -> text::Builder<'a> {
         text::Builder::new_unchecked(self.0.set_blob(value.into()))
     }
 
@@ -788,12 +788,12 @@ impl<'a, T: Table> ty::StructBuilder for StructBuilder<'a, T> {
 
 impl<'a, T: Table> StructBuilder<'a, T> {
     #[inline]
-    pub fn as_reader(&self) -> StructReader<T> {
+    pub fn as_reader(&self) -> StructReader<'_, T> {
         AnyStruct(self.0.as_reader())
     }
 
     #[inline]
-    pub fn by_ref(&mut self) -> StructBuilder<T> {
+    pub fn by_ref(&mut self) -> StructBuilder<'_, T> {
         AnyStruct(self.0.by_ref())
     }
 
@@ -818,12 +818,12 @@ impl<'a, T: Table> StructBuilder<'a, T> {
     }
 
     #[inline]
-    pub fn ptr_section(&self) -> list::Reader<AnyPtr, T> {
+    pub fn ptr_section(&self) -> list::Reader<'_, AnyPtr, T> {
         List::new(self.0.ptr_section())
     }
 
     #[inline]
-    pub fn ptr_section_mut(&mut self) -> list::Builder<AnyPtr, T> {
+    pub fn ptr_section_mut(&mut self) -> list::Builder<'_, AnyPtr, T> {
         List::new(self.0.ptr_section_mut())
     }
 
@@ -1067,12 +1067,12 @@ impl<'a, T: Table> From<ListBuilder<'a, T>> for ptr::ListBuilder<'a, T> {
 
 impl<'a, T: Table> ListBuilder<'a, T> {
     #[inline]
-    pub fn as_reader(&self) -> ListReader<T> {
+    pub fn as_reader(&self) -> ListReader<'_, T> {
         self.0.as_reader().into()
     }
 
     #[inline]
-    pub fn by_ref(&mut self) -> ListBuilder<T> {
+    pub fn by_ref(&mut self) -> ListBuilder<'_, T> {
         self.0.by_ref().into()
     }
 

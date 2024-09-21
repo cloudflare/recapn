@@ -537,7 +537,7 @@ impl Unpacker {
         Ok(())
     }
 
-    fn unpack_inner<'a>(&mut self, src: &mut &[u8], dst: &mut &mut [Word]) -> StopReason {
+    fn unpack_inner(&mut self, src: &mut &[u8], dst: &mut &mut [Word]) -> StopReason {
         if src.is_empty() {
             return StopReason::NeedInput;
         }

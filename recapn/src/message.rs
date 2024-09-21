@@ -101,13 +101,13 @@ impl<'a> SingleSegmentMessage<'a> {
     ///
     /// If you want a limited reader, use [`Message::reader_with_options`].
     #[inline]
-    pub fn reader(&self) -> Reader {
+    pub fn reader(&self) -> Reader<'_> {
         Reader::limitless(&self.arena)
     }
 
     /// Creates a new reader for this message with the specified reader options.
     #[inline]
-    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader {
+    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader<'_> {
         Reader::new(&self.arena, options)
     }
 
@@ -186,7 +186,7 @@ impl<'e, A: Alloc> Message<'e, A> {
 impl<'e, A: Alloc + ?Sized> Message<'e, A> {
     /// Returns the segments of the message, or None if a root segment hasn't been allocated yet.
     #[inline]
-    pub fn segments(&self) -> Option<MessageSegments> {
+    pub fn segments(&self) -> Option<MessageSegments<'_>> {
         let (first, arena) = self.arena.try_root_and_build()?;
         Some(MessageSegments { first, arena })
     }
@@ -201,13 +201,13 @@ impl<'e, A: Alloc + ?Sized> Message<'e, A> {
     ///
     /// If you want a limited reader, use [`Message::reader_with_options`].
     #[inline]
-    pub fn reader(&self) -> Reader {
+    pub fn reader(&self) -> Reader<'_> {
         Reader::limitless(self.arena.as_read())
     }
 
     /// Creates a new reader for this message with the specified reader options.
     #[inline]
-    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader {
+    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader<'_> {
         Reader::new(self.arena.as_read(), options)
     }
 
@@ -316,7 +316,7 @@ impl<'b, 'e: 'b> Builder<'b, 'e> {
         }
     }
 
-    pub fn segments(&self) -> MessageSegments {
+    pub fn segments(&self) -> MessageSegments<'_> {
         MessageSegments {
             first: self.root,
             arena: self.arena,
@@ -518,13 +518,13 @@ impl<'a> Reader<'a> {
 
     /// Returns the root as any pointer. If no root segment exists, this is a default null pointer.
     #[inline]
-    pub fn root(&self) -> any::PtrReader {
+    pub fn root(&self) -> any::PtrReader<'_> {
         self.root_option().unwrap_or_default()
     }
 
     /// Returns the root as any pointer. If no root segment exists, this returns None.
     #[inline]
-    pub fn root_option(&self) -> Option<any::PtrReader> {
+    pub fn root_option(&self) -> Option<any::PtrReader<'_>> {
         let ptr = PtrReader::root(&self.message, self.limiter.as_ref(), self.nesting_limit)?;
         Some(ptr.into())
     }
