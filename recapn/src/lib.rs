@@ -154,8 +154,15 @@ impl Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Error::UnexpectedRead(read) => Some(read),
+            Error::IncompatibleUpgrade(upgrade) => Some(upgrade),
+            _ => None,
+        }
+    }
+}
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
@@ -169,5 +176,4 @@ impl Display for NotInSchema {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for NotInSchema {}
+impl core::error::Error for NotInSchema {}

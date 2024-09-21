@@ -1381,8 +1381,7 @@ impl fmt::Display for FailedRead {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for FailedRead {}
+impl core::error::Error for FailedRead {}
 
 /// An error returned when attempting to perform an incompatible upgrade to another list type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1415,8 +1414,7 @@ impl fmt::Display for IncompatibleUpgrade {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for IncompatibleUpgrade {}
+impl core::error::Error for IncompatibleUpgrade {}
 
 /// Describes the location of an object in a Cap'n Proto message. This can be used to create
 /// pointers directly into a message without needing to navigate through the message tree.
