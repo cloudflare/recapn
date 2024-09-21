@@ -332,5 +332,4 @@ impl fmt::Display for TableReadError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for TableReadError {}
+impl core::error::Error for TableReadError {}
