@@ -50,8 +50,8 @@ impl NonZeroU29 {
     pub const MIN_VALUE: u32 = 1;
     pub const MAX_VALUE: u32 = 2u32.pow(29) - 1;
 
-    pub const MIN: Self = Self(NonZeroU32::new(Self::MIN_VALUE).unwrap());
-    pub const MAX: Self = Self(NonZeroU32::new(Self::MAX_VALUE).unwrap());
+    pub const MIN: Self = Self(unsafe { NonZeroU32::new_unchecked(Self::MIN_VALUE) });
+    pub const MAX: Self = Self(unsafe { NonZeroU32::new_unchecked(Self::MAX_VALUE) });
 
     pub const ONE: Self = Self::MIN;
 
@@ -65,6 +65,15 @@ impl NonZeroU29 {
         } else {
             None
         }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub const fn new_unwrap(n: u32) -> Self {
+        let Some(s) = Self::new(n) else {
+            panic!("integer value out of range")
+        };
+        s
     }
 
     #[inline]
@@ -114,6 +123,15 @@ impl u29 {
         } else {
             None
         }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub const fn new_unwrap(n: u32) -> Self {
+        let Some(s) = Self::new(n) else {
+            panic!("integer value out of range")
+        };
+        s
     }
 
     #[inline]
@@ -192,6 +210,15 @@ impl i30 {
         } else {
             None
         }
+    }
+
+    #[inline]
+    #[track_caller]
+    pub const fn new_unwrap(n: i32) -> Self {
+        let Some(s) = Self::new(n) else {
+            panic!("integer value out of range")
+        };
+        s
     }
 
     #[inline]

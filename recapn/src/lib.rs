@@ -1,7 +1,6 @@
 //! A fast, safe, feature complete Cap'n Proto implementation for modern Rust.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(const_option)]
 #![cfg_attr(feature = "std", feature(write_all_vectored))]
 
 use crate::alloc::AllocLen;

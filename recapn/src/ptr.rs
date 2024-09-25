@@ -300,7 +300,7 @@ impl StructSize {
     /// ```
     #[inline]
     pub const fn len(self) -> ObjectLen {
-        ObjectLen::new(self.total()).unwrap()
+        ObjectLen::new_unwrap(self.total())
     }
 
     /// Gets the max number of elements an struct list can contain of this struct.
@@ -334,7 +334,7 @@ impl StructSize {
             ElementCount::MAX
         } else {
             // subtract 1 for the tag ptr
-            ElementCount::new((ElementCount::MAX_VALUE - 1) / (self.total())).unwrap()
+            ElementCount::new_unwrap((ElementCount::MAX_VALUE - 1) / (self.total()))
         }
     }
 
@@ -420,7 +420,7 @@ struct Parts {
 impl Parts {
     /// Gets the segment offset of some content. This is only valid for struct and list pointers.
     pub const fn content_offset(&self) -> SignedSegmentOffset {
-        SignedSegmentOffset::new(self.lower.get() as i32 >> 2).unwrap()
+        SignedSegmentOffset::new_unwrap(self.lower.get() as i32 >> 2)
     }
 
     /// Replace the segment offset of some content
@@ -591,7 +591,7 @@ struct StructPtr {
 }
 
 impl StructPtr {
-    pub const EMPTY: Self = Self::new(SignedSegmentOffset::new(-1).unwrap(), StructSize::EMPTY);
+    pub const EMPTY: Self = Self::new(SignedSegmentOffset::new_unwrap(-1), StructSize::EMPTY);
 
     #[inline]
     pub const fn new(offset: SignedSegmentOffset, StructSize { data, ptrs }: StructSize) -> Self {
@@ -2459,7 +2459,7 @@ impl<'a> StructReader<'a, Empty> {
     ///
     /// As such any other use of this function is unsafe.
     pub const unsafe fn new_unchecked(ptr: NonNull<Word>, size: StructSize) -> Self {
-        let ptrs_offset = SegmentOffset::new(size.data as u32).unwrap();
+        let ptrs_offset = SegmentOffset::new_unwrap(size.data as u32);
 
         Self {
             data_start: ptr.cast(),
@@ -2753,7 +2753,7 @@ impl<'a> ListReader<'a, Empty> {
         element_size: ElementSize,
     ) -> Self {
         let ptr = NonNull::new_unchecked(slice.as_ptr().cast_mut());
-        Self::new_unchecked(ptr, u29::new(element_count).unwrap(), element_size)
+        Self::new_unchecked(ptr, u29::new_unwrap(element_count), element_size)
     }
 }
 
@@ -3025,7 +3025,7 @@ impl<'a> BlobReader<'a> {
     }
 }
 
-const LANDING_PAD_LEN: AllocLen = AllocLen::new(2).unwrap();
+const LANDING_PAD_LEN: AllocLen = AllocLen::new_unwrap(2);
 
 pub(crate) enum OrphanObject<'a> {
     Struct {

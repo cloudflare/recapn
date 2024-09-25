@@ -51,10 +51,10 @@ impl<'a> Reader<'a> {
     /// If the slice is too large to be in a message, this function panics.
     #[inline]
     pub const fn from_slice(slice: &'a [u8]) -> Self {
-        Self(
-            ptr::Reader::new(slice)
-                .expect("slice is too large to be contained within a cap'n proto message"),
-        )
+        let Some(r) = ptr::Reader::new(slice) else {
+            panic!("slice is too large to be contained within a cap'n proto message")
+        };
+        Self(r)
     }
 
     #[inline]
