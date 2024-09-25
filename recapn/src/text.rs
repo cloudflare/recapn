@@ -63,16 +63,17 @@ impl<'a> Reader<'a> {
     pub const fn from_slice(s: &'a [u8]) -> Self {
         match s {
             [.., 0] => match ptr::Reader::new(s) {
-                Some(r) => Some(Self(r)),
-                None => None,
+                Some(r) => return Self(r),
+                None => {},
             },
-            _ => None,
+            _ => {},
         }
-        .expect("attempted to make invalid text blob from slice")
+
+        panic!("attempted to make invalid text blob from slice")
     }
 
     pub const fn byte_count(&self) -> ByteCount {
-        ByteCount::new(self.0.len().get()).unwrap()
+        ByteCount::new_unwrap(self.0.len().get())
     }
 
     /// The length of the text (including the null terminator)
@@ -193,7 +194,10 @@ impl<'a> Builder<'a> {
     /// Returns the bytes of the text field without the null terminator
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
-        let (_, remainder) = self.as_bytes_with_nul().split_last().unwrap();
+        let Some((_, remainder)) = self.as_bytes_with_nul().split_last() else {
+            // Originally we would panic here, but really anything is valid
+            return &[]
+        };
         remainder
     }
 

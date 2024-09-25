@@ -187,7 +187,7 @@ impl<'a> SegmentPtr<'a> {
     }
 
     pub const fn signed_offset_from_end(self, offset: SignedSegmentOffset) -> Self {
-        const ONE: SignedSegmentOffset = SignedSegmentOffset::new(1).unwrap();
+        const ONE: SignedSegmentOffset = SignedSegmentOffset::new_unwrap(1);
 
         self.signed_offset(ONE).signed_offset(offset)
     }
@@ -370,7 +370,7 @@ pub struct Growing<A> {
 
 impl<A> Growing<A> {
     /// The default length used for the first segment of 1024 words (8 kibibytes).
-    pub const DEFAULT_FIRST_SEGMENT_LEN: AllocLen = AllocLen::new(1024).unwrap();
+    pub const DEFAULT_FIRST_SEGMENT_LEN: AllocLen = AllocLen::new_unwrap(1024);
 
     #[inline]
     pub const fn new(first_segment: AllocLen, alloc: A) -> Self {
