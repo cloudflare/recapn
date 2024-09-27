@@ -260,8 +260,7 @@ impl fmt::Display for IncompleteError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for IncompleteError {}
+impl core::error::Error for IncompleteError {}
 
 #[derive(Clone, Copy, Debug)]
 enum WrittenBytes {

@@ -6,7 +6,7 @@ $files = @(
 
 try {
     Push-Location $PSScriptRoot
-    $command = "capnp compile $($files -join ' ') -o- | cargo run -p recapnc --bin capnpc-rust"
+    $command = "capnp compile $($files -join ' ') -I. --no-standard-import -o- | cargo run -p recapnc --bin capnpc-rust"
     cmd /c $command
 }
 finally {

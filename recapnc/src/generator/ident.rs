@@ -1,19 +1,23 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use anyhow::{ensure, Result};
+use crate::generator::GeneratorError;
+use crate::Result;
 
 fn make_ident(s: &str) -> Result<syn::Ident> {
     let mut ident_str = make_ident_str(s)?;
-    syn::parse_str(&ident_str).or_else(|_| {
+    let res = syn::parse_str(&ident_str).unwrap_or_else(|_| {
         ident_str.insert_str(0, "r#");
-        syn::parse_str(&ident_str).map_err(Into::into)
-    })
+        syn::parse_str::<syn::Ident>(&ident_str).expect("valid identifier string")
+    });
+    Ok(res)
 }
 
 // Convert a string into a valid identifier string by replacing invalid characters with underscores.
 fn make_ident_str(s: &str) -> Result<String> {
-    ensure!(!s.is_empty(), "identifier string cannot be empty");
+    if s.is_empty() {
+        return Err(GeneratorError::EmptyName.into())
+    }
 
     let mut output = String::with_capacity(s.len());
 

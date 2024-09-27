@@ -50,7 +50,7 @@ use crate::ptr::{
 };
 use crate::rpc::{Capable, Empty, InsertableInto, Table};
 use crate::ty::{self, EnumResult, ListValue, StructReader as _};
-use crate::{any, data, text, Error, ErrorKind, Family, NotInSchema, Result};
+use crate::{any, data, text, Error, Family, NotInSchema, Result};
 
 mod internal {
     use super::*;
@@ -1396,7 +1396,7 @@ where
     }
 
     #[inline]
-    pub fn get(&self) -> S::Reader<'b, T> {
+    pub fn get(&self) -> S::Reader<'p, T> {
         ty::StructReader::from_ptr(match self.raw_ptr().to_struct() {
             Ok(Some(ptr)) => ptr,
             _ => self.default_imbued_ptr(),
@@ -1404,12 +1404,12 @@ where
     }
 
     #[inline]
-    pub fn get_option(&self) -> Option<S::Reader<'b, T>> {
+    pub fn get_option(&self) -> Option<S::Reader<'p, T>> {
         self.try_get_option().ok().flatten()
     }
 
     #[inline]
-    pub fn try_get(&self) -> Result<S::Reader<'b, T>> {
+    pub fn try_get(&self) -> Result<S::Reader<'p, T>> {
         Ok(ty::StructReader::from_ptr(
             match self.raw_ptr().to_struct() {
                 Ok(Some(ptr)) => ptr,
@@ -1420,7 +1420,7 @@ where
     }
 
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<S::Reader<'b, T>>> {
+    pub fn try_get_option(&self) -> Result<Option<S::Reader<'p, T>>> {
         match self.raw_ptr().to_struct() {
             Ok(Some(ptr)) => Ok(Some(ty::StructReader::from_ptr(ptr))),
             Ok(None) => Ok(None),
@@ -1611,7 +1611,7 @@ impl<Repr> PtrField<text::Text, Repr> {
 
 impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, text::Text> {
     #[inline]
-    pub fn get(&self) -> text::Reader<'b> {
+    pub fn get(&self) -> text::Reader<'p> {
         self.get_option().unwrap_or_else(|| self.default())
     }
 
@@ -1621,27 +1621,27 @@ impl<'b, 'p: 'b, T: Table + 'p> PtrFieldReader<'b, 'p, T, text::Text> {
     /// If the field is null or an error occurs while reading the pointer to the text itself, this
     /// returns the default value.
     #[inline]
-    pub fn as_str(&self) -> Result<&'b str, Utf8Error> {
+    pub fn as_str(&self) -> Result<&'p str, Utf8Error> {
         self.get().as_str()
     }
 
     #[inline]
-    pub fn get_option(&self) -> Option<text::Reader<'b>> {
+    pub fn get_option(&self) -> Option<text::Reader<'p>> {
         self.try_get_option().ok().flatten()
     }
 
     #[inline]
-    pub fn try_get(&self) -> Result<text::Reader<'b>> {
+    pub fn try_get(&self) -> Result<text::Reader<'p>> {
         self.try_get_option()
             .map(|op| op.unwrap_or_else(|| self.default()))
     }
 
     #[inline]
-    pub fn try_get_option(&self) -> Result<Option<text::Reader<'b>>> {
+    pub fn try_get_option(&self) -> Result<Option<text::Reader<'p>>> {
         match self.raw_ptr().to_blob() {
             Ok(Some(ptr)) => {
                 let text =
-                    text::Reader::new(ptr).ok_or(Error::from(ErrorKind::TextNotNulTerminated))?;
+                    text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
 
                 Ok(Some(text))
             }

@@ -66,8 +66,14 @@ impl From<TableReadError> for ReadError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ReadError {}
+impl core::error::Error for ReadError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            ReadError::Table(table) => Some(table),
+            _ => None,
+        }
+    }
+}
 
 /// A segment set that directly uses the stream table found in the message data without allocating.
 ///
@@ -271,8 +277,8 @@ impl Display for StreamError {
     }
 }
 
-impl std::error::Error for StreamError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for StreamError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             StreamError::Table(err) => Some(err),
             StreamError::SegmentTooLarge { .. } => None,
