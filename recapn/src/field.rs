@@ -56,6 +56,10 @@ mod internal {
     use super::*;
 
     pub trait Accessable {
+        type Table: Table;
+
+        unsafe fn is_variant_set(&self, variant: &VariantInfo) -> bool;
+
         type Group<G: FieldGroup>;
         unsafe fn group<G: FieldGroup>(self) -> Self::Group<G>;
 
@@ -65,18 +69,47 @@ mod internal {
         type Enum<E: ty::Enum>;
         unsafe fn enum_value<E: ty::Enum>(self, info: &'static FieldInfo<Enum<E>>)
             -> Self::Enum<E>;
+
+        unsafe fn ptr_reader(&self, slot: u16) -> ptr::PtrReader<'_, Self::Table>;
+
+        #[inline]
+        unsafe fn is_ptr_null(&self, slot: u16) -> bool {
+            self.ptr_reader(slot).is_null()
+        }
+    }
+
+    pub trait BuildAccessable: Accessable {
+        unsafe fn set_variant(&mut self, variant: &VariantInfo);
+
+        type ByRef<'b> where Self: 'b;
+        fn by_ref<'b>(&'b mut self) -> Self::ByRef<'b>;
+    }
+
+    pub trait BuildAccessablePtr<'a>: BuildAccessable {
+        unsafe fn into_ptr_field(self, slot: u16) -> ptr::PtrBuilder<'a, Self::Table>;
+        unsafe fn ptr_field(&mut self, slot: u16) -> ptr::PtrBuilder<'_, Self::Table>;
     }
 
     impl<'b, 'p, T: Table> Accessable for StructReader<'b, 'p, T> {
+        type Table = T;
+
+        #[inline]
+        unsafe fn is_variant_set(&self, variant: &VariantInfo) -> bool {
+            self.data_field::<u16>(variant.slot as usize) == variant.case
+        }
+
         type Group<G: FieldGroup> = G::Reader<'p, T>;
+        #[inline]
         unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
             ty::StructReader::from_ptr(self.clone())
         }
         type Data<D: Data> = D;
+        #[inline]
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D> {
             self.data_field_with_default(info.slot as usize, info.default)
         }
         type Enum<E: ty::Enum> = EnumResult<E>;
+        #[inline]
         unsafe fn enum_value<E: ty::Enum>(
             self,
             info: &'static FieldInfo<Enum<E>>,
@@ -86,14 +119,27 @@ mod internal {
             let value = self.data_field_with_default::<u16>(slot as usize, default);
             E::try_from(value)
         }
+
+        #[inline]
+        unsafe fn ptr_reader(&self, slot: u16) -> ptr::PtrReader<'_, Self::Table> {
+            self.ptr_field(slot)
+        }
     }
 
     impl<'b, 'p, T: Table> Accessable for StructBuilder<'b, 'p, T> {
+        type Table = T;
+
+        #[inline]
+        unsafe fn is_variant_set(&self, variant: &VariantInfo) -> bool {
+            self.data_field_unchecked::<u16>(variant.slot as usize) == variant.case
+        }
         type Group<G: FieldGroup> = G::Builder<'b, T>;
+        #[inline]
         unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
             ty::StructBuilder::from_ptr(self.by_ref())
         }
         type Data<D: Data> = DataField<D, Self>;
+        #[inline]
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D> {
             DataField {
                 descriptor: info,
@@ -101,6 +147,7 @@ mod internal {
             }
         }
         type Enum<E: ty::Enum> = DataField<Enum<E>, Self>;
+        #[inline]
         unsafe fn enum_value<E: ty::Enum>(
             self,
             info: &'static FieldInfo<Enum<E>>,
@@ -109,15 +156,48 @@ mod internal {
                 descriptor: info,
                 repr: self,
             }
+        }
+        #[inline]
+        unsafe fn ptr_reader(&self, slot: u16) -> ptr::PtrReader<'_, Self::Table> {
+            self.ptr_field_unchecked(slot)
+        }
+    }
+    impl<'b, 'p, T: Table> BuildAccessable for StructBuilder<'b, 'p, T> {
+        #[inline]
+        unsafe fn set_variant(&mut self, variant: &VariantInfo) {
+            self.set_field_unchecked(variant.slot as usize, variant.case)
+        }
+        type ByRef<'c> = StructBuilder<'c, 'p, T> where Self: 'c;
+        #[inline]
+        fn by_ref<'c>(&'c mut self) -> Self::ByRef<'c> {
+            &mut *self
+        }
+    }
+    impl<'b, 'p, T: Table> BuildAccessablePtr<'b> for StructBuilder<'b, 'p, T> {
+        #[inline]
+        unsafe fn into_ptr_field(self, slot: u16) -> ptr::PtrBuilder<'b, Self::Table> {
+            self.ptr_field_mut_unchecked(slot)
+        }
+        #[inline]
+        unsafe fn ptr_field(&mut self, slot: u16) -> ptr::PtrBuilder<'_, Self::Table> {
+            self.ptr_field_mut_unchecked(slot)
         }
     }
 
     impl<'p, T: Table> Accessable for OwnedStructBuilder<'p, T> {
+        type Table = T;
+
+        #[inline]
+        unsafe fn is_variant_set(&self, variant: &VariantInfo) -> bool {
+            self.data_field_unchecked::<u16>(variant.slot as usize) == variant.case
+        }
         type Group<G: FieldGroup> = G::Builder<'p, T>;
+        #[inline]
         unsafe fn group<G: FieldGroup>(self) -> Self::Group<G> {
             ty::StructBuilder::from_ptr(self)
         }
         type Data<D: Data> = DataField<D, Self>;
+        #[inline]
         unsafe fn data<D: Data>(self, info: &'static FieldInfo<D>) -> Self::Data<D> {
             DataField {
                 descriptor: info,
@@ -125,6 +205,7 @@ mod internal {
             }
         }
         type Enum<E: ty::Enum> = DataField<Enum<E>, Self>;
+        #[inline]
         unsafe fn enum_value<E: ty::Enum>(
             self,
             info: &'static FieldInfo<Enum<E>>,
@@ -134,10 +215,35 @@ mod internal {
                 repr: self,
             }
         }
+        #[inline]
+        unsafe fn ptr_reader(&self, slot: u16) -> ptr::PtrReader<'_, Self::Table> {
+            self.ptr_field_unchecked(slot)
+        }
+    }
+    impl<'p, T: Table> BuildAccessable for OwnedStructBuilder<'p, T> {
+        #[inline]
+        unsafe fn set_variant(&mut self, variant: &VariantInfo) {
+            self.set_field_unchecked(variant.slot as usize, variant.case)
+        }
+        type ByRef<'b> = OwnedStructBuilder<'b, T> where Self: 'b;
+        #[inline]
+        fn by_ref<'b>(&'b mut self) -> Self::ByRef<'b> {
+            self.by_ref()
+        }
+    }
+    impl<'p, T: Table> BuildAccessablePtr<'p> for OwnedStructBuilder<'p, T> {
+        #[inline]
+        unsafe fn into_ptr_field(self, slot: u16) -> ptr::PtrBuilder<'p, Self::Table> {
+            self.into_ptr_field_unchecked(slot)
+        }
+        #[inline]
+        unsafe fn ptr_field(&mut self, slot: u16) -> ptr::PtrBuilder<'_, Self::Table> {
+            self.ptr_field_mut_unchecked(slot)
+        }
     }
 }
 
-use internal::Accessable;
+use internal::{Accessable, BuildAccessable, BuildAccessablePtr};
 
 pub type StructReader<'b, 'p, T> = &'b ptr::StructReader<'p, T>;
 pub type StructBuilder<'b, 'p, T> = &'b mut ptr::StructBuilder<'p, T>;
@@ -762,12 +868,30 @@ pub struct PtrField<V: PtrValue, Repr> {
     repr: Repr,
 }
 
+impl<V: PtrValue, Repr: Accessable> PtrField<V, Repr> {
+    #[inline]
+    pub fn is_null(&self) -> bool {
+        unsafe { self.repr.is_ptr_null(self.descriptor.slot as u16) }
+    }
+}
+
+impl<V: PtrValue, Repr: BuildAccessable> PtrField<V, Repr> {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
+    #[inline]
+    pub fn by_ref<'c>(&'c mut self) -> PtrField<V, Repr::ByRef<'c>> {
+        PtrField {
+            descriptor: self.descriptor,
+            repr: self.repr.by_ref(),
+        }
+    }
+}
+
 pub type PtrFieldReader<'b, 'p, T, V> = PtrField<V, StructReader<'b, 'p, T>>;
 pub type PtrFieldBuilder<'b, 'p, T, V> = PtrField<V, StructBuilder<'b, 'p, T>>;
 pub type PtrFieldOwner<'p, T, V> = PtrField<V, OwnedStructBuilder<'p, T>>;
 
 impl<'b, 'p, T: Table, V: PtrValue> PtrFieldReader<'b, 'p, T, V> {
-    #[inline]
     fn raw_ptr(&self) -> ptr::PtrReader<'p, T> {
         self.repr.ptr_field(self.descriptor.slot as u16)
     }
@@ -776,127 +900,32 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrFieldReader<'b, 'p, T, V> {
     pub fn ptr(&self) -> any::PtrReader<'p, T> {
         self.raw_ptr().into()
     }
-
-    #[inline]
-    pub fn is_null(&self) -> bool {
-        self.ptr().is_null()
-    }
 }
 
-impl<'b, 'p, T: Table, V: PtrValue> PtrFieldBuilder<'b, 'p, T, V> {
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
+impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrField<V, B> {
     #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrFieldBuilder<'c, 'p, T, V> {
-        PtrField {
-            descriptor: self.descriptor,
-            repr: &mut *self.repr,
-        }
+    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<'_, B::Table> {
+        unsafe { self.repr.ptr_field(self.descriptor.slot as u16) }
     }
 
     #[inline]
-    fn raw_read_ptr(&self) -> ptr::PtrReader<'_, T> {
-        unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
-    }
-
-    #[inline]
-    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<'_, T> {
-        unsafe {
-            self.repr
-                .ptr_field_mut_unchecked(self.descriptor.slot as u16)
-        }
-    }
-
-    #[inline]
-    fn into_raw_build_ptr(self) -> ptr::PtrBuilder<'b, T> {
-        unsafe {
-            self.repr
-                .ptr_field_mut_unchecked(self.descriptor.slot as u16)
-        }
-    }
-
-    #[inline]
-    pub fn is_null(&self) -> bool {
-        self.raw_read_ptr().is_null()
+    fn into_raw_build_ptr(self) -> ptr::PtrBuilder<'b, B::Table> {
+        unsafe { self.repr.into_ptr_field(self.descriptor.slot as u16) }
     }
 
     /// Build the field as any pointer type.
     #[inline]
-    pub fn ptr(self) -> any::PtrBuilder<'b, T> {
+    pub fn ptr(self) -> any::PtrBuilder<'b, B::Table> {
         self.into_raw_build_ptr().into()
     }
 
     #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
+    pub fn adopt(&mut self, orphan: Orphan<'_, V, B::Table>) {
         self.raw_build_ptr().adopt(orphan.into_inner());
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, V, T> {
-        Orphan::new(self.raw_build_ptr().disown_into(orphanage))
-    }
-
-    #[inline]
-    pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
-        self.raw_build_ptr().try_clear(err_handler)
-    }
-
-    #[inline]
-    pub fn clear(&mut self) {
-        self.raw_build_ptr().clear()
-    }
-}
-
-impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
-    #[inline]
-    pub fn by_ref(&mut self) -> PtrFieldOwner<'_, T, V> {
-        PtrField {
-            descriptor: self.descriptor,
-            repr: self.repr.by_ref(),
-        }
-    }
-
-    #[inline]
-    fn raw_read_ptr(&self) -> ptr::PtrReader<'_, T> {
-        unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) }
-    }
-
-    #[inline]
-    fn raw_build_ptr(&mut self) -> ptr::PtrBuilder<'_, T> {
-        unsafe {
-            self.repr
-                .ptr_field_mut_unchecked(self.descriptor.slot as u16)
-        }
-    }
-
-    #[inline]
-    fn into_raw_build_ptr(self) -> ptr::PtrBuilder<'p, T> {
-        unsafe {
-            self.repr
-                .into_ptr_field_unchecked(self.descriptor.slot as u16)
-        }
-    }
-
-    #[inline]
-    pub fn is_null(&self) -> bool {
-        self.raw_read_ptr().is_null()
-    }
-
-    /// Build the field as any pointer type.
-    #[inline]
-    pub fn ptr(self) -> any::PtrBuilder<'p, T> {
-        self.into_raw_build_ptr().into()
-    }
-
-    #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
-        self.raw_build_ptr().adopt(orphan.into_inner());
-    }
-
-    #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Orphan<'c, V, T> {
+    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, B::Table>) -> Orphan<'c, V, B::Table> {
         Orphan::new(self.raw_build_ptr().disown_into(orphanage))
     }
 
@@ -912,10 +941,41 @@ impl<'p, T: Table, V: PtrValue> PtrFieldOwner<'p, T, V> {
 }
 
 /// A base type for accessing union variant fields.
+#[derive(Clone)]
 pub struct PtrVariant<V: PtrValue, Repr> {
     descriptor: &'static FieldInfo<V>,
     variant: &'static VariantInfo,
     repr: Repr,
+}
+
+impl<V: PtrValue, Repr: Accessable> PtrVariant<V, Repr> {
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        unsafe { self.repr.is_variant_set(&self.variant) }
+    }
+
+    #[inline]
+    pub fn is_null(&self) -> bool {
+        if self.is_set() {
+            unsafe { self.repr.is_ptr_null(self.descriptor.slot as u16) }
+        } else {
+            true
+        }
+    }
+}
+
+impl<V: PtrValue, Repr: BuildAccessable> PtrVariant<V, Repr> {
+    /// Create a new field builder "by reference". This allows a field builder to be reused
+    /// as many builder functions consume the builder.
+    #[inline]
+    pub fn by_ref<'c>(&'c mut self) -> PtrVariant<V, Repr::ByRef<'c>> {
+        PtrVariant {
+            variant: self.variant,
+            descriptor: self.descriptor,
+            repr: self.repr.by_ref(),
+        }
+    }
 }
 
 pub type PtrVariantReader<'b, 'p, T, V> = PtrVariant<V, StructReader<'b, 'p, T>>;
@@ -923,13 +983,6 @@ pub type PtrVariantBuilder<'b, 'p, T, V> = PtrVariant<V, StructBuilder<'b, 'p, T
 pub type PtrVariantOwner<'p, T, V> = PtrVariant<V, OwnedStructBuilder<'p, T>>;
 
 impl<'b, 'p, T: Table, V: PtrValue> PtrVariantReader<'b, 'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        self.repr.data_field::<u16>(slot as usize) == case
-    }
-
     #[inline]
     fn raw_ptr_or_null(&self) -> ptr::PtrReader<'b, T> {
         if self.is_set() {
@@ -946,69 +999,41 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantReader<'b, 'p, T, V> {
             repr: self.repr,
         })
     }
-
-    #[inline]
-    pub fn is_null(&self) -> bool {
-        if let Some(f) = self.field() {
-            f.is_null()
-        } else {
-            true
-        }
-    }
 }
 
-impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
+impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrVariant<V, B> {
     #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
-    }
-
-    /// Create a new field builder "by reference". This allows a field builder to be reused
-    /// as many builder functions consume the builder.
-    #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrVariantBuilder<'c, 'p, T, V> {
-        PtrVariant {
-            descriptor: self.descriptor,
-            variant: self.variant,
-            repr: &mut *self.repr,
-        }
-    }
-
-    #[inline]
-    fn raw_read_ptr(&self) -> Option<ptr::PtrReader<'_, T>> {
-        self.is_set()
-            .then(|| unsafe { self.repr.ptr_field_unchecked(self.descriptor.slot as u16) })
-    }
-
-    #[inline]
-    fn raw_build_ptr(&mut self) -> Option<ptr::PtrBuilder<'_, T>> {
+    fn raw_build_ptr(&mut self) -> Option<ptr::PtrBuilder<'_, B::Table>> {
         self.is_set().then(|| unsafe {
             self.repr
-                .ptr_field_mut_unchecked(self.descriptor.slot as u16)
+                .ptr_field(self.descriptor.slot as u16)
         })
     }
 
     #[inline]
-    pub fn init_field(self) -> PtrFieldBuilder<'b, 'p, T, V> {
-        if !self.is_set() {
-            let &VariantInfo { slot, case } = self.variant;
-            unsafe {
-                self.repr.set_field_unchecked::<u16>(slot as usize, case);
-                self.repr
-                    .ptr_field_mut_unchecked(self.descriptor.slot as u16)
-                    .clear();
-            }
+    fn set_case(&mut self) -> bool {
+        let is_set = self.is_set();
+        if !is_set {
+            unsafe { self.repr.set_variant(self.variant); }
         }
-        PtrField {
-            descriptor: self.descriptor,
-            repr: self.repr,
-        }
+        is_set
     }
 
     #[inline]
-    pub fn field(self) -> Option<PtrFieldBuilder<'b, 'p, T, V>> {
+    pub fn init_field(mut self) -> PtrField<V, B> {
+        let was_set = self.set_case();
+        let mut field = PtrField {
+            descriptor: self.descriptor,
+            repr: self.repr,
+        };
+        if !was_set {
+            field.clear();
+        }
+        field
+    }
+
+    #[inline]
+    pub fn field(self) -> Option<PtrField<V, B>> {
         self.is_set().then_some(PtrField {
             descriptor: self.descriptor,
             repr: self.repr,
@@ -1016,58 +1041,34 @@ impl<'b, 'p, T: Table, V: PtrValue> PtrVariantBuilder<'b, 'p, T, V> {
     }
 
     #[inline]
-    pub fn is_null(&self) -> bool {
-        if let Some(f) = self.raw_read_ptr() {
-            f.is_null()
-        } else {
-            true
-        }
-    }
-
-    #[inline]
-    pub fn adopt(&mut self, orphan: Orphan<'_, V, T>) {
-        if !self.is_set() {
-            let &VariantInfo { slot, case } = self.variant;
-            unsafe {
-                self.repr.set_field_unchecked::<u16>(slot as usize, case);
-            }
-        }
-        let mut ptr = unsafe {
+    pub fn adopt(&mut self, orphan: Orphan<'_, V, B::Table>) {
+        self.set_case();
+        unsafe {
             self.repr
-                .ptr_field_mut_unchecked(self.descriptor.slot as u16)
-        };
-        ptr.adopt(orphan.into_inner());
+                .ptr_field(self.descriptor.slot as u16)
+                .adopt(orphan.into_inner())
+        }
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, T>) -> Option<Orphan<'c, V, T>> {
+    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, B::Table>) -> Option<Orphan<'c, V, B::Table>> {
         self.raw_build_ptr()
             .map(|mut p| Orphan::new(p.disown_into(orphanage)))
     }
 
     #[inline]
     pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
-        let Some(mut ptr) = self.raw_build_ptr() else {
-            return Ok(());
-        };
-        ptr.try_clear(err_handler)
+        match self.raw_build_ptr() {
+            Some(mut ptr) => ptr.try_clear(err_handler),
+            None => Ok(())
+        }
     }
 
     #[inline]
     pub fn clear(&mut self) {
-        let Some(mut ptr) = self.raw_build_ptr() else {
-            return;
-        };
-        ptr.clear()
-    }
-}
-
-impl<'p, T: Table, V: PtrValue> PtrVariantOwner<'p, T, V> {
-    /// Returns a bool indicating whether or not this field is set in the union
-    #[inline]
-    pub fn is_set(&self) -> bool {
-        let &VariantInfo { slot, case } = self.variant;
-        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
+        if let Some(mut ptr) = self.raw_build_ptr() {
+            ptr.clear();
+        }
     }
 }
 
