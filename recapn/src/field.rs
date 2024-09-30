@@ -545,6 +545,7 @@ impl<E: ty::Enum> ListValue for Enum<E> {
 /// the sense that they aren't actual "things" on the wire. Void fields take up no encoding space
 /// and groups don't take up any encoding space either. They also have no associated data, so they
 /// don't have an associated descriptor, just variant info.
+#[must_use = "accessors don't do anything unless you call one of their functions"]
 pub struct VoidVariant<T, Repr> {
     t: PhantomData<fn() -> T>,
     variant: &'static VariantInfo,
@@ -575,6 +576,7 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructReader<'b, 'p,
         ty::StructReader::from_ptr(self.repr.clone())
     }
 
+    #[inline]
     pub fn get_or_default(&self) -> G::Reader<'p, T> {
         match self.get() {
             Some(r) => r,
@@ -633,6 +635,7 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p
     }
 }
 
+#[must_use = "accessors don't do anything unless you call one of their functions"]
 pub struct DataField<D: Value, Repr> {
     descriptor: &'static FieldInfo<D>,
     repr: Repr,
@@ -661,6 +664,7 @@ impl<'b, 'p, T: Table, D: Data> DataField<D, StructBuilder<'b, 'p, T>> {
     }
 }
 
+#[must_use = "accessors don't do anything unless you call one of their functions"]
 pub struct DataVariant<D: Value, Repr> {
     descriptor: &'static FieldInfo<D>,
     variant: &'static VariantInfo,
@@ -863,6 +867,7 @@ impl<'b, 'p, T: Table, E: ty::Enum> DataVariant<Enum<E>, StructBuilder<'b, 'p, T
     }
 }
 
+#[must_use = "accessors don't do anything unless you call one of their functions"]
 pub struct PtrField<V: PtrValue, Repr> {
     descriptor: &'static FieldInfo<V>,
     repr: Repr,
