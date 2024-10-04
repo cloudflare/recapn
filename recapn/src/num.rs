@@ -5,6 +5,17 @@ use core::fmt;
 use core::hint::unreachable_unchecked;
 use core::num::NonZeroU32;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct TryFromIntError(pub(crate) ());
+
+impl fmt::Display for TryFromIntError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("out of range integral type conversion attempted")
+    }
+}
+
+impl core::error::Error for TryFromIntError {}
+
 /// A simple macro to implement cmp traits using the inner type gotten through a get() function
 macro_rules! get_cmp {
     ($ty1:ty, $ty2:ty) => {
@@ -40,6 +51,33 @@ macro_rules! fwd_fmt_traits {
             }
         }
     };
+}
+
+macro_rules! from_int_impl {
+    ($dst:ty: $in:ty => $($src:ty),*) => {$(
+        impl From<$src> for $dst {
+            #[inline]
+            fn from(value: $src) -> $dst {
+                let inner = <$in as From<$src>>::from(value);
+                <$dst>::new_unwrap(inner)
+            }
+        }
+    )*};
+}
+
+macro_rules! try_from_int_impl {
+    ($dst:ty: $in:ty => $($src:ty),*) => {$(
+        impl TryFrom<$src> for $dst {
+            type Error = TryFromIntError;
+
+            #[inline]
+            fn try_from(value: $src) -> Result<$dst, TryFromIntError> {
+                let inner = <$in as TryFrom<$src>>::try_from(value)
+                    .map_err(|_| TryFromIntError(()))?;
+                <$dst>::new(inner).ok_or(TryFromIntError(()))
+            }
+        }
+    )*};
 }
 
 /// A 29 bit integer. It cannot be zero.
@@ -176,17 +214,14 @@ impl From<Option<NonZeroU29>> for u29 {
     }
 }
 
-impl From<u16> for u29 {
-    fn from(v: u16) -> Self {
-        Self(u32::from(v))
-    }
-}
-
 impl From<u29> for i30 {
     fn from(u29(v): u29) -> Self {
         Self(v as i32)
     }
 }
+
+from_int_impl!(u29: u32 => u8, u16);
+try_from_int_impl!(u29: u32 => i8, i16, u32, i32, u64, i64, u128, i128, usize, isize);
 
 get_cmp!(NonZeroU29, u29);
 get_cmp!(u29, NonZeroU29);
@@ -242,14 +277,5 @@ impl i30 {
 
 fwd_fmt_traits!(i30);
 
-impl From<u16> for i30 {
-    fn from(v: u16) -> Self {
-        Self(i32::from(v))
-    }
-}
-
-impl From<i16> for i30 {
-    fn from(v: i16) -> Self {
-        Self(i32::from(v))
-    }
-}
+from_int_impl!(i30: i32 => u8, i8, u16, i16);
+try_from_int_impl!(i30: i32 => u32, i32, u64, i64, u128, i128, usize, isize);
