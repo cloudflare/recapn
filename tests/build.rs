@@ -17,4 +17,7 @@ fn main() {
 
     // Simple test with imports
     run!("build_rs": "build.capnp", "bar.capnp");
+
+    // Test that we ignore missing nodes when generating
+    run!("missing_annotation": "foo.capnp");
 }
