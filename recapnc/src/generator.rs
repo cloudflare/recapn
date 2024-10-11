@@ -13,9 +13,8 @@ use recapn::ptr::{ElementSize, StructSize, UnwrapErrors};
 use recapn::{any, data, text, ReaderOf};
 use syn::punctuated::Punctuated;
 use syn::PathSegment;
-use thiserror::Error;
 
-use crate::Result;
+use crate::{Error, Result};
 use crate::quotes::{
     FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem,
     GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich,
@@ -211,7 +210,7 @@ impl fmt::Display for NameContext {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum GeneratorError {
     #[error("name for {context} is not valid UTF8: {error}")]
     InvalidName {
@@ -253,7 +252,14 @@ fn validate_file(
     });
 
     for nested in schema.nested_items() {
-        validate_item(nested?, nodes, identifiers, &mut scope)?;
+        let nested = match nested {
+            Ok(n) => n,
+            // Unreferenced nodes from files not requested can be missing, so we just continue.
+            // If it turns out we needed it, an error will come up later.
+            Err(Error::Schema(SchemaError::MissingNode(_))) => continue,
+            res @ Err(_) => res?,
+        };
+        validate_item(nested, nodes, identifiers, &mut scope)?;
     }
 
     Ok(())

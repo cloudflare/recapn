@@ -4,7 +4,7 @@
 pub mod gen;
 
 pub mod build_gen {
-    include!(concat!(env!("OUT_DIR"), "/mod.rs"));
+    include!(concat!(env!("OUT_DIR"), "/build_rs/mod.rs"));
 }
 
 use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
