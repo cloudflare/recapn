@@ -133,6 +133,13 @@ impl<'a, T: Table> ty::FromPtr<PtrReader<'a, T>> for AnyPtr {
     }
 }
 
+impl PtrReader<'_, Empty> {
+    #[inline]
+    pub const fn null() -> Self {
+        Self(ptr::PtrReader::null())
+    }
+}
+
 impl<'a, T: Table> PtrReader<'a, T> {
     #[inline]
     pub fn target_size(&self) -> Result<MessageSize> {
@@ -248,7 +255,7 @@ impl<'a, T: CapTable + BreakableCapSystem> PtrReader<'a, T> {
 impl<'a> Default for PtrReader<'a, Empty> {
     #[inline]
     fn default() -> Self {
-        AnyPtr::from(ptr::PtrReader::null())
+        AnyPtr::null()
     }
 }
 
