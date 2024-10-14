@@ -1,5 +1,6 @@
 //! A fixed size blob of bytes contained in a Cap'n Proto message
 
+use core::fmt;
 use core::ops::{Deref, DerefMut};
 
 use crate::internal::Sealed;
@@ -9,6 +10,18 @@ use crate::{ty, Family, IntoFamily};
 pub mod ptr {
     pub use crate::ptr::{BlobBuilder as Builder, BlobReader as Reader};
 }
+
+/// An error returned when trying to set a data field to a slice value if the value is too large.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct TryFromSliceError(pub(crate) ());
+
+impl fmt::Display for TryFromSliceError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str("attempted to create a data blob from too large a slice")
+    }
+}
+
+impl core::error::Error for TryFromSliceError {}
 
 #[derive(Clone, Copy)]
 pub struct Data<T = Family>(T);
@@ -55,6 +68,14 @@ impl<'a> Reader<'a> {
             panic!("slice is too large to be contained within a cap'n proto message")
         };
         Self(r)
+    }
+
+    #[inline]
+    pub const fn try_from_slice(slice: &'a [u8]) -> Result<Self, TryFromSliceError> {
+        match ptr::Reader::new(slice) {
+            Some(b) => Ok(Self(b)),
+            None => Err(TryFromSliceError(())),
+        }
     }
 
     #[inline]

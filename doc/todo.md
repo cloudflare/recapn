@@ -17,25 +17,6 @@
   * We need to test the different patterns that are expected to be usable by users of the library.
 
 - [ ] Field accessors! Because someone 5 years ago thought it'd be a good idea to implement them in the library.
-  - [ ] `PtrVariantOwner` generic accessors
-  * Needs `by_ref`, `init_field`, `field`, `is_null`, `adopt`, `disown_into`, `try_clear`, and `clear` methods. We can basically just copy `PtrVariantBuilder` for this.
-  - [ ] `PtrFieldBuilder` for `List<AnyStruct>`
-  * Needs `try_set`, `set`, and `try_init`
-  - [ ] `PtrFieldOwner` for `List<V>`
-  * Copy from `PtrFieldBuilder`. Change lifetimes as appropriate.
-  - [ ] `PtrVariantBuilder` for `List<V>`
-  * Needs `get`, `try_set`, `set`, `init`, `try_init`, `init_with_size`. Essentially just the same accessors as `PtrFieldBuilder` but based on the variant helpers.
-  * We also need the accessors from `List<AnyStruct>` which is slightly different due to the lack of fixed size to check.
-  - [ ] `PtrVariantOwner` for `List<V>`
-  * Copy from `PtrVariantBuilder`.
-  - [ ] `PtrFieldOwner` and `PtrVariantOwner` for `Struct<S>`
-  - [ ] `PtrVariantReader` and`PtrVariantBuilder` for `Text`
-  - [ ] `PtrVariantReader` and `PtrVariantBuilder` for `Data`
-  - [ ] `PtrVariantReader`, `PtrVariantBuilder`, and `PtrVariantOwner` for `AnyPtr`
-  * Probably just needs an alias or two for the obvious ops.
-  - [ ] `PtrFieldBuilder`, `PtrFieldOwner`, `PtrVariantReader`, `PtrVariantBuilder`, and `PtrVariantOwner` for `AnyStruct`
-  - [ ] `PtrFieldBuilder`, `PtrFieldOwner`, `PtrVariantReader`, `PtrVariantBuilder`, and `PtrVariantOwner` for `AnyList`
-  - [ ] `PtrFieldReader`, `PtrFieldBuilder`, `PtrVariantReader`, and `PtrVariantBuilder` for `Capability<C>`
   - [ ] Support "any" capability. We need some sort of marker for the type. Other than that it just returns whatever the `CapSystem`'s `Cap` type is.
 - [ ] List accessors! Same thing as field accessors, but for list elements!
  - As a whole, list accessors need to be refactored to be more inline with field accessors in their current state. This brings with it better reusability of ptr element accessors like `is_null`, `clear`, `adopt`, and `disown_into`.
