@@ -498,8 +498,24 @@ impl<R: io::BufRead> PackedStream<R> {
     }
 }
 
+/// Read a message from a stream in packed encoding. This creates a `PackedStream` and reads the
+/// message, flushing the packed state at the end to make sure the message is complete.
 #[cfg(feature = "std")]
-pub fn read_packed_from_stream<R: io::BufRead>(
+#[inline]
+pub fn read_from_packed_stream<R: io::BufRead>(
+    stream: R,
+    options: StreamOptions,
+) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
+    let mut packed = PackedStream::new(stream);
+    let msg = read_with_packed_stream(&mut packed, options)?;
+    packed.finish()?;
+    Ok(msg)
+}
+
+/// Read a message from a `PackedStream`. This allows you to continue reading more packed
+/// data after the stream and reuse the packed state.
+#[cfg(feature = "std")]
+pub fn read_with_packed_stream<R: io::BufRead>(
     stream: &mut PackedStream<R>,
     options: StreamOptions,
 ) -> Result<SegmentSet<Box<[Word]>>, StreamError> {
