@@ -14,6 +14,9 @@ pub enum TestEnum {
     Grault,
     Garply,
 }
+impl _p::ty::SchemaType for TestEnum {
+    const ID: u64 = 11281115850894843091u64;
+}
 impl core::convert::TryFrom<u16> for TestEnum {
     type Error = _p::NotInSchema;
     #[inline]
@@ -40,6 +43,9 @@ impl core::convert::From<TestEnum> for u16 {
 impl _p::ty::Enum for TestEnum {}
 #[derive(Clone)]
 pub struct TestAllTypes<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestAllTypes {
+    const ID: u64 = 11576770112468509693u64;
+}
 impl<T> _p::IntoFamily for TestAllTypes<T> {
     type Family = TestAllTypes;
 }
@@ -1041,6 +1047,9 @@ pub mod test_all_types {
 }
 #[derive(Clone)]
 pub struct TestDefaults<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestDefaults {
+    const ID: u64 = 16951442063890005174u64;
+}
 impl<T> _p::IntoFamily for TestDefaults<T> {
     type Family = TestDefaults;
 }
@@ -2465,6 +2474,9 @@ pub mod test_defaults {
 }
 #[derive(Clone)]
 pub struct TestAnyPointer<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestAnyPointer {
+    const ID: u64 = 16418534539999625432u64;
+}
 impl<T> _p::IntoFamily for TestAnyPointer<T> {
     type Family = TestAnyPointer;
 }
@@ -2605,6 +2617,9 @@ pub mod test_any_pointer {
 }
 #[derive(Clone)]
 pub struct TestAnyOthers<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestAnyOthers {
+    const ID: u64 = 17624926160216128089u64;
+}
 impl<T> _p::IntoFamily for TestAnyOthers<T> {
     type Family = TestAnyOthers;
 }
@@ -2809,6 +2824,9 @@ pub mod test_any_others {
 }
 #[derive(Clone)]
 pub struct TestOutOfOrder<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestOutOfOrder {
+    const ID: u64 = 12237961271712940587u64;
+}
 impl<T> _p::IntoFamily for TestOutOfOrder<T> {
     type Family = TestOutOfOrder;
 }
@@ -3149,6 +3167,9 @@ pub mod test_out_of_order {
 }
 #[derive(Clone)]
 pub struct TestUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUnion {
+    const ID: u64 = 17615433251264122450u64;
+}
 impl<T> _p::IntoFamily for TestUnion<T> {
     type Family = TestUnion;
 }
@@ -3473,6 +3494,9 @@ pub mod test_union {
     >;
     #[derive(Clone)]
     pub struct Union0<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Union0 {
+        const ID: u64 = 18191912664303118104u64;
+    }
     impl<T> _p::IntoFamily for Union0<T> {
         type Family = Union0;
     }
@@ -4205,6 +4229,9 @@ pub mod test_union {
     }
     #[derive(Clone)]
     pub struct Union1<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Union1 {
+        const ID: u64 = 17152640438752803506u64;
+    }
     impl<T> _p::IntoFamily for Union1<T> {
         type Family = Union1;
     }
@@ -5193,6 +5220,9 @@ pub mod test_union {
     }
     #[derive(Clone)]
     pub struct Union2<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Union2 {
+        const ID: u64 = 12665807985332545236u64;
+    }
     impl<T> _p::IntoFamily for Union2<T> {
         type Family = Union2;
     }
@@ -5542,6 +5572,9 @@ pub mod test_union {
     }
     #[derive(Clone)]
     pub struct Union3<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Union3 {
+        const ID: u64 = 11743982853245042771u64;
+    }
     impl<T> _p::IntoFamily for Union3<T> {
         type Family = Union3;
     }
@@ -5892,6 +5925,9 @@ pub mod test_union {
 }
 #[derive(Clone)]
 pub struct TestUnnamedUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUnnamedUnion {
+    const ID: u64 = 11398179977172298166u64;
+}
 impl<T> _p::IntoFamily for TestUnnamedUnion<T> {
     type Family = TestUnnamedUnion;
 }
@@ -6202,6 +6238,9 @@ pub mod test_unnamed_union {
 }
 #[derive(Clone)]
 pub struct TestUnionInUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUnionInUnion {
+    const ID: u64 = 9919540258373898018u64;
+}
 impl<T> _p::IntoFamily for TestUnionInUnion<T> {
     type Family = TestUnionInUnion;
 }
@@ -6342,6 +6381,9 @@ pub mod test_union_in_union {
     >;
     #[derive(Clone)]
     pub struct Outer<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Outer {
+        const ID: u64 = 14989658265959753484u64;
+    }
     impl<T> _p::IntoFamily for Outer<T> {
         type Family = Outer;
     }
@@ -6584,6 +6626,9 @@ pub mod test_union_in_union {
         }
         #[derive(Clone)]
         pub struct Inner<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Inner {
+            const ID: u64 = 18418844042507380187u64;
+        }
         impl<T> _p::IntoFamily for Inner<T> {
             type Family = Inner;
         }
@@ -6816,6 +6861,9 @@ pub mod test_union_in_union {
 }
 #[derive(Clone)]
 pub struct TestGroups<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestGroups {
+    const ID: u64 = 15889848844705083651u64;
+}
 impl<T> _p::IntoFamily for TestGroups<T> {
     type Family = TestGroups;
 }
@@ -6951,6 +6999,9 @@ pub mod test_groups {
     >;
     #[derive(Clone)]
     pub struct Groups<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Groups {
+        const ID: u64 = 16297092532260647528u64;
+    }
     impl<T> _p::IntoFamily for Groups<T> {
         type Family = Groups;
     }
@@ -7270,6 +7321,9 @@ pub mod test_groups {
         }
         #[derive(Clone)]
         pub struct Foo<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Foo {
+            const ID: u64 = 17725247334230595951u64;
+        }
         impl<T> _p::IntoFamily for Foo<T> {
             type Family = Foo;
         }
@@ -7438,6 +7492,9 @@ pub mod test_groups {
         }
         #[derive(Clone)]
         pub struct Baz<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Baz {
+            const ID: u64 = 17364244297077400755u64;
+        }
         impl<T> _p::IntoFamily for Baz<T> {
             type Family = Baz;
         }
@@ -7617,6 +7674,9 @@ pub mod test_groups {
         }
         #[derive(Clone)]
         pub struct Bar<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Bar {
+            const ID: u64 = 13197729232770957341u64;
+        }
         impl<T> _p::IntoFamily for Bar<T> {
             type Family = Bar;
         }
@@ -7787,6 +7847,9 @@ pub mod test_groups {
 }
 #[derive(Clone)]
 pub struct TestInterleavedGroups<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestInterleavedGroups {
+    const ID: u64 = 17833927931941809216u64;
+}
 impl<T> _p::IntoFamily for TestInterleavedGroups<T> {
     type Family = TestInterleavedGroups;
 }
@@ -7966,6 +8029,9 @@ pub mod test_interleaved_groups {
     >;
     #[derive(Clone)]
     pub struct Group1<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Group1 {
+        const ID: u64 = 14359826595932787656u64;
+    }
     impl<T> _p::IntoFamily for Group1<T> {
         type Family = Group1;
     }
@@ -8302,6 +8368,9 @@ pub mod test_interleaved_groups {
         }
         #[derive(Clone)]
         pub struct Corge<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Corge {
+            const ID: u64 = 15783706300749852986u64;
+        }
         impl<T> _p::IntoFamily for Corge<T> {
             type Family = Corge;
         }
@@ -8501,6 +8570,9 @@ pub mod test_interleaved_groups {
     }
     #[derive(Clone)]
     pub struct Group2<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Group2 {
+        const ID: u64 = 14737364805121315049u64;
+    }
     impl<T> _p::IntoFamily for Group2<T> {
         type Family = Group2;
     }
@@ -8837,6 +8909,9 @@ pub mod test_interleaved_groups {
         }
         #[derive(Clone)]
         pub struct Corge<T = _p::Family>(T);
+        impl _p::ty::SchemaType for Corge {
+            const ID: u64 = 11535953086999162423u64;
+        }
         impl<T> _p::IntoFamily for Corge<T> {
             type Family = Corge;
         }
@@ -9037,6 +9112,9 @@ pub mod test_interleaved_groups {
 }
 #[derive(Clone)]
 pub struct TestUnionDefaults<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUnionDefaults {
+    const ID: u64 = 10734295287736874776u64;
+}
 impl<T> _p::IntoFamily for TestUnionDefaults<T> {
     type Family = TestUnionDefaults;
 }
@@ -9370,6 +9448,9 @@ pub mod test_union_defaults {
 }
 #[derive(Clone)]
 pub struct TestNestedTypes<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestNestedTypes {
+    const ID: u64 = 15704814498293758925u64;
+}
 impl<T> _p::IntoFamily for TestNestedTypes<T> {
     type Family = TestNestedTypes;
 }
@@ -9599,6 +9680,9 @@ pub mod test_nested_types {
         Foo,
         Bar,
     }
+    impl _p::ty::SchemaType for NestedEnum {
+        const ID: u64 = 13137513566248654548u64;
+    }
     impl core::convert::TryFrom<u16> for NestedEnum {
         type Error = _p::NotInSchema;
         #[inline]
@@ -9619,6 +9703,9 @@ pub mod test_nested_types {
     impl _p::ty::Enum for NestedEnum {}
     #[derive(Clone)]
     pub struct NestedStruct<T = _p::Family>(T);
+    impl _p::ty::SchemaType for NestedStruct {
+        const ID: u64 = 9425193603353401195u64;
+    }
     impl<T> _p::IntoFamily for NestedStruct<T> {
         type Family = NestedStruct;
     }
@@ -9800,6 +9887,9 @@ pub mod test_nested_types {
             Qux,
             Quux,
         }
+        impl _p::ty::SchemaType for NestedEnum {
+            const ID: u64 = 14961192461319945715u64;
+        }
         impl core::convert::TryFrom<u16> for NestedEnum {
             type Error = _p::NotInSchema;
             #[inline]
@@ -9823,6 +9913,9 @@ pub mod test_nested_types {
 }
 #[derive(Clone)]
 pub struct TestUsing<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUsing {
+    const ID: u64 = 16684337128724213861u64;
+}
 impl<T> _p::IntoFamily for TestUsing<T> {
     type Family = TestUsing;
 }
@@ -9998,6 +10091,9 @@ pub mod test_using {
 }
 #[derive(Clone)]
 pub struct TestLists<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestLists {
+    const ID: u64 = 16436033939557263230u64;
+}
 impl<T> _p::IntoFamily for TestLists<T> {
     type Family = TestLists;
 }
@@ -10468,6 +10564,9 @@ pub mod test_lists {
     >;
     #[derive(Clone)]
     pub struct Struct0<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct0 {
+        const ID: u64 = 9516880324197535726u64;
+    }
     impl<T> _p::IntoFamily for Struct0<T> {
         type Family = Struct0;
     }
@@ -10589,6 +10688,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct1<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct1 {
+        const ID: u64 = 16212492949613817193u64;
+    }
     impl<T> _p::IntoFamily for Struct1<T> {
         type Family = Struct1;
     }
@@ -10713,6 +10815,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct8<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct8 {
+        const ID: u64 = 11979885299532567643u64;
+    }
     impl<T> _p::IntoFamily for Struct8<T> {
         type Family = Struct8;
     }
@@ -10837,6 +10942,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct16<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct16 {
+        const ID: u64 = 12154080321006508140u64;
+    }
     impl<T> _p::IntoFamily for Struct16<T> {
         type Family = Struct16;
     }
@@ -10961,6 +11069,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct32<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct32 {
+        const ID: u64 = 12500847820679612226u64;
+    }
     impl<T> _p::IntoFamily for Struct32<T> {
         type Family = Struct32;
     }
@@ -11085,6 +11196,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct64<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct64 {
+        const ID: u64 = 17265170339751315014u64;
+    }
     impl<T> _p::IntoFamily for Struct64<T> {
         type Family = Struct64;
     }
@@ -11209,6 +11323,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct StructP<T = _p::Family>(T);
+    impl _p::ty::SchemaType for StructP {
+        const ID: u64 = 14315801579593032231u64;
+    }
     impl<T> _p::IntoFamily for StructP<T> {
         type Family = StructP;
     }
@@ -11339,6 +11456,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct0c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct0c {
+        const ID: u64 = 10680888278325309802u64;
+    }
     impl<T> _p::IntoFamily for Struct0c<T> {
         type Family = Struct0c;
     }
@@ -11482,6 +11602,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct1c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct1c {
+        const ID: u64 = 9912911025091744973u64;
+    }
     impl<T> _p::IntoFamily for Struct1c<T> {
         type Family = Struct1c;
     }
@@ -11630,6 +11753,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct8c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct8c {
+        const ID: u64 = 17088473475326966308u64;
+    }
     impl<T> _p::IntoFamily for Struct8c<T> {
         type Family = Struct8c;
     }
@@ -11776,6 +11902,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct16c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct16c {
+        const ID: u64 = 11058733449371015398u64;
+    }
     impl<T> _p::IntoFamily for Struct16c<T> {
         type Family = Struct16c;
     }
@@ -11927,6 +12056,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct32c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct32c {
+        const ID: u64 = 17104576006234732804u64;
+    }
     impl<T> _p::IntoFamily for Struct32c<T> {
         type Family = Struct32c;
     }
@@ -12078,6 +12210,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct Struct64c<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Struct64c {
+        const ID: u64 = 13579539769030442109u64;
+    }
     impl<T> _p::IntoFamily for Struct64c<T> {
         type Family = Struct64c;
     }
@@ -12229,6 +12364,9 @@ pub mod test_lists {
     }
     #[derive(Clone)]
     pub struct StructPc<T = _p::Family>(T);
+    impl _p::ty::SchemaType for StructPc {
+        const ID: u64 = 14043178718634049853u64;
+    }
     impl<T> _p::IntoFamily for StructPc<T> {
         type Family = StructPc;
     }
@@ -12376,6 +12514,9 @@ pub mod test_lists {
 }
 #[derive(Clone)]
 pub struct TestFieldZeroIsBit<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestFieldZeroIsBit {
+    const ID: u64 = 10591386225455521116u64;
+}
 impl<T> _p::IntoFamily for TestFieldZeroIsBit<T> {
     type Family = TestFieldZeroIsBit;
 }
@@ -12550,6 +12691,9 @@ pub mod test_field_zero_is_bit {
 }
 #[derive(Clone)]
 pub struct TestListDefaults<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestListDefaults {
+    const ID: u64 = 12128665705163980778u64;
+}
 impl<T> _p::IntoFamily for TestListDefaults<T> {
     type Family = TestListDefaults;
 }
@@ -12834,6 +12978,9 @@ pub mod test_list_defaults {
 }
 #[derive(Clone)]
 pub struct TestLateUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestLateUnion {
+    const ID: u64 = 12064647091276568275u64;
+}
 impl<T> _p::IntoFamily for TestLateUnion<T> {
     type Family = TestLateUnion;
 }
@@ -13060,6 +13207,9 @@ pub mod test_late_union {
     >;
     #[derive(Clone)]
     pub struct TheUnion<T = _p::Family>(T);
+    impl _p::ty::SchemaType for TheUnion {
+        const ID: u64 = 9255601619890511993u64;
+    }
     impl<T> _p::IntoFamily for TheUnion<T> {
         type Family = TheUnion;
     }
@@ -13357,6 +13507,9 @@ pub mod test_late_union {
     }
     #[derive(Clone)]
     pub struct AnotherUnion<T = _p::Family>(T);
+    impl _p::ty::SchemaType for AnotherUnion {
+        const ID: u64 = 13949681613641715258u64;
+    }
     impl<T> _p::IntoFamily for AnotherUnion<T> {
         type Family = AnotherUnion;
     }
@@ -13665,6 +13818,9 @@ pub mod test_late_union {
 }
 #[derive(Clone)]
 pub struct TestOldVersion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestOldVersion {
+    const ID: u64 = 10786980725090540968u64;
+}
 impl<T> _p::IntoFamily for TestOldVersion<T> {
     type Family = TestOldVersion;
 }
@@ -13845,6 +14001,9 @@ pub mod test_old_version {
 }
 #[derive(Clone)]
 pub struct TestNewVersion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestNewVersion {
+    const ID: u64 = 10292794929418620131u64;
+}
 impl<T> _p::IntoFamily for TestNewVersion<T> {
     type Family = TestNewVersion;
 }
@@ -14066,6 +14225,9 @@ pub mod test_new_version {
 }
 #[derive(Clone)]
 pub struct TestOldUnionVersion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestOldUnionVersion {
+    const ID: u64 = 13645873259884889234u64;
+}
 impl<T> _p::IntoFamily for TestOldUnionVersion<T> {
     type Family = TestOldUnionVersion;
 }
@@ -14295,6 +14457,9 @@ pub mod test_old_union_version {
 }
 #[derive(Clone)]
 pub struct TestNewUnionVersion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestNewUnionVersion {
+    const ID: u64 = 14403854196475775275u64;
+}
 impl<T> _p::IntoFamily for TestNewUnionVersion<T> {
     type Family = TestNewUnionVersion;
 }
@@ -14545,6 +14710,9 @@ pub mod test_new_union_version {
     }
     #[derive(Clone)]
     pub struct A<T = _p::Family>(T);
+    impl _p::ty::SchemaType for A {
+        const ID: u64 = 9665617732163419780u64;
+    }
     impl<T> _p::IntoFamily for A<T> {
         type Family = A;
     }
@@ -14763,6 +14931,9 @@ pub mod test_new_union_version {
 }
 #[derive(Clone)]
 pub struct TestStructUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestStructUnion {
+    const ID: u64 = 18084065694535650873u64;
+}
 impl<T> _p::IntoFamily for TestStructUnion<T> {
     type Family = TestStructUnion;
 }
@@ -14898,6 +15069,9 @@ pub mod test_struct_union {
     >;
     #[derive(Clone)]
     pub struct SomeStruct<T = _p::Family>(T);
+    impl _p::ty::SchemaType for SomeStruct {
+        const ID: u64 = 11362240471143747717u64;
+    }
     impl<T> _p::IntoFamily for SomeStruct<T> {
         type Family = SomeStruct;
     }
@@ -15072,6 +15246,9 @@ pub mod test_struct_union {
     }
     #[derive(Clone)]
     pub struct Un<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Un {
+        const ID: u64 = 11038002073750690364u64;
+    }
     impl<T> _p::IntoFamily for Un<T> {
         type Family = Un;
     }
@@ -15345,6 +15522,9 @@ pub mod test_struct_union {
 }
 #[derive(Clone)]
 pub struct TestPrintInlineStructs<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestPrintInlineStructs {
+    const ID: u64 = 16052121554796510268u64;
+}
 impl<T> _p::IntoFamily for TestPrintInlineStructs<T> {
     type Family = TestPrintInlineStructs;
 }
@@ -15550,6 +15730,9 @@ pub mod test_print_inline_structs {
     >;
     #[derive(Clone)]
     pub struct InlineStruct<T = _p::Family>(T);
+    impl _p::ty::SchemaType for InlineStruct {
+        const ID: u64 = 10252785401236871874u64;
+    }
     impl<T> _p::IntoFamily for InlineStruct<T> {
         type Family = InlineStruct;
     }
@@ -15716,6 +15899,9 @@ pub mod test_print_inline_structs {
 }
 #[derive(Clone)]
 pub struct TestWholeFloatDefault<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestWholeFloatDefault {
+    const ID: u64 = 10497843076135628848u64;
+}
 impl<T> _p::IntoFamily for TestWholeFloatDefault<T> {
     type Family = TestWholeFloatDefault;
 }
@@ -15875,6 +16061,9 @@ pub mod test_whole_float_default {
 }
 #[derive(Clone)]
 pub struct TestGenerics<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestGenerics {
+    const ID: u64 = 11338811349910758123u64;
+}
 impl<T> _p::IntoFamily for TestGenerics<T> {
     type Family = TestGenerics;
 }
@@ -16199,6 +16388,9 @@ pub mod test_generics {
     }
     #[derive(Clone)]
     pub struct Inner<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Inner {
+        const ID: u64 = 17773527472803523699u64;
+    }
     impl<T> _p::IntoFamily for Inner<T> {
         type Family = Inner;
     }
@@ -16353,6 +16545,9 @@ pub mod test_generics {
     }
     #[derive(Clone)]
     pub struct Inner2<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Inner2 {
+        const ID: u64 = 12225938941820720181u64;
+    }
     impl<T> _p::IntoFamily for Inner2<T> {
         type Family = Inner2;
     }
@@ -16568,6 +16763,9 @@ pub mod test_generics {
         >;
         #[derive(Clone)]
         pub struct DeepNest<T = _p::Family>(T);
+        impl _p::ty::SchemaType for DeepNest {
+            const ID: u64 = 13159661719685629683u64;
+        }
         impl<T> _p::IntoFamily for DeepNest<T> {
             type Family = DeepNest;
         }
@@ -16805,6 +17003,9 @@ pub mod test_generics {
     }
     #[derive(Clone)]
     pub struct UseAliases<T = _p::Family>(T);
+    impl _p::ty::SchemaType for UseAliases {
+        const ID: u64 = 10260729233116210895u64;
+    }
     impl<T> _p::IntoFamily for UseAliases<T> {
         type Family = UseAliases;
     }
@@ -17099,6 +17300,9 @@ pub mod test_generics {
     }
     #[derive(Clone)]
     pub struct Ug<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Ug {
+        const ID: u64 = 13000334785903802446u64;
+    }
     impl<T> _p::IntoFamily for Ug<T> {
         type Family = Ug;
     }
@@ -17219,6 +17423,9 @@ pub mod test_generics {
 }
 #[derive(Clone)]
 pub struct BoxedText<T = _p::Family>(T);
+impl _p::ty::SchemaType for BoxedText {
+    const ID: u64 = 11210786258299153994u64;
+}
 impl<T> _p::IntoFamily for BoxedText<T> {
     type Family = BoxedText;
 }
@@ -17346,6 +17553,9 @@ pub mod boxed_text {
 }
 #[derive(Clone)]
 pub struct TestGenericsWrapper<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestGenericsWrapper {
+    const ID: u64 = 12228031604858979421u64;
+}
 impl<T> _p::IntoFamily for TestGenericsWrapper<T> {
     type Family = TestGenericsWrapper;
 }
@@ -17490,6 +17700,9 @@ pub mod test_generics_wrapper {
 }
 #[derive(Clone)]
 pub struct TestGenericsWrapper2<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestGenericsWrapper2 {
+    const ID: u64 = 17478333155010509316u64;
+}
 impl<T> _p::IntoFamily for TestGenericsWrapper2<T> {
     type Family = TestGenericsWrapper2;
 }
@@ -17638,6 +17851,9 @@ pub mod test_generics_wrapper2 {
 }
 #[derive(Clone)]
 pub struct TestGenericsUnion<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestGenericsUnion {
+    const ID: u64 = 11909892652185784419u64;
+}
 impl<T> _p::IntoFamily for TestGenericsUnion<T> {
     type Family = TestGenericsUnion;
 }
@@ -17897,6 +18113,9 @@ pub mod test_generics_union {
 }
 #[derive(Clone)]
 pub struct TestUseGenerics<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestUseGenerics {
+    const ID: u64 = 10675697872305927055u64;
+}
 impl<T> _p::IntoFamily for TestUseGenerics<T> {
     type Family = TestUseGenerics;
 }
@@ -19377,6 +19596,9 @@ pub mod test_use_generics {
 }
 #[derive(Clone)]
 pub struct TestEmptyStruct<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestEmptyStruct {
+    const ID: u64 = 14220547125180143324u64;
+}
 impl<T> _p::IntoFamily for TestEmptyStruct<T> {
     type Family = TestEmptyStruct;
 }
@@ -19483,6 +19705,9 @@ pub mod test_empty_struct {
 }
 #[derive(Clone)]
 pub struct TestConstants<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestConstants {
+    const ID: u64 = 12388686092088975509u64;
+}
 impl<T> _p::IntoFamily for TestConstants<T> {
     type Family = TestConstants;
 }
@@ -21543,6 +21768,9 @@ pub const BLOCK_TEXT: _p::ty::ConstPtr<_p::Text> = unsafe {
 };
 #[derive(Clone)]
 pub struct TestAnyPointerConstants<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestAnyPointerConstants {
+    const ID: u64 = 15979476109953374643u64;
+}
 impl<T> _p::IntoFamily for TestAnyPointerConstants<T> {
     type Family = TestAnyPointerConstants;
 }
@@ -22215,6 +22443,9 @@ pub const ANY_POINTER_CONSTANTS: _p::ty::ConstPtr<_p::Struct<TestAnyPointerConst
 };
 #[derive(Clone)]
 pub struct TestListOfAny<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestListOfAny {
+    const ID: u64 = 12849988285685149627u64;
+}
 impl<T> _p::IntoFamily for TestListOfAny<T> {
     type Family = TestListOfAny;
 }
@@ -22384,6 +22615,9 @@ pub mod test_list_of_any {
 }
 #[derive(Clone)]
 pub struct TestContainMembrane<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestContainMembrane {
+    const ID: u64 = 10706263223626234460u64;
+}
 impl<T> _p::IntoFamily for TestContainMembrane<T> {
     type Family = TestContainMembrane;
 }
@@ -22556,6 +22790,9 @@ pub mod test_contain_membrane {
 }
 #[derive(Clone)]
 pub struct TestTransferCap<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestTransferCap {
+    const ID: u64 = 15936944576269548016u64;
+}
 impl<T> _p::IntoFamily for TestTransferCap<T> {
     type Family = TestTransferCap;
 }
@@ -22700,6 +22937,9 @@ pub mod test_transfer_cap {
     >;
     #[derive(Clone)]
     pub struct Element<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Element {
+        const ID: u64 = 14350226048854280892u64;
+    }
     impl<T> _p::IntoFamily for Element<T> {
         type Family = Element;
     }
@@ -22860,6 +23100,9 @@ pub mod test_transfer_cap {
 }
 #[derive(Clone)]
 pub struct TestSturdyRef<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestSturdyRef {
+    const ID: u64 = 14896386035283523266u64;
+}
 impl<T> _p::IntoFamily for TestSturdyRef<T> {
     type Family = TestSturdyRef;
 }
@@ -23034,6 +23277,9 @@ pub mod test_sturdy_ref {
 }
 #[derive(Clone)]
 pub struct TestSturdyRefHostId<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestSturdyRefHostId {
+    const ID: u64 = 16153633125947204418u64;
+}
 impl<T> _p::IntoFamily for TestSturdyRefHostId<T> {
     type Family = TestSturdyRefHostId;
 }
@@ -23177,6 +23423,9 @@ pub mod test_sturdy_ref_host_id {
 }
 #[derive(Clone)]
 pub struct TestSturdyRefObjectId<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestSturdyRefObjectId {
+    const ID: u64 = 12588314220840310423u64;
+}
 impl<T> _p::IntoFamily for TestSturdyRefObjectId<T> {
     type Family = TestSturdyRefObjectId;
 }
@@ -23330,6 +23579,9 @@ pub mod test_sturdy_ref_object_id {
         TestTailCaller,
         TestMoreStuff,
     }
+    impl _p::ty::SchemaType for Tag {
+        const ID: u64 = 17240499757294867513u64;
+    }
     impl core::convert::TryFrom<u16> for Tag {
         type Error = _p::NotInSchema;
         #[inline]
@@ -23355,6 +23607,9 @@ pub mod test_sturdy_ref_object_id {
 }
 #[derive(Clone)]
 pub struct TestProvisionId<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestProvisionId {
+    const ID: u64 = 11411091520228545634u64;
+}
 impl<T> _p::IntoFamily for TestProvisionId<T> {
     type Family = TestProvisionId;
 }
@@ -23461,6 +23716,9 @@ pub mod test_provision_id {
 }
 #[derive(Clone)]
 pub struct TestRecipientId<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestRecipientId {
+    const ID: u64 = 16874908487150058986u64;
+}
 impl<T> _p::IntoFamily for TestRecipientId<T> {
     type Family = TestRecipientId;
 }
@@ -23567,6 +23825,9 @@ pub mod test_recipient_id {
 }
 #[derive(Clone)]
 pub struct TestThirdPartyCapId<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestThirdPartyCapId {
+    const ID: u64 = 12107106793842693225u64;
+}
 impl<T> _p::IntoFamily for TestThirdPartyCapId<T> {
     type Family = TestThirdPartyCapId;
 }
@@ -23676,6 +23937,9 @@ pub mod test_third_party_cap_id {
 }
 #[derive(Clone)]
 pub struct TestJoinResult<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestJoinResult {
+    const ID: u64 = 17637655861324215808u64;
+}
 impl<T> _p::IntoFamily for TestJoinResult<T> {
     type Family = TestJoinResult;
 }
@@ -23782,6 +24046,9 @@ pub mod test_join_result {
 }
 #[derive(Clone)]
 pub struct TestNameAnnotation<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestNameAnnotation {
+    const ID: u64 = 15131407126639566168u64;
+}
 impl<T> _p::IntoFamily for TestNameAnnotation<T> {
     type Family = TestNameAnnotation;
 }
@@ -24097,6 +24364,9 @@ pub mod test_name_annotation {
         Bar,
         Baz,
     }
+    impl _p::ty::SchemaType for BadlyNamedEnum {
+        const ID: u64 = 17730902487403718730u64;
+    }
     impl core::convert::TryFrom<u16> for BadlyNamedEnum {
         type Error = _p::NotInSchema;
         #[inline]
@@ -24118,6 +24388,9 @@ pub mod test_name_annotation {
     impl _p::ty::Enum for BadlyNamedEnum {}
     #[derive(Clone)]
     pub struct NestedStruct<T = _p::Family>(T);
+    impl _p::ty::SchemaType for NestedStruct {
+        const ID: u64 = 13709075339766211204u64;
+    }
     impl<T> _p::IntoFamily for NestedStruct<T> {
         type Family = NestedStruct;
     }
@@ -24302,6 +24575,9 @@ pub mod test_name_annotation {
             Corge,
             Grault,
         }
+        impl _p::ty::SchemaType for DeeplyNestedEnum {
+            const ID: u64 = 17783377494901203680u64;
+        }
         impl core::convert::TryFrom<u16> for DeeplyNestedEnum {
             type Error = _p::NotInSchema;
             #[inline]
@@ -24324,6 +24600,9 @@ pub mod test_name_annotation {
     }
     #[derive(Clone)]
     pub struct BadlyNamedUnion<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BadlyNamedUnion {
+        const ID: u64 = 9933200673777910140u64;
+    }
     impl<T> _p::IntoFamily for BadlyNamedUnion<T> {
         type Family = BadlyNamedUnion;
     }
@@ -24612,6 +24891,9 @@ pub mod test_name_annotation {
         }
         #[derive(Clone)]
         pub struct BadlyNamedGroup<T = _p::Family>(T);
+        impl _p::ty::SchemaType for BadlyNamedGroup {
+            const ID: u64 = 14076365459987674914u64;
+        }
         impl<T> _p::IntoFamily for BadlyNamedGroup<T> {
             type Family = BadlyNamedGroup;
         }
@@ -24773,6 +25055,9 @@ pub mod test_name_annotation {
 }
 #[derive(Clone)]
 pub struct TestImpliedFirstField<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestImpliedFirstField {
+    const ID: u64 = 17073458209730106194u64;
+}
 impl<T> _p::IntoFamily for TestImpliedFirstField<T> {
     type Family = TestImpliedFirstField;
 }
@@ -25041,6 +25326,9 @@ pub mod test_implied_first_field {
     >;
     #[derive(Clone)]
     pub struct TextStruct<T = _p::Family>(T);
+    impl _p::ty::SchemaType for TextStruct {
+        const ID: u64 = 10399958892050652522u64;
+    }
     impl<T> _p::IntoFamily for TextStruct<T> {
         type Family = TextStruct;
     }
@@ -25192,6 +25480,9 @@ pub mod test_implied_first_field {
     }
     #[derive(Clone)]
     pub struct IntGroup<T = _p::Family>(T);
+    impl _p::ty::SchemaType for IntGroup {
+        const ID: u64 = 17683013451488578037u64;
+    }
     impl<T> _p::IntoFamily for IntGroup<T> {
         type Family = IntGroup;
     }
@@ -25364,6 +25655,9 @@ pub const TEST_IMPLIED_FIRST_FIELD: _p::ty::ConstPtr<
 };
 #[derive(Clone)]
 pub struct TestCycleANoCaps<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestCycleANoCaps {
+    const ID: u64 = 13375596688656551808u64;
+}
 impl<T> _p::IntoFamily for TestCycleANoCaps<T> {
     type Family = TestCycleANoCaps;
 }
@@ -25505,6 +25799,9 @@ pub mod test_cycle_a_no_caps {
 }
 #[derive(Clone)]
 pub struct TestCycleBNoCaps<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestCycleBNoCaps {
+    const ID: u64 = 9886200362498451516u64;
+}
 impl<T> _p::IntoFamily for TestCycleBNoCaps<T> {
     type Family = TestCycleBNoCaps;
 }
@@ -25682,6 +25979,9 @@ pub mod test_cycle_b_no_caps {
 }
 #[derive(Clone)]
 pub struct TestCycleAWithCaps<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestCycleAWithCaps {
+    const ID: u64 = 10517235811239054007u64;
+}
 impl<T> _p::IntoFamily for TestCycleAWithCaps<T> {
     type Family = TestCycleAWithCaps;
 }
@@ -25823,6 +26123,9 @@ pub mod test_cycle_a_with_caps {
 }
 #[derive(Clone)]
 pub struct TestCycleBWithCaps<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestCycleBWithCaps {
+    const ID: u64 = 17813587854411418758u64;
+}
 impl<T> _p::IntoFamily for TestCycleBWithCaps<T> {
     type Family = TestCycleBWithCaps;
 }

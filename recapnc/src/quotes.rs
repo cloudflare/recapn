@@ -111,6 +111,7 @@ impl ToTokens for GeneratedItem {
 }
 
 pub struct GeneratedStruct {
+    pub id: u64,
     pub ident: syn::Ident,
     pub mod_ident: syn::Ident,
     pub type_params: Vec<syn::TypeParam>,
@@ -263,6 +264,7 @@ to_tokens!(
         | self
         | {
             let Self {
+                id,
                 ident: name,
                 mod_ident: modname,
                 nested_items: nested,
@@ -301,6 +303,10 @@ to_tokens!(
                 #[derive(Clone)]
                 pub struct #name<T = _p::Family>(T);
 
+                impl _p::ty::SchemaType for #name {
+                    const ID: u64 = #id;
+                }
+    
                 impl<T> _p::IntoFamily for #name<T> {
                     type Family = #name;
                 }
@@ -682,13 +688,14 @@ impl GeneratedVariant {
 }
 
 pub struct GeneratedEnum {
+    pub id: u64,
     pub name: syn::Ident,
     pub enumerants: Vec<syn::Ident>,
 }
 
 to_tokens!(
     GeneratedEnum | self | {
-        let (name, enumerants) = (&self.name, &self.enumerants);
+        let GeneratedEnum { id, name, enumerants } = self;
         let enum_matches = self.enumerants.iter().enumerate().map(|(value, ident)| {
             let value = value as u16;
             quote!(#value => Ok(Self::#ident))
@@ -700,6 +707,10 @@ to_tokens!(
             pub enum #name {
                 #[default]
                 #(#enumerants),*
+            }
+
+            impl _p::ty::SchemaType for #name {
+                const ID: u64 = #id;
             }
 
             impl core::convert::TryFrom<u16> for #name {

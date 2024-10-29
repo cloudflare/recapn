@@ -543,6 +543,7 @@ impl GeneratorContext {
         let size = (!schema.is_group()).then(|| schema.struct_size());
 
         let mut generated = GeneratedStruct {
+            id: schema.node.id(),
             ident: info.type_info.type_ident.clone(),
             mod_ident: info.mod_ident.clone(),
             type_params: Vec::new(),
@@ -989,7 +990,7 @@ impl GeneratorContext {
 
     fn generate_enum(
         &self,
-        _: &EnumSchema<'_>,
+        schema: &EnumSchema<'_>,
         EnumInfo {
             type_info: TypeInfo { type_ident, .. },
             enumerants,
@@ -997,6 +998,7 @@ impl GeneratorContext {
         _: &mut FileContext,
     ) -> Result<GeneratedEnum> {
         Ok(GeneratedEnum {
+            id: schema.node.id(),
             name: type_ident.clone(),
             enumerants: enumerants.clone(),
         })
