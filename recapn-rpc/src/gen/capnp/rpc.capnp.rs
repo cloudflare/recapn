@@ -3,6 +3,9 @@ use recapn::prelude::gen as _p;
 use super::{__file, __imports};
 #[derive(Clone)]
 pub struct Message<T = _p::Family>(T);
+impl _p::ty::SchemaType for Message {
+    const ID: u64 = 10500036013887172658u64;
+}
 impl<T> _p::IntoFamily for Message<T> {
     type Family = Message;
 }
@@ -983,6 +986,9 @@ pub mod message {
 }
 #[derive(Clone)]
 pub struct Bootstrap<T = _p::Family>(T);
+impl _p::ty::SchemaType for Bootstrap {
+    const ID: u64 = 16811039658553601732u64;
+}
 impl<T> _p::IntoFamily for Bootstrap<T> {
     type Family = Bootstrap;
 }
@@ -1139,6 +1145,9 @@ pub mod bootstrap {
 }
 #[derive(Clone)]
 pub struct Call<T = _p::Family>(T);
+impl _p::ty::SchemaType for Call {
+    const ID: u64 = 9469473312751832276u64;
+}
 impl<T> _p::IntoFamily for Call<T> {
     type Family = Call;
 }
@@ -1440,6 +1449,9 @@ pub mod call {
     pub type Builder<'a, T = _p::rpc::Empty> = super::Call<_p::StructBuilder<'a, T>>;
     #[derive(Clone)]
     pub struct SendResultsTo<T = _p::Family>(T);
+    impl _p::ty::SchemaType for SendResultsTo {
+        const ID: u64 = 15774052265921044377u64;
+    }
     impl<T> _p::IntoFamily for SendResultsTo<T> {
         type Family = SendResultsTo;
     }
@@ -1736,6 +1748,9 @@ pub mod call {
 }
 #[derive(Clone)]
 pub struct Return<T = _p::Family>(T);
+impl _p::ty::SchemaType for Return {
+    const ID: u64 = 11392333052105676602u64;
+}
 impl<T> _p::IntoFamily for Return<T> {
     type Family = Return;
 }
@@ -2244,6 +2259,9 @@ pub mod r#return {
 }
 #[derive(Clone)]
 pub struct Finish<T = _p::Family>(T);
+impl _p::ty::SchemaType for Finish {
+    const ID: u64 = 15239388059401719395u64;
+}
 impl<T> _p::IntoFamily for Finish<T> {
     type Family = Finish;
 }
@@ -2385,6 +2403,9 @@ pub mod finish {
 }
 #[derive(Clone)]
 pub struct Resolve<T = _p::Family>(T);
+impl _p::ty::SchemaType for Resolve {
+    const ID: u64 = 13529541526594062446u64;
+}
 impl<T> _p::IntoFamily for Resolve<T> {
     type Family = Resolve;
 }
@@ -2657,6 +2678,9 @@ pub mod resolve {
 }
 #[derive(Clone)]
 pub struct Release<T = _p::Family>(T);
+impl _p::ty::SchemaType for Release {
+    const ID: u64 = 12473400923157197975u64;
+}
 impl<T> _p::IntoFamily for Release<T> {
     type Family = Release;
 }
@@ -2793,6 +2817,9 @@ pub mod release {
 }
 #[derive(Clone)]
 pub struct Disembargo<T = _p::Family>(T);
+impl _p::ty::SchemaType for Disembargo {
+    const ID: u64 = 17970548384007534353u64;
+}
 impl<T> _p::IntoFamily for Disembargo<T> {
     type Family = Disembargo;
 }
@@ -2958,6 +2985,9 @@ pub mod disembargo {
     >;
     #[derive(Clone)]
     pub struct Context<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Context {
+        const ID: u64 = 15376050949367520589u64;
+    }
     impl<T> _p::IntoFamily for Context<T> {
         type Family = Context;
     }
@@ -3286,6 +3316,9 @@ pub mod disembargo {
 }
 #[derive(Clone)]
 pub struct Provide<T = _p::Family>(T);
+impl _p::ty::SchemaType for Provide {
+    const ID: u64 = 11270825879279873114u64;
+}
 impl<T> _p::IntoFamily for Provide<T> {
     type Family = Provide;
 }
@@ -3462,6 +3495,9 @@ pub mod provide {
 }
 #[derive(Clone)]
 pub struct Accept<T = _p::Family>(T);
+impl _p::ty::SchemaType for Accept {
+    const ID: u64 = 15332985841292492822u64;
+}
 impl<T> _p::IntoFamily for Accept<T> {
     type Family = Accept;
 }
@@ -3620,6 +3656,9 @@ pub mod accept {
 }
 #[derive(Clone)]
 pub struct Join<T = _p::Family>(T);
+impl _p::ty::SchemaType for Join {
+    const ID: u64 = 18149955118657700271u64;
+}
 impl<T> _p::IntoFamily for Join<T> {
     type Family = Join;
 }
@@ -3791,6 +3830,9 @@ pub mod join {
 }
 #[derive(Clone)]
 pub struct MessageTarget<T = _p::Family>(T);
+impl _p::ty::SchemaType for MessageTarget {
+    const ID: u64 = 10789521159760378817u64;
+}
 impl<T> _p::IntoFamily for MessageTarget<T> {
     type Family = MessageTarget;
 }
@@ -4047,6 +4089,9 @@ pub mod message_target {
 }
 #[derive(Clone)]
 pub struct Payload<T = _p::Family>(T);
+impl _p::ty::SchemaType for Payload {
+    const ID: u64 = 11100916931204903995u64;
+}
 impl<T> _p::IntoFamily for Payload<T> {
     type Family = Payload;
 }
@@ -4213,6 +4258,9 @@ pub mod payload {
 }
 #[derive(Clone)]
 pub struct CapDescriptor<T = _p::Family>(T);
+impl _p::ty::SchemaType for CapDescriptor {
+    const ID: u64 = 9593755465305995440u64;
+}
 impl<T> _p::IntoFamily for CapDescriptor<T> {
     type Family = CapDescriptor;
 }
@@ -4703,6 +4751,9 @@ pub mod cap_descriptor {
 }
 #[derive(Clone)]
 pub struct PromisedAnswer<T = _p::Family>(T);
+impl _p::ty::SchemaType for PromisedAnswer {
+    const ID: u64 = 15564635848320162976u64;
+}
 impl<T> _p::IntoFamily for PromisedAnswer<T> {
     type Family = PromisedAnswer;
 }
@@ -4869,6 +4920,9 @@ pub mod promised_answer {
     >;
     #[derive(Clone)]
     pub struct Op<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Op {
+        const ID: u64 = 17516350820840804481u64;
+    }
     impl<T> _p::IntoFamily for Op<T> {
         type Family = Op;
     }
@@ -5096,6 +5150,9 @@ pub mod promised_answer {
 }
 #[derive(Clone)]
 pub struct ThirdPartyCapDescriptor<T = _p::Family>(T);
+impl _p::ty::SchemaType for ThirdPartyCapDescriptor {
+    const ID: u64 = 15235686326393111165u64;
+}
 impl<T> _p::IntoFamily for ThirdPartyCapDescriptor<T> {
     type Family = ThirdPartyCapDescriptor;
 }
@@ -5268,6 +5325,9 @@ pub mod third_party_cap_descriptor {
 }
 #[derive(Clone)]
 pub struct Exception<T = _p::Family>(T);
+impl _p::ty::SchemaType for Exception {
+    const ID: u64 = 15430940935639230746u64;
+}
 impl<T> _p::IntoFamily for Exception<T> {
     type Family = Exception;
 }
@@ -5490,6 +5550,9 @@ pub mod exception {
         Overloaded,
         Disconnected,
         Unimplemented,
+    }
+    impl _p::ty::SchemaType for Type {
+        const ID: u64 = 12865824133959433560u64;
     }
     impl core::convert::TryFrom<u16> for Type {
         type Error = _p::NotInSchema;
