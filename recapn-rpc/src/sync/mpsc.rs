@@ -171,13 +171,15 @@ impl<C: Chan + ?Sized> Hash for Sender<C> {
     }
 }
 
+unsafe impl<C: Chan> Send for Sender<C> where Request<C>: Send {}
+unsafe impl<C: Chan> Sync for Sender<C> where Request<C>: Send {}
+
 #[derive(Debug)]
 pub struct Receiver<C: Chan> {
     shared: Arc<SharedChannel<C>>,
 }
 
 unsafe impl<C: Chan> Send for Receiver<C> where Request<C>: Send {}
-
 unsafe impl<C: Chan> Sync for Receiver<C> where Request<C>: Send {}
 
 impl<C: Chan> Receiver<C> {
