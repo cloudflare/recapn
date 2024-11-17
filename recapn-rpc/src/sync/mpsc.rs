@@ -194,42 +194,75 @@ impl<C: Chan> Receiver<C> {
     /// begin refering to the channel associated with the forwarded channel.
     ///
     /// Forwarding to a sender on this same channel will result in the receiver being returned.
-    pub fn forward_to(self, other: &Sender<C>) -> Result<(), Self> {
-        let (other_shared, mut other_lock) = match other.shared.resolve_and_lock() {
-            Ok(v) => v,
-            Err(r) => {
+    pub fn forward_to(self, mut other: &Sender<C>) -> Result<(), Self> {
+        let this = &self.shared;
+        let (other_shared, mut resolution) = other.shared.most_resolved();
+        loop {
+            if let Some(r) = resolution {
                 match r {
                     MostResolved::Dropped => drop(self),
                     MostResolved::Error(err) => self.close(err.clone()),
                 }
-                return Ok(());
+                return Ok(())
             }
-        };
 
-        if Arc::ptr_eq(&self.shared, other_shared) {
-            return Err(self);
-        }
+            // Declare the lock variables separately from the named locks. This is done to make sure
+            // the locks are also *dropped* in a consistent order, as Rust invokes Drop on variables
+            // in reverse declaration order. This way, lock_b is always unlocked first, followed
+            // by lock_a. self_lock and other_lock are always mutable borrows to their proper locks.
+            let mut lock_a;
+            let mut lock_b;
+            let self_lock;
+            let other_lock;
 
-        let mut self_lock = self.shared.state.lock();
-        if self_lock.requests.is_empty() {
+            let self_ptr = core::ptr::from_ref(this.as_ref());
+            let other_ptr = core::ptr::from_ref(other_shared.as_ref());
+            match self_ptr.cmp(&other_ptr) {
+                std::cmp::Ordering::Less => {
+                    lock_a = this.state.lock();
+                    lock_b = other_shared.state.lock();
+                    self_lock = &mut lock_a;
+                    other_lock = &mut lock_b;
+                },
+                std::cmp::Ordering::Greater => {
+                    lock_a = other_shared.state.lock();
+                    lock_b = this.state.lock();
+                    self_lock = &mut lock_b;
+                    other_lock = &mut lock_a;
+                },
+                std::cmp::Ordering::Equal => return Err(self),
+            };
+
+            (other, resolution) = other.most_resolved();
+
+            // Continue the loop if other resolved while we were acquiring locks.
+            if resolution.is_some() {
+                continue;
+            }
+
             unsafe {
                 self.shared.resolution.resolve(ChannelResolution::Forward(other.clone()));
             }
+
+            // There's no requests to forward, so just return early. This way we won't wake up the
+            // other receiver for no reason.
+            if self_lock.requests.is_empty() {
+                return Ok(());
+            }
+
+            other_lock.requests.append_back(&mut self_lock.requests);
+
+            let waker = other_lock.waker.take();
+
+            drop(lock_b);
+            drop(lock_a);
+
+            if let Some(w) = waker {
+                w.wake();
+            }
+
             return Ok(());
         }
-
-        other_lock.requests.append_back(&mut self_lock.requests);
-
-        let waker = other_lock.waker.take();
-
-        drop(self_lock);
-        drop(other_lock);
-
-        if let Some(w) = waker {
-            w.wake();
-        }
-
-        Ok(())
     }
 
     /// Await the closing of the channel, without taking any requesting from it.
@@ -560,10 +593,6 @@ impl<C: Chan> SharedChannel<C> {
                 break Ok((this, channel));
             }
         }
-    }
-
-    pub fn lock_unresolved(&self) -> Option<MutexGuard<State<C>>> {
-        todo!()
     }
 }
 
