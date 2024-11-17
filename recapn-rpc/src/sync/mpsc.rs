@@ -113,11 +113,11 @@ impl<C: Chan> Sender<C> {
         self.try_resolved().is_some()
     }
 
-    pub fn try_resolved(&self) -> Option<Resolution<C>> {
+    pub fn try_resolved(&self) -> Option<Resolution<'_, C>> {
         self.shared.try_resolved()
     }
 
-    pub fn most_resolved(mut self: &Self) -> (&Self, Option<MostResolved<C::Error>>) {
+    pub fn most_resolved(mut self: &Self) -> (&Self, Option<MostResolved<'_, C::Error>>) {
         loop {
             let resolution = self.try_resolved();
             return match resolution {
@@ -148,7 +148,7 @@ impl<C: Chan> Sender<C> {
     }
 
     /// Wait for the channel to be resolved.
-    pub async fn resolution(&self) -> Resolution<C> {
+    pub async fn resolution(&self) -> Resolution<'_, C> {
         todo!()
     }
 
@@ -270,7 +270,7 @@ impl<C: Chan> Receiver<C> {
         poll_fn(|cx| self.poll_closed(cx)).await;
     }
 
-    pub fn poll_closed(&mut self, cx: &mut Context) -> Poll<()> {
+    pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         self.shared.resolution.sender_poll_closed(cx)
     }
 
@@ -282,7 +282,7 @@ impl<C: Chan> Receiver<C> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    pub fn poll_recv(&mut self, cx: &mut Context) -> Poll<Option<Request<C>>> {
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<Request<C>>> {
         if self.is_closed() {
             return Poll::Ready(None);
         }
@@ -523,7 +523,7 @@ impl<C: Chan + Debug> Debug for SharedChannel<C> {
 }
 
 impl<C: Chan> SharedChannel<C> {
-    pub fn try_resolved(&self) -> Option<Resolution<C>> {
+    pub fn try_resolved(&self) -> Option<Resolution<'_, C>> {
         match self.resolution.state() {
             ShotState::Closed => Some(Resolution::Dropped),
             ShotState::Empty => None,
