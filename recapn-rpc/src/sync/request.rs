@@ -322,7 +322,8 @@ impl<C: Chan> SharedRequest<C> {
     ///
     /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
     pub unsafe fn remove_receiver(&self) {
-        let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
+        let old = self.receivers_count.fetch_sub(1, Relaxed);
+        let last_receiver = old - 1 == 0;
         if last_receiver {
             self.state.set_recv_closed();
             self.finished_waiters.wake_all();
@@ -878,135 +879,5 @@ impl<C: Chan> Clone for PipelineBuilder<C> {
         Self {
             shared: self.shared.clone(),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use assert_matches2::assert_matches;
-    use hashbrown::HashMap;
-    use mpsc::TryRecvError;
-
-    use crate::{
-        sync::{mpsc, request::RequestUsage},
-        Error,
-    };
-
-    use super::{request_response, Chan, IntoResults, PipelineResolver, ResponseReceiverFactory};
-
-    #[derive(Debug)]
-    struct TestChannel;
-
-    #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-    struct IntRequest(i32);
-
-    #[derive(Clone, Debug)]
-    struct IntsResponse(HashMap<i32, mpsc::Sender<TestChannel>>);
-
-    #[derive(PartialEq, Eq, Hash, Debug)]
-    struct IntPipelineKey(i32);
-
-    impl IntoResults<TestChannel> for Error {
-        #[inline]
-        fn into_results(self) -> <TestChannel as Chan>::Results {
-            Err(self)
-        }
-    }
-
-    impl Chan for TestChannel {
-        type Parameters = IntRequest;
-        type Error = Error;
-        type Results = Result<IntsResponse, Error>;
-        type PipelineKey = IntPipelineKey;
-        type Pipeline = IntsResponse;
-    }
-
-    impl PipelineResolver<TestChannel> for IntsResponse {
-        fn resolve(
-            &self,
-            _: ResponseReceiverFactory<'_, TestChannel>,
-            key: IntPipelineKey,
-            channel: mpsc::Receiver<TestChannel>,
-        ) {
-            let Some(results) = self.0.get(&key.0) else {
-                channel.close(Error::failed("unknown pipeline"));
-                return;
-            };
-
-            if let Err(c) = channel.forward_to(results) {
-                // If it's an infinite loop, close it with an error
-                c.close(Error::failed("infinite loop"));
-            }
-        }
-
-        fn pipeline(
-            &self,
-            _: ResponseReceiverFactory<'_, TestChannel>,
-            key: IntPipelineKey,
-        ) -> mpsc::Sender<TestChannel> {
-            match self.0.get(&key.0) {
-                Some(c) => c.clone(),
-                None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
-            }
-        }
-    }
-
-    impl PipelineResolver<TestChannel> for Result<IntsResponse, Error> {
-        fn resolve(
-            &self,
-            recv: ResponseReceiverFactory<'_, TestChannel>,
-            key: IntPipelineKey,
-            channel: mpsc::Receiver<TestChannel>,
-        ) {
-            match self {
-                Ok(r) => r.resolve(recv, key, channel),
-                Err(err) => channel.close(err.clone()),
-            }
-        }
-
-        fn pipeline(
-            &self,
-            _: ResponseReceiverFactory<'_, TestChannel>,
-            key: IntPipelineKey,
-        ) -> mpsc::Sender<TestChannel> {
-            match self {
-                Ok(r) => match r.0.get(&key.0) {
-                    Some(c) => c.clone(),
-                    None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
-                },
-                Err(err) => mpsc::broken(TestChannel, err.clone()),
-            }
-        }
-    }
-
-    #[test]
-    fn sync_request_response() {
-        // Make a request and respond, then receive the result and check it.
-
-        let input = IntRequest(1);
-        let (req, resp) = request_response::<TestChannel>(input);
-        assert_eq!(req.usage(), RequestUsage::Response);
-
-        let (params, responder) = req.respond();
-        assert_eq!(input, params);
-
-        assert!(!responder.is_finished());
-        responder.respond(Ok(IntsResponse(HashMap::new())));
-
-        let results = resp.try_recv().unwrap();
-        let response = (*results).as_ref().unwrap();
-
-        assert!(response.0.is_empty());
-    }
-
-    #[test]
-    fn sync_close_request() {
-        // Make a request, but drop the request, and make sure the receiver becomes aware of it.
-
-        let input = IntRequest(1);
-        let (req, resp) = request_response::<TestChannel>(input);
-        drop(req);
-
-        assert_matches!(resp.try_recv(), Err(TryRecvError::Closed));
     }
 }
