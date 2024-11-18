@@ -103,11 +103,6 @@ impl<C: Chan + ?Sized> Drop for Sender<C> {
 
 impl<C: Chan> Sender<C> {
     pub fn send(&self, req: Request<C>) -> Result<(), (Request<C>, Option<&C::Error>)> {
-        if req.is_finished() {
-            // Just drop the request nobody wants the result
-            return Ok(());
-        }
-
         let (this, mut channel) = match self.shared.resolve_and_lock() {
             Ok(v) => v,
             Err(r) => {
@@ -125,6 +120,13 @@ impl<C: Chan> Sender<C> {
 
         unsafe {
             req_shared.set_parent(this.clone());
+        }
+
+        if req_shared.is_finished() {
+            // Just drop the request nobody wants the result
+            let _ = channel.requests.pop_back();
+            unsafe { req_shared.take_parent(); }
+            return Ok(());
         }
 
         let waker = channel.waker.take();
