@@ -26,8 +26,7 @@ use super::TryRecvError;
 use super::mpsc::{self, weak_channel, Sender, SharedChannel, WeakChannel};
 use super::util::Marc;
 use super::util::atomic_state::{AtomicState, ShotState};
-use super::util::closed_task::ClosedTask;
-use super::util::wait_list::{RecvWaiter, WaitList, Waiter};
+use super::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
 use super::util::linked_list::{Link, Pointers};
 
 /// An abstract channel. This is associated data stored in a mpsc channel that
@@ -60,9 +59,7 @@ pub struct ResponseReceiverFactory<'a, C: Chan> {
 
 impl<'a, C: Chan> Clone for ResponseReceiverFactory<'a, C> {
     fn clone(&self) -> Self {
-        Self {
-            shared: self.shared,
-        }
+        Self { shared: self.shared }
     }
 }
 
@@ -146,13 +143,14 @@ pub(crate) struct SharedRequest<C: Chan> {
     /// that are waiting for the response to be received.
     receivers_count: AtomicUsize,
 
-    /// A set of waiters waiting to receive the value. Pipelined requests
-    /// are not included here since they're fulfilled separately.
+    /// A set of waiters waiting to receive the value.
+    /// Pipelined requests are not included here since they're fulfilled separately.
     waiters: WaitList,
 
-    /// The close task, woken up when all the receivers have been dropped and the channel
-    /// has been marked closed.
-    closed_task: ClosedTask,
+    /// A set of waiters waiting for the request to be finished. Finished waiters are not contained
+    /// within the receiving waiters since we want to make sure we only wake up finished tasks when
+    /// all receivers leave scope.
+    finished_waiters: WaitList,
 
     /// The response value.
     response: UnsafeCell<MaybeUninit<C::Results>>,
@@ -214,10 +212,6 @@ impl<C: Chan> Drop for SharedRequest<C> {
             unsafe { self.response.get_mut().assume_init_drop() }
         }
 
-        if state.is_closed_task_set() {
-            unsafe { self.closed_task.drop() }
-        }
-
         if state.is_pipeline_set() {
             unsafe { self.pipeline_dest.get_mut().assume_init_drop() }
         }
@@ -233,8 +227,8 @@ impl<C: Chan> SharedRequest<C> {
             usage,
             state: AtomicState::new(),
             waiters: WaitList::new(),
+            finished_waiters: WaitList::new(),
             receivers_count: AtomicUsize::new(receivers),
-            closed_task: ClosedTask::new(),
             response: UnsafeCell::new(MaybeUninit::uninit()),
             pipeline_map: Mutex::new(HashMap::new()),
             pipeline_dest: UnsafeCell::new(MaybeUninit::uninit()),
@@ -262,7 +256,11 @@ impl<C: Chan> SharedRequest<C> {
     }
 
     pub fn finished(self: &Arc<Self>) -> Finished<C> {
-        todo!()
+        Finished {
+            shared: self.clone(),
+            waiter: ClosedWaiter::new(),
+            state: Poll::Pending,
+        }
     }
 
     pub fn is_finished(&self) -> bool {
@@ -326,7 +324,9 @@ impl<C: Chan> SharedRequest<C> {
     pub unsafe fn remove_receiver(&self) {
         let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
         if last_receiver {
-            self.closed_task.close(&self.state);
+            self.state.set_recv_closed();
+            self.finished_waiters.wake_all();
+
             self.try_remove_from_channel();
         }
     }
@@ -531,7 +531,7 @@ pub struct Finished<C: Chan> {
     shared: Arc<SharedRequest<C>>,
 
     #[pin]
-    waiter: Option<Waiter>,
+    waiter: ClosedWaiter,
 
     state: Poll<()>,
 }
@@ -539,15 +539,30 @@ pub struct Finished<C: Chan> {
 impl<C: Chan> Future for Finished<C> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        todo!()
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        if this.state.is_ready() {
+            return this.state.clone();
+        }
+
+        let finished = this.waiter.poll(ctx, &this.shared.state, &this.shared.finished_waiters);
+        if !finished {
+            return Poll::Pending
+        }
+
+        *this.state = Poll::Ready(());
+
+        Poll::Ready(())
     }
 }
 
 #[pinned_drop]
 impl<C: Chan> PinnedDrop for Finished<C> {
     fn drop(self: Pin<&mut Self>) {
-        todo!()
+        let this = self.project();
+
+        this.waiter.pinned_drop(&this.shared.finished_waiters);
     }
 }
 
@@ -965,7 +980,6 @@ mod test {
     }
 
     #[test]
-    #[ignore = "borked"]
     fn sync_request_response() {
         // Make a request and respond, then receive the result and check it.
 
