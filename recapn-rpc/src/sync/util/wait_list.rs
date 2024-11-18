@@ -295,7 +295,7 @@ impl RecvWaiter {
                 // `notify_waiters` call anyways.
 
                 let state = atom.state();
-                match atom.state() {
+                match state {
                     ShotState::Empty => {
                         // The channel hasn't closed, let's update the waker
                         unsafe {
@@ -339,6 +339,162 @@ impl RecvWaiter {
                 }
 
                 state
+            }
+        }
+    }
+
+    pub fn pinned_drop(self: Pin<&mut Self>, waiters: &WaitList) {
+        let this = self.project();
+
+        if let Some(waiter) = this.waiter.as_pin_mut() {
+            let mut waiters = waiters.list.lock();
+
+            // remove the entry from the list (if not already removed)
+            //
+            // Safety: we hold the lock, so we have an exclusive access to every list the
+            // waiter may be contained in. If the node is not contained in the `waiters`
+            // list, then it is contained by a guarded list used by `notify_waiters`.
+            unsafe { waiters.remove(NonNull::from(&*waiter)) };
+        }
+    }
+}
+
+/// A waiter helper to make the poll logic behind sharedshot components reusable.
+///
+/// This contains the state of the waiter and nothing else. Custom pollers call into this
+/// via the poll function and provide the atomic state and wait list that the waiter puts
+/// itself in.
+#[derive(Debug)]
+#[pin_project]
+pub(crate) struct ClosedWaiter {
+    #[pin]
+    waiter: Option<Waiter>,
+}
+
+impl ClosedWaiter {
+    /// Creates a new recv waiter for waiting on the result of a sharedshot.
+    pub const fn new() -> Self {
+        Self { waiter: None }
+    }
+
+    pub fn poll(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+        atom: &AtomicState,
+        waiters: &WaitList,
+    ) -> bool {
+        let mut this = self.project();
+
+        match this.waiter.as_mut().as_pin_mut() {
+            None => {
+                if atom.load(Acquire).is_recv_closed() {
+                    return true;
+                }
+
+                // Clone the waker before locking, a waker clone can be triggering arbitrary code.
+                let waker = ctx.waker().clone();
+
+                // Acquire the lock and attempt to transition to the waiting state.
+                let mut waiters = waiters.list.lock();
+
+                if atom.load(Acquire).is_recv_closed() {
+                    return true;
+                }
+
+                let waiter =
+                    unsafe { Pin::get_unchecked_mut(this.waiter).insert(Waiter::new(Some(waker))) };
+
+                // Insert the waiter into the linked list
+                waiters.push_front(NonNull::from(&*waiter));
+
+                false
+            }
+            Some(waiter) => {
+                if waiter.notified.load(Acquire) {
+                    // Safety: waiter is already unlinked and will not be shared again,
+                    // so we have exclusive access `waker`.
+                    unsafe {
+                        let waker = &mut *waiter.waker.get();
+                        drop(waker.take());
+                    }
+
+                    this.waiter.set(None);
+                    return atom.load(Acquire).is_recv_closed();
+                }
+
+                // We were not notified, implying it is still stored in a waiter list.
+                // In order to access the waker fields, we must acquire the lock first.
+
+                let mut old_waker = None;
+                let mut waiters = waiters.list.lock();
+
+                // We hold the lock and notifications are set only with the lock held,
+                // so this can be relaxed, because the happens-before relationship is
+                // established through the mutex.
+                if waiter.notified.load(Relaxed) {
+                    // Safety: waiter is already unlinked and will not be shared again,
+                    // so we have an exclusive access to `waker`.
+                    old_waker = unsafe {
+                        let waker = &mut *waiter.waker.get();
+                        waker.take()
+                    };
+
+                    drop(waiters);
+                    drop(old_waker);
+
+                    this.waiter.set(None);
+                    return atom.load(Acquire).is_recv_closed();
+                }
+
+                // Before we add a waiter to the list we check if the channel has closed.
+                // If it's closed it means that there is a call to `notify_waiters` in
+                // progress and this waiter must be contained by a guarded list used in
+                // `notify_waiters`. So at this point we can treat the waiter as notified and
+                // remove it from the list, as it would have been notified in the
+                // `notify_waiters` call anyways.
+
+                let is_closed = atom.load(Acquire).is_recv_closed();
+                if is_closed {
+                    // Safety: we hold the lock, so we can modify the waker.
+                    old_waker = unsafe {
+                        let waker = &mut *waiter.waker.get();
+                        waker.take()
+                    };
+
+                    // Safety: we hold the lock, so we have an exclusive access to the list.
+                    // The list is used in `notify_waiters`, so it must be guarded.
+                    unsafe { waiters.remove(NonNull::from(&*waiter)) };
+
+                    // Explicit drop of the lock to indicate the scope that the
+                    // lock is held. Because holding the lock is required to
+                    // ensure safe access to fields not held within the lock, it
+                    // is helpful to visualize the scope of the critical
+                    // section.
+                    drop(waiters);
+
+                    // Drop the old waker after releasing the lock.
+                    drop(old_waker);
+
+                    this.waiter.set(None);
+                } else {
+                    // The channel hasn't closed, let's update the waker
+                    unsafe {
+                        let current = &mut *waiter.waker.get();
+                        let polling_waker = ctx.waker();
+                        let should_update = current.is_none()
+                            || matches!(current, Some(w) if w.will_wake(polling_waker));
+                        if should_update {
+                            old_waker =
+                                std::mem::replace(&mut *current, Some(polling_waker.clone()));
+                        }
+                    }
+
+                    // Drop the old waker after releasing the lock.
+                    drop(waiters);
+                    drop(old_waker);
+                }
+
+                is_closed
             }
         }
     }
