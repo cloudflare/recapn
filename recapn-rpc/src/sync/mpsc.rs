@@ -19,9 +19,10 @@ use crate::sync::request::{Request, SharedRequest};
 use crate::sync::util::array_vec::ArrayVec;
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
-use std::future::poll_fn;
+use std::future::{poll_fn, Future};
 use std::hash::{Hash, Hasher};
 use std::mem::MaybeUninit;
+use std::pin::Pin;
 use std::process::abort;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
@@ -29,16 +30,16 @@ use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
 use parking_lot::{Mutex, MutexGuard};
+use pin_project::{pin_project, pinned_drop};
 
 use super::request::{self, Chan, IntoResults};
 use super::util::atomic_state::{AtomicState, ShotState};
 use super::util::closed_task::ClosedTask;
 use super::util::linked_list::LinkedList;
 
-use super::util::wait_list::WaitList;
+use super::util::wait_list::{RecvWaiter, WaitList};
 pub use super::TryRecvError;
 
-#[derive(Clone, Copy)]
 pub enum Resolution<'a, C: Chan> {
     /// The channel was forwarded to another channel
     Forwarded(&'a Sender<C>),
@@ -48,7 +49,18 @@ pub enum Resolution<'a, C: Chan> {
     Error(&'a C::Error),
 }
 
-#[derive(Clone, Copy)]
+impl<C: Chan> Clone for Resolution<'_, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            Resolution::Forwarded(s) => Resolution::Forwarded(s),
+            Resolution::Dropped => Resolution::Dropped,
+            Resolution::Error(e) => Resolution::Error(*e),
+        }
+    }
+}
+impl<C: Chan> Copy for Resolution<'_, C> {}
+
 pub enum MostResolved<'a, E> {
     /// The receiving end was dropped
     Dropped,
@@ -56,16 +68,36 @@ pub enum MostResolved<'a, E> {
     Error(&'a E),
 }
 
+impl<C: Chan> Clone for MostResolved<'_, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            MostResolved::Dropped => MostResolved::Dropped,
+            MostResolved::Error(e) => MostResolved::Error(*e),
+        }
+    }
+}
+impl<C: Chan> Copy for MostResolved<'_, C> {}
+
 #[derive(Debug)]
 pub struct Sender<C: Chan + ?Sized> {
     shared: Arc<SharedChannel<C>>,
 }
 
-impl<C: Chan> Clone for Sender<C> {
+impl<C: Chan + ?Sized> Clone for Sender<C> {
     fn clone(&self) -> Self {
+        unsafe {
+            self.shared.resolution.add_sender();
+        }
         Self {
             shared: self.shared.clone(),
         }
+    }
+}
+
+impl<C: Chan + ?Sized> Drop for Sender<C> {
+    fn drop(&mut self) {
+        unsafe { self.shared.resolution.remove_sender(); }
     }
 }
 
@@ -148,13 +180,67 @@ impl<C: Chan> Sender<C> {
     }
 
     /// Wait for the channel to be resolved.
-    pub async fn resolution(&self) -> Resolution<'_, C> {
-        todo!()
+    pub fn resolution(&self) -> Resolved<'_, C> {
+        Resolved {
+            shared: &self.shared,
+            waiter: RecvWaiter::new(),
+            state: Poll::Pending,
+        }
     }
 
     #[inline]
     pub fn chan(&self) -> &C {
         &self.shared.chan
+    }
+}
+
+#[pin_project(PinnedDrop)]
+pub struct Resolved<'a, C: Chan> {
+    shared: &'a SharedChannel<C>,
+
+    #[pin]
+    waiter: RecvWaiter,
+
+    state: Poll<Resolution<'a, C>>,
+}
+
+impl<'a, C: Chan> Future for Resolved<'a, C> {
+    type Output = Resolution<'a, C>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        if this.state.is_ready() {
+            return this.state.clone();
+        }
+
+        let poll = this.waiter.poll(
+            ctx, &this.shared.resolution.state, &this.shared.resolution.waiters);
+
+        let value = match poll {
+            ShotState::Empty => return Poll::Pending,
+            ShotState::Closed => Resolution::Dropped,
+            ShotState::Sent => {
+                let value = unsafe { this.shared.resolution.get_ref_unchecked() };
+                match value {
+                    ChannelResolution::Error(err) => Resolution::Error(err),
+                    ChannelResolution::Forward(fwd) => Resolution::Forwarded(fwd),
+                }
+            },
+        };
+
+        *this.state = Poll::Ready(value);
+
+        Poll::Ready(value)
+    }
+}
+
+#[pinned_drop]
+impl<C: Chan> PinnedDrop for Resolved<'_, C> {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+
+        this.waiter.pinned_drop(&this.shared.resolution.waiters);
     }
 }
 
@@ -368,6 +454,15 @@ impl<C: Chan> Receiver<C> {
     }
 }
 
+impl<C: Chan> Drop for Receiver<C> {
+    fn drop(&mut self) {
+        let state = self.shared.resolution.state.load(Relaxed);
+        if !state.is_set() {
+            unsafe { self.shared.resolution.close_receiver(); }
+        }
+    }
+}
+
 pub(crate) struct State<C: Chan> {
     /// If this is a pipeline channel, this holds a reference back to the parent request to
     /// make sure it doesn't go out of scope. The parent request itself holds a weak pointer
@@ -392,9 +487,9 @@ struct ResolutionState<C: Chan + ?Sized> {
     /// A set of waiters waiting to receive the value.
     waiters: WaitList,
 
-    /// The number of receivers waiting for the response. When this value reaches zero,
+    /// The number of senders waiting for resolution. When this value reaches zero,
     /// the channel is closed and the closed task is woken up.
-    receivers_count: AtomicUsize,
+    sender_count: AtomicUsize,
 
     /// Tracks the receiver waiting for the channel to close (without pulling a value
     /// from the channel)
@@ -409,7 +504,7 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         Self {
             state: AtomicState::new(),
             waiters: WaitList::new(),
-            receivers_count: AtomicUsize::new(recvs),
+            sender_count: AtomicUsize::new(recvs),
             closed_task: ClosedTask::new(),
             value: UnsafeCell::new(MaybeUninit::uninit()),
         }
@@ -419,7 +514,7 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         Self {
             state: AtomicState::new_set(),
             waiters: WaitList::new(),
-            receivers_count: AtomicUsize::new(recvs),
+            sender_count: AtomicUsize::new(recvs),
             closed_task: ClosedTask::new(),
             value: UnsafeCell::new(MaybeUninit::new(resolution)),
         }
@@ -433,8 +528,8 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         self.state.load(Relaxed).is_recv_closed()
     }
 
-    pub unsafe fn add_receiver(&self) {
-        let old = self.receivers_count.fetch_add(1, Relaxed);
+    pub unsafe fn add_sender(&self) {
+        let old = self.sender_count.fetch_add(1, Relaxed);
 
         if old == usize::MAX {
             abort();
@@ -454,15 +549,15 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
     /// the receiving side.
     ///
     /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
-    pub unsafe fn remove_receiver(&self) {
-        let last_receiver = self.receivers_count.fetch_sub(1, Relaxed) == 0;
+    pub unsafe fn remove_sender(&self) {
+        let last_receiver = self.sender_count.fetch_sub(1, Relaxed) == 0;
         if last_receiver {
             self.closed_task.close(&self.state)
         }
     }
 
-    /// Close the send half of the channel.
-    pub unsafe fn close_sender(&self) {
+    /// Close the receiver without resolving.
+    pub unsafe fn close_receiver(&self) {
         self.state.set_send_closed();
         self.waiters.wake_all();
     }
@@ -478,6 +573,7 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         let prev = self.state.try_set_value();
         if prev.is_recv_closed() {
             value_store.assume_init_drop();
+            
             return
         }
 
@@ -491,6 +587,10 @@ impl<C: Chan + ?Sized> Drop for ResolutionState<C> {
 
         if state.is_set() {
             unsafe { self.value.get_mut().assume_init_drop() }
+        }
+
+        if state.is_closed_task_set() {
+            unsafe { self.closed_task.drop(); }
         }
     }
 }
@@ -647,6 +747,7 @@ pub struct WeakChannel<C: Chan> {
 impl<C: Chan> WeakChannel<C> {
     pub fn sender(&self) -> Option<Sender<C>> {
         let shared = self.shared.upgrade()?;
+        unsafe { shared.resolution.add_sender(); }
         Some(Sender { shared })
     }
 
