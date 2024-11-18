@@ -14,7 +14,7 @@ use recapn::rpc::Capable;
 use crate::client::Client;
 use crate::connection;
 use crate::pipeline::PipelineOp;
-use crate::sync::request::{IntoResults, PipelineResolver, ResponseReceiverFactory};
+use crate::sync::request::{PipelineResolver, ResponseReceiverFactory};
 use crate::sync::{mpsc, request};
 use crate::table::{CapTable, Table};
 use crate::Error;
@@ -33,7 +33,7 @@ pub(crate) enum RpcChannel {
     Spawned,
     /// A client to handle bootstrap requests.
     Bootstrap(connection::QuestionId),
-    /// Local pipeline
+    /// A local request pipeline
     Pipeline,
     /// A client to handle pipelined requests to a remote party.
     RemotePipeline,
@@ -84,7 +84,7 @@ impl MessagePayload {
         }
     }
 
-    pub fn reader(&self, options: message::ReaderOptions) -> message::Reader {
+    pub fn reader(&self, options: message::ReaderOptions) -> message::Reader<'_> {
         message::Reader::new(self.segments(), options)
     }
 }
@@ -108,7 +108,7 @@ pub struct RpcResponse {
 }
 
 impl RpcResponse {
-    pub fn with_results<T>(&self, f: impl FnOnce(any::PtrReader<CapTable>) -> T) -> T {
+    pub fn with_results<T>(&self, f: impl FnOnce(any::PtrReader<'_, CapTable<'_>>) -> T) -> T {
         let reader = self.message.reader(ReaderOptions::default());
         let results = match self.root {
             ResultsRoot::Results => reader.root().imbue(self.table.reader()),
@@ -135,7 +135,7 @@ impl RpcResponse {
 impl PipelineResolver<RpcChannel> for RpcResponse {
     fn resolve(
         &self,
-        _: ResponseReceiverFactory<RpcChannel>,
+        _: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -150,7 +150,7 @@ impl PipelineResolver<RpcChannel> for RpcResponse {
     }
     fn pipeline(
         &self,
-        _: ResponseReceiverFactory<RpcChannel>,
+        _: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
     ) -> mpsc::Sender<RpcChannel> {
         match self.try_resolve_pipeline_ops(&key) {
@@ -163,7 +163,7 @@ impl PipelineResolver<RpcChannel> for RpcResponse {
 impl PipelineResolver<RpcChannel> for Result<RpcResponse, Error> {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -174,7 +174,7 @@ impl PipelineResolver<RpcChannel> for Result<RpcResponse, Error> {
     }
     fn pipeline(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
     ) -> mpsc::Sender<RpcChannel> {
         match self {
@@ -187,7 +187,7 @@ impl PipelineResolver<RpcChannel> for Result<RpcResponse, Error> {
 impl PipelineResolver<RpcChannel> for RpcResults {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -198,7 +198,7 @@ impl PipelineResolver<RpcChannel> for RpcResults {
     }
     fn pipeline(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
     ) -> mpsc::Sender<RpcChannel> {
         match self {
@@ -244,7 +244,7 @@ pub enum SetPipeline {
 impl PipelineResolver<RpcChannel> for SetPipeline {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
         channel: Receiver,
     ) {
@@ -255,7 +255,7 @@ impl PipelineResolver<RpcChannel> for SetPipeline {
     }
     fn pipeline(
         &self,
-        recv: ResponseReceiverFactory<RpcChannel>,
+        recv: ResponseReceiverFactory<'_, RpcChannel>,
         key: Arc<[PipelineOp]>,
     ) -> Sender {
         match self {
@@ -265,7 +265,7 @@ impl PipelineResolver<RpcChannel> for SetPipeline {
     }
 }
 
-impl IntoResults<RpcChannel> for Error {
+impl request::IntoResults<RpcChannel> for Error {
     fn into_results(self) -> <RpcChannel as request::Chan>::Results {
         RpcResults::Owned(Err(self))
     }

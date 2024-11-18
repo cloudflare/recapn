@@ -23,7 +23,8 @@ pub mod server;
 pub mod sync;
 pub mod table;
 
-pub use gen::capnp_rpc_capnp::exception::Type as ErrorKind;
+pub(crate) use gen::capnp_rpc_capnp as rpc_capnp;
+pub use rpc_capnp::exception::Type as ErrorKind;
 
 #[derive(Clone, Debug)]
 pub struct Error {

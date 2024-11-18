@@ -135,7 +135,7 @@ impl CallBuilder {
         }
     }
 
-    pub fn params(&mut self) -> any::PtrBuilder<CapTable> {
+    pub fn params(&mut self) -> any::PtrBuilder<'_, CapTable<'_>> {
         let table = self.table.builder();
         self.params.builder().into_root().imbue(table)
     }
@@ -170,13 +170,13 @@ pub struct Request<P, R> {
 }
 
 impl<P: ty::Struct, R> Request<P, R> {
-    pub fn params(&mut self) -> BuilderOf<P, CapTable> {
+    pub fn params(&mut self) -> BuilderOf<'_, P, CapTable<'_>> {
         self.params_ptr().init_struct::<P>()
     }
 }
 
 impl<P, R> Request<P, R> {
-    pub fn params_ptr(&mut self) -> any::PtrBuilder<CapTable> {
+    pub fn params_ptr(&mut self) -> any::PtrBuilder<'_, CapTable<'_>> {
         self.request.params()
     }
 
@@ -245,7 +245,7 @@ pub struct StreamingRequest<P> {
 }
 
 impl<P: ty::Struct> StreamingRequest<P> {
-    pub fn params(&mut self) -> BuilderOf<P, CapTable> {
+    pub fn params(&mut self) -> BuilderOf<'_, P, CapTable<'_>> {
         self.request.params().init_struct::<P>()
     }
 }
@@ -315,11 +315,11 @@ pub struct Response<R> {
 
 impl<R> Response<R> {
     /// Get a new reader for the results of this message.
-    pub fn results(&self) -> Result<Results<R>> {
+    pub fn results(&self) -> Result<Results<'_, R>> {
         self.results_with_options(ReaderOptions::default())
     }
 
-    pub fn results_with_options(&self, ops: ReaderOptions) -> Result<Results<R>> {
+    pub fn results_with_options(&self, ops: ReaderOptions) -> Result<Results<'_, R>> {
         let Some(inner) = &self.inner else {
             return Err(dropped_request());
         };
@@ -355,7 +355,7 @@ pub struct Results<'a, T> {
 
 impl<T: ty::Struct> Results<'_, T> {
     /// Gets the root structure of the results.
-    pub fn get(&self) -> ReaderOf<T, CapTable> {
+    pub fn get(&self) -> ReaderOf<'_, T, CapTable<'_>> {
         match self.root {
             chan::ResultsRoot::Results => self
                 .reader
