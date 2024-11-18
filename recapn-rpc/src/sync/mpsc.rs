@@ -49,6 +49,34 @@ pub enum Resolution<'a, C: Chan> {
     Error(&'a C::Error),
 }
 
+impl<'a, C: Chan> Resolution<'a, C> {
+    pub fn forwarded(self) -> Option<&'a Sender<C>> {
+        let Self::Forwarded(f) = self else {
+            return None
+        };
+        Some(f)
+    }
+
+    pub fn is_forwarded(&self) -> bool {
+        matches!(self, Self::Forwarded(_))
+    }
+
+    pub fn is_dropped(&self) -> bool {
+        matches!(self, Self::Dropped)
+    }
+
+    pub fn error(self) -> Option<&'a C::Error> {
+        let Self::Error(e) = self else {
+            return None
+        };
+        Some(e)
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
+    }
+}
+
 impl<C: Chan> Clone for Resolution<'_, C> {
     #[inline]
     fn clone(&self) -> Self {
@@ -781,6 +809,3 @@ pub(crate) fn weak_channel<C: Chan>(
     let sender = Sender { shared: channel };
     (sender, weak_channel)
 }
-
-#[cfg(test)]
-mod test {}
