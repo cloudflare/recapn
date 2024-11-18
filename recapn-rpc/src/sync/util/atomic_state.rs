@@ -2,7 +2,6 @@
 
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Release, Relaxed};
-use crate::sync::TryRecvError;
 
 const STATE_SET: u8 = 0b0000_0001;
 const STATE_SEND_CLOSED: u8 = 0b0000_0010;
@@ -17,16 +16,6 @@ pub(crate) enum ShotState {
     Sent,
     Empty,
     Closed,
-}
-
-impl ShotState {
-    pub fn map_sent<T>(self, f: impl FnOnce() -> T) -> Result<T, TryRecvError> {
-        match self {
-            Self::Sent => Ok(f()),
-            Self::Empty => Err(TryRecvError::Empty),
-            Self::Closed => Err(TryRecvError::Closed),
-        }
-    }
 }
 
 /// Atomic state used by sharedshot and request state.
@@ -120,11 +109,6 @@ impl AtomicState {
             }
         }
         StateFlags(state)
-    }
-
-    #[inline]
-    pub fn clear_set_value(&mut self) {
-        *self.0.get_mut() &= !STATE_SET;
     }
 
     #[inline]
