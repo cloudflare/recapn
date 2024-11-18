@@ -228,11 +228,11 @@ pub struct Parameters<P> {
 }
 
 impl<P> Parameters<P> {
-    pub fn reader(&self) -> ParametersReader<P> {
+    pub fn reader(&self) -> ParametersReader<'_, P> {
         self.with_options(message::ReaderOptions::default())
     }
 
-    pub fn with_options(&self, options: message::ReaderOptions) -> ParametersReader<P> {
+    pub fn with_options(&self, options: message::ReaderOptions) -> ParametersReader<'_, P> {
         ParametersReader {
             p: PhantomData,
             root: self.inner.root,
@@ -250,13 +250,13 @@ pub struct ParametersReader<'a, P> {
 }
 
 impl<'a, P: ty::Struct> ParametersReader<'a, P> {
-    pub fn get(&self) -> ReaderOf<P, CapTable> {
+    pub fn get(&self) -> ReaderOf<'_, P, CapTable<'_>> {
         self.root().read_as_struct::<P>()
     }
 }
 
 impl<'a, P> ParametersReader<'a, P> {
-    pub fn root(&self) -> any::PtrReader<CapTable> {
+    pub fn root(&self) -> any::PtrReader<'_, CapTable<'_>> {
         match self.root {
             chan::ParamsRoot::Params => self.reader.root().imbue(self.table.reader()),
         }

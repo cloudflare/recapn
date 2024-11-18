@@ -69,14 +69,14 @@ pub trait PipelineResolver<C: Chan> {
     /// Resolves the pipeline channel with the given key.
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<C>,
+        recv: ResponseReceiverFactory<'_, C>,
         key: C::PipelineKey,
         channel: mpsc::Receiver<C>,
     );
 
     /// Returns the pipeline channel with the given key. If the key doesn't match,
     /// this may return an already broken channel.
-    fn pipeline(&self, recv: ResponseReceiverFactory<C>, key: C::PipelineKey) -> mpsc::Sender<C>;
+    fn pipeline(&self, recv: ResponseReceiverFactory<'_, C>, key: C::PipelineKey) -> mpsc::Sender<C>;
 }
 
 /// Describes a conversion from a type into "results".
@@ -924,7 +924,7 @@ mod test {
     impl PipelineResolver<TestChannel> for IntsResponse {
         fn resolve(
             &self,
-            _: ResponseReceiverFactory<TestChannel>,
+            _: ResponseReceiverFactory<'_, TestChannel>,
             key: IntPipelineKey,
             channel: mpsc::Receiver<TestChannel>,
         ) {
@@ -941,7 +941,7 @@ mod test {
 
         fn pipeline(
             &self,
-            _: ResponseReceiverFactory<TestChannel>,
+            _: ResponseReceiverFactory<'_, TestChannel>,
             key: IntPipelineKey,
         ) -> mpsc::Sender<TestChannel> {
             match self.0.get(&key.0) {
@@ -954,7 +954,7 @@ mod test {
     impl PipelineResolver<TestChannel> for Result<IntsResponse, Error> {
         fn resolve(
             &self,
-            recv: ResponseReceiverFactory<TestChannel>,
+            recv: ResponseReceiverFactory<'_, TestChannel>,
             key: IntPipelineKey,
             channel: mpsc::Receiver<TestChannel>,
         ) {
@@ -966,7 +966,7 @@ mod test {
 
         fn pipeline(
             &self,
-            _: ResponseReceiverFactory<TestChannel>,
+            _: ResponseReceiverFactory<'_, TestChannel>,
             key: IntPipelineKey,
         ) -> mpsc::Sender<TestChannel> {
             match self {
