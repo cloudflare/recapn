@@ -22,30 +22,17 @@ use hashbrown::{Equivalent, HashMap};
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
-use super::TryRecvError;
-use super::mpsc::{self, weak_channel, Sender, SharedChannel, WeakChannel};
-use super::util::Marc;
-use super::util::atomic_state::{AtomicState, ShotState};
-use super::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
-use super::util::linked_list::{Link, Pointers};
+use crate::{Chan, PipelineResolver};
+use crate::mpsc::{self, weak_channel, Sender, SharedChannel, WeakChannel};
+use crate::util::Marc;
+use crate::util::atomic_state::{AtomicState, ShotState};
+use crate::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
+use crate::util::linked_list::{Link, Pointers};
 
-/// An abstract channel. This is associated data stored in a mpsc channel that
-/// also references associated types with the request-response system.
-pub trait Chan: Sized {
-    /// The parameters passed into the request.
-    type Parameters;
-
-    /// A key used to distinguish between different pipelines.
-    type PipelineKey: Eq + Hash;
-
-    /// An error that can be used to terminate channels.
-    type Error: Clone + IntoResults<Self>;
-
-    /// The results associated with this parameter type.
-    type Results: PipelineResolver<Self>;
-
-    /// A pipeline that can be configured separately via `set_pipeline`.
-    type Pipeline: PipelineResolver<Self>;
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum TryRecvError {
+    Empty,
+    Closed,
 }
 
 /// Allows for the creation of `ResponseReceivers` from within a `PipelineResolver`.
@@ -64,25 +51,6 @@ impl<'a, C: Chan> Clone for ResponseReceiverFactory<'a, C> {
 }
 
 impl<'a, C: Chan> Copy for ResponseReceiverFactory<'a, C> {}
-
-pub trait PipelineResolver<C: Chan> {
-    /// Resolves the pipeline channel with the given key.
-    fn resolve(
-        &self,
-        recv: ResponseReceiverFactory<'_, C>,
-        key: C::PipelineKey,
-        channel: mpsc::Receiver<C>,
-    );
-
-    /// Returns the pipeline channel with the given key. If the key doesn't match,
-    /// this may return an already broken channel.
-    fn pipeline(&self, recv: ResponseReceiverFactory<'_, C>, key: C::PipelineKey) -> mpsc::Sender<C>;
-}
-
-/// Describes a conversion from a type into "results".
-pub trait IntoResults<C: Chan> {
-    fn into_results(self) -> C::Results;
-}
 
 /// A hint to how a request is going to be used.
 ///

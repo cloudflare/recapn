@@ -1,7 +1,5 @@
 use crate::chan::{self, LocalMessage, Receiver, RpcCall, RpcChannel, Sender};
 use crate::pipeline::{Pipeline, PipelineOf};
-use crate::sync::mpsc;
-use crate::sync::request::{request_pipeline, request_response, request_response_pipeline};
 use crate::table::{CapTable, Table};
 use crate::{Error, Result};
 use pin_project::pin_project;
@@ -9,6 +7,7 @@ use recapn::any;
 use recapn::message::{Message, ReaderOptions};
 use recapn::rpc::{Capable, Pipelinable, TypedPipeline};
 use recapn::{message, rpc, ty, BuilderOf, ReaderOf};
+use recapn_channel::{mpsc, request_response, request_pipeline, request_response_pipeline};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
 use std::pin::Pin;

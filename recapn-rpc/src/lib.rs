@@ -20,7 +20,6 @@ pub mod connection;
 pub mod gen;
 pub mod pipeline;
 pub mod server;
-pub mod sync;
 pub mod table;
 
 pub(crate) use gen::capnp_rpc_capnp as rpc_capnp;

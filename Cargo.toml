@@ -2,6 +2,7 @@
 members = [
     "recapn",
     "recapnc",
+    "recapn-channel",
     "recapn-rpc",
     "tests",
     "fuzz",

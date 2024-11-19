@@ -3,14 +3,14 @@ use hashbrown::HashMap;
 use tokio_test::assert_ready;
 use tokio_test::task::spawn;
 
-use crate::Error;
-
-use super::request::request_response_pipeline;
-use super::TryRecvError;
-use super::mpsc;
-use super::request::{
-    request_response, RequestUsage, Chan, IntoResults, PipelineResolver, ResponseReceiverFactory
+use crate::request::TryRecvError;
+use crate::{mpsc, Chan, IntoResults, PipelineResolver};
+use crate::request::{
+    request_response, request_response_pipeline, RequestUsage, ResponseReceiverFactory
 };
+
+#[derive(Clone, Debug)]
+struct Error(#[allow(dead_code)] &'static str);
 
 #[derive(Debug)]
 struct TestChannel;
@@ -47,13 +47,13 @@ impl PipelineResolver<TestChannel> for IntsResponse {
         channel: mpsc::Receiver<TestChannel>,
     ) {
         let Some(results) = self.0.get(&key.0) else {
-            channel.close(Error::failed("unknown pipeline"));
+            channel.close(Error("unknown pipeline"));
             return;
         };
 
         if let Err(c) = channel.forward_to(results) {
             // If it's an infinite loop, close it with an error
-            c.close(Error::failed("infinite loop"));
+            c.close(Error("infinite loop"));
         }
     }
 
@@ -64,7 +64,7 @@ impl PipelineResolver<TestChannel> for IntsResponse {
     ) -> mpsc::Sender<TestChannel> {
         match self.0.get(&key.0) {
             Some(c) => c.clone(),
-            None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
+            None => mpsc::broken(TestChannel, Error("unknown pipeline")),
         }
     }
 }
@@ -90,7 +90,7 @@ impl PipelineResolver<TestChannel> for Result<IntsResponse, Error> {
         match self {
             Ok(r) => match r.0.get(&key.0) {
                 Some(c) => c.clone(),
-                None => mpsc::broken(TestChannel, Error::failed("unknown pipeline")),
+                None => mpsc::broken(TestChannel, Error("unknown pipeline")),
             },
             Err(err) => mpsc::broken(TestChannel, err.clone()),
         }

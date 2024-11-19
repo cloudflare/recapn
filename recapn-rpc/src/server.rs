@@ -6,6 +6,7 @@
 use recapn::message::Message;
 use recapn::rpc::Capable;
 use recapn::{any, message, ty, BuilderOf, ReaderOf};
+use recapn_channel::mpsc;
 use std::convert;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -15,7 +16,6 @@ use tokio::task::JoinHandle;
 
 use crate::chan::{self, LocalMessage, RpcCall, RpcChannel};
 use crate::client::{self, Client};
-use crate::sync::mpsc;
 use crate::table::{CapTable, Table};
 use crate::{table, Error, Result};
 

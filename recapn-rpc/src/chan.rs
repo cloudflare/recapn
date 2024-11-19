@@ -10,12 +10,13 @@ use recapn::any;
 use recapn::arena::ReadArena;
 use recapn::message::{self, Message, ReaderOptions};
 use recapn::rpc::Capable;
+use recapn_channel::{Chan, IntoResults, PipelineResolver};
+use recapn_channel::mpsc;
+use recapn_channel::request::{self, ResponseReceiverFactory};
 
 use crate::client::Client;
 use crate::connection;
 use crate::pipeline::PipelineOp;
-use crate::sync::request::{PipelineResolver, ResponseReceiverFactory};
-use crate::sync::{mpsc, request};
 use crate::table::{CapTable, Table};
 use crate::Error;
 
@@ -52,7 +53,7 @@ pub type Responder = request::Responder<RpcChannel>;
 pub type Response = request::Response<RpcChannel>;
 pub type PipelineBuilder = request::PipelineBuilder<RpcChannel>;
 
-impl request::Chan for RpcChannel {
+impl Chan for RpcChannel {
     type Parameters = RpcCall;
 
     type PipelineKey = Arc<[PipelineOp]>;
@@ -265,8 +266,8 @@ impl PipelineResolver<RpcChannel> for SetPipeline {
     }
 }
 
-impl request::IntoResults<RpcChannel> for Error {
-    fn into_results(self) -> <RpcChannel as request::Chan>::Results {
+impl IntoResults<RpcChannel> for Error {
+    fn into_results(self) -> <RpcChannel as Chan>::Results {
         RpcResults::Owned(Err(self))
     }
 }
