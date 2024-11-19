@@ -10,14 +10,14 @@ use recapn::orphan::Orphan;
 use recapn::ptr::{ElementSize, ReturnErrors};
 use recapn::rpc::Capable;
 use recapn::{list, message, BuilderOf, NotInSchema, ReaderOf};
+use recapn_channel::{mpsc, request, PipelineResolver};
+use recapn_channel::request::{RequestUsage, ResponseReceiverFactory};
 use tokio::select;
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::sync::oneshot;
 
 use crate::client::Client;
 use crate::gen::capnp_rpc_capnp as rpc_capnp;
-use crate::sync::request::{PipelineResolver, RequestUsage, ResponseReceiverFactory};
-use crate::sync::{mpsc, request};
 use crate::table::{CapTable, Table};
 use crate::pipeline::PipelineOp;
 use crate::chan::{

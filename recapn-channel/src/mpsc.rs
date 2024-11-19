@@ -15,8 +15,6 @@
 //! this set of types combines the channel queue with the oneshot mechanism and makes it
 //! so one request makes one allocation.
 
-use crate::sync::request::{Request, SharedRequest};
-use crate::sync::util::array_vec::ArrayVec;
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::future::{poll_fn, Future};
@@ -32,13 +30,13 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::{Mutex, MutexGuard};
 use pin_project::{pin_project, pinned_drop};
 
-use super::request::{self, Chan, IntoResults};
-use super::util::atomic_state::{AtomicState, ShotState};
-use super::util::closed_task::ClosedTask;
-use super::util::linked_list::LinkedList;
-
-use super::util::wait_list::{RecvWaiter, WaitList};
-pub use super::TryRecvError;
+use crate::{Chan, IntoResults};
+use crate::request::{self, Request, SharedRequest};
+use crate::util::array_vec::ArrayVec;
+use crate::util::atomic_state::{AtomicState, ShotState};
+use crate::util::closed_task::ClosedTask;
+use crate::util::linked_list::LinkedList;
+use crate::util::wait_list::{RecvWaiter, WaitList};
 
 pub enum Resolution<'a, C: Chan> {
     /// The channel was forwarded to another channel
