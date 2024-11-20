@@ -45,6 +45,8 @@ pub(crate) enum RpcChannel {
 
 pub type Sender = mpsc::Sender<RpcChannel>;
 pub type Receiver = mpsc::Receiver<RpcChannel>;
+pub type Item = mpsc::Item<RpcChannel>;
+pub type Event = mpsc::Event<<RpcChannel as Chan>::Event>;
 
 pub type Request = request::Request<RpcChannel>;
 pub type ResponseReceiver = request::ResponseReceiver<RpcChannel>;
@@ -54,6 +56,7 @@ pub type Response = request::Response<RpcChannel>;
 pub type PipelineBuilder = request::PipelineBuilder<RpcChannel>;
 
 impl Chan for RpcChannel {
+    type Event = ();
     type Parameters = RpcCall;
 
     type PipelineKey = Arc<[PipelineOp]>;

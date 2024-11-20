@@ -21,13 +21,7 @@ impl<T> Marc<T> {
         }
     }
 
-    pub fn get(&self) -> &T {
-        debug_assert!(self.shared.is_some());
-
-        unsafe { self.shared.as_ref().unwrap_unchecked() }
-    }
-
-    pub fn inner(&self) -> &Arc<T> {
+    pub fn get(&self) -> &Arc<T> {
         debug_assert!(self.shared.is_some());
 
         unsafe { self.shared.as_ref().unwrap_unchecked() }
