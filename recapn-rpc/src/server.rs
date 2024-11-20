@@ -80,6 +80,14 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
         let Some(req) = receiver.recv().await else {
             return Ok(false);
         };
+        let req = match req {
+            mpsc::Item::Request(req) => req,
+            mpsc::Item::Event(event) => {
+                // I want this to explode when I actually make an event value.
+                let () = event.into_inner();
+                return Ok(true)
+            },
+        };
         let (request, responder) = req.respond();
         let RpcCall {
             interface,

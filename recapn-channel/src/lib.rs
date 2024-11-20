@@ -13,6 +13,10 @@ pub use request::{request_response, request_pipeline, request_response_pipeline}
 /// An abstract channel. This is associated data stored in a mpsc channel that
 /// also references associated types with the request-response system.
 pub trait Chan: Sized {
+    /// Event data that can be sent through a channel. This allows you to pass arbitrary data
+    /// through a channel on the request path without it behaving like a request.
+    type Event;
+
     /// The parameters passed into the request.
     type Parameters;
 

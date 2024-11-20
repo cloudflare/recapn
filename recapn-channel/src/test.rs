@@ -32,6 +32,7 @@ impl IntoResults<TestChannel> for Error {
 }
 
 impl Chan for TestChannel {
+    type Event = ();
     type Parameters = IntRequest;
     type Error = Error;
     type Results = Result<IntsResponse, Error>;

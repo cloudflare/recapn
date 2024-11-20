@@ -555,7 +555,8 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
 
     fn handle_cap_message(&mut self, msg: CapMessage) -> Result<(), Error> {
         match msg.event {
-            CapEvent::Call(call) => self.send_call(msg.target, call),
+            CapEvent::Call(chan::Item::Request(call)) => self.send_call(msg.target, call),
+            CapEvent::Call(chan::Item::Event(_)) => todo!(),
             CapEvent::Disembargo { inbound, outbound } => {}
             CapEvent::Finished => {}
         }
@@ -1108,7 +1109,7 @@ impl CapTarget {
 /// A capability event.
 enum CapEvent {
     /// A call forwarded to the connection.
-    Call(chan::Request),
+    Call(chan::Item),
     /// The cap handler sent a message to the connection so it couldn't automatically resolve
     /// the channel. When the connection receives this, it might send a disembargo to the other
     /// party, or just handle the resolution itself.

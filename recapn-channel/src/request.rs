@@ -11,8 +11,7 @@ use std::hash::Hash;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::pin::Pin;
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, Relaxed};
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -23,11 +22,10 @@ use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
 use crate::{Chan, PipelineResolver};
-use crate::mpsc::{self, weak_channel, Sender, SharedChannel, WeakChannel};
+use crate::mpsc::{self, weak_channel, Sender, SharedChannel, SharedLink, WeakChannel};
 use crate::util::Marc;
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
-use crate::util::linked_list::{Link, Pointers};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TryRecvError {
@@ -41,7 +39,7 @@ pub enum TryRecvError {
 /// needs the original response. The factory can be used to create `ResponseReceiver` instances
 /// and process the response when it comes in.
 pub struct ResponseReceiverFactory<'a, C: Chan> {
-    shared: &'a Arc<SharedRequest<C>>,
+    shared: &'a Arc<RequestInner<C>>,
 }
 
 impl<'a, C: Chan> Clone for ResponseReceiverFactory<'a, C> {
@@ -83,12 +81,6 @@ pub enum RequestUsage {
 /// into one structure in order to save memory allocations as all of these effectively
 /// have the same lifetime.
 pub(crate) struct SharedRequest<C: Chan> {
-    /// Intrusive linked-list pointers for request channels
-    ///
-    /// In order to maintain "one allocation per request", we intrusively link
-    /// requests together to build a request chain.
-    pointers: Pointers<SharedRequest<C>>,
-
     /// The channel this request is contained in. If all the receivers of this request
     /// drop, we attempt to automatically remove the request from whatever channel it's in.
     parent: Mutex<Option<Arc<SharedChannel<C>>>>,
@@ -130,6 +122,8 @@ pub(crate) struct SharedRequest<C: Chan> {
     pipeline_dest: UnsafeCell<MaybeUninit<Option<C::Pipeline>>>,
 }
 
+type RequestInner<C> = SharedLink<SharedRequest<C>>;
+
 // TODO(NOW): Make this more accurate this is definitely wrong.
 unsafe impl<C> Send for SharedRequest<C>
 where
@@ -152,23 +146,6 @@ where
 {
 }
 
-unsafe impl<C: Chan> Link for SharedRequest<C> {
-    type Handle = Arc<Self>;
-    type Target = Self;
-
-    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
-        NonNull::new(Arc::into_raw(handle).cast_mut()).unwrap()
-    }
-    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
-        Arc::from_raw(ptr.as_ptr().cast_const())
-    }
-    unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>> {
-        let me = target.as_ptr();
-        let field = addr_of_mut!((*me).pointers);
-        NonNull::new_unchecked(field)
-    }
-}
-
 impl<C: Chan> Drop for SharedRequest<C> {
     fn drop(&mut self) {
         // The request parameters don't need to be dropped since we would've had to drop
@@ -187,10 +164,9 @@ impl<C: Chan> Drop for SharedRequest<C> {
 }
 
 impl<C: Chan> SharedRequest<C> {
-    pub fn new(request: C::Parameters, usage: RequestUsage, receivers: usize) -> Self {
-        Self {
+    pub fn new(request: C::Parameters, usage: RequestUsage, receivers: usize) -> Arc<SharedLink<Self>> {
+        SharedLink::new(Self {
             parent: Mutex::new(None),
-            pointers: Pointers::new(),
             request: UnsafeCell::new(ManuallyDrop::new(request)),
             usage,
             state: AtomicState::new(),
@@ -200,7 +176,7 @@ impl<C: Chan> SharedRequest<C> {
             response: UnsafeCell::new(MaybeUninit::uninit()),
             pipeline_map: Mutex::new(HashMap::new()),
             pipeline_dest: UnsafeCell::new(MaybeUninit::uninit()),
-        }
+        })
     }
 
     pub unsafe fn request(&self) -> &C::Parameters {
@@ -221,14 +197,6 @@ impl<C: Chan> SharedRequest<C> {
     pub fn close_sender(&self) {
         self.state.set_send_closed();
         self.waiters.wake_all();
-    }
-
-    pub fn finished(self: &Arc<Self>) -> Finished<C> {
-        Finished {
-            shared: self.clone(),
-            waiter: ClosedWaiter::new(),
-            state: Poll::Pending,
-        }
     }
 
     pub fn is_finished(&self) -> bool {
@@ -300,102 +268,17 @@ impl<C: Chan> SharedRequest<C> {
         }
     }
 
-    fn pipeline<K, F>(self: &Arc<Self>, key: K, chan: F) -> Sender<C>
-    where
-        K: Hash + Equivalent<C::PipelineKey>,
-        C::PipelineKey: From<K>,
-        F: FnOnce() -> C,
-    {
-        if !self.state.load(Acquire).is_pipeline_set() {
-            // The pipeline hasn't been set yet. Lock the pipeline map so we can get a
-            // pipelined client.
-            let mut map = self.pipeline_map.lock();
-            // Load relaxed since the mutex lock provides the synchronization we need
-            // if the pipeline does get set.
-            if !self.state.load(Relaxed).is_pipeline_set() {
-                // It *still* hasn't been set, time to mutate the map
-                let sender = match map.raw_entry_mut().from_key(&key) {
-                    RawEntryMut::Occupied(mut occupied) => match occupied.get().sender() {
-                        Some(sender) => sender,
-                        None => {
-                            let receiver = Receiver::track(self.clone());
-                            let (sender, weak_channel) = weak_channel(chan(), receiver);
-                            let _ = occupied.insert(weak_channel);
-                            sender
-                        }
-                    },
-                    RawEntryMut::Vacant(vacant) => {
-                        let receiver = Receiver::track(self.clone());
-                        let (sender, weak_channel) = weak_channel(chan(), receiver);
-                        let _ = vacant.insert(C::PipelineKey::from(key), weak_channel);
-                        sender
-                    }
-                };
+    fn resolve_pipeline_map(&self, resolver: impl Fn(C::PipelineKey, mpsc::Receiver<C>)) {
+        // Declare the lock first so that it's dropped last.
+        let mut lock;
+        // Set the flag with relaxed ordering since when we return the unlock will
+        // provide our synchronization.
+        scopeguard::defer!({ self.state.set_pipeline(Ordering::Relaxed); });
 
-                return sender;
-            }
-        }
-
-        let factory = ResponseReceiverFactory { shared: self };
-
-        let key = key.into();
-
-        // Ah, a pipeline was set, so we can apply the ops and resolve directly into the
-        // correct client.
-        let pipeline = unsafe { (*self.pipeline_dest.get()).assume_init_ref() };
-        match pipeline {
-            Some(p) => p.pipeline(factory, key),
-            None => unsafe { self.response().pipeline(factory, key) },
-        }
-    }
-
-    unsafe fn respond_and_resolve(self: &Arc<Self>, result: C::Results) {
-        // Write the response first
-        (*self.response.get()).write(result);
-
-        // Then set the pipeline to the response and resolve the pipeline.
-        // If this panics we'll leak the response which kinda sucks
-        // (since we won't set the flag saying the response is set)
-        // so let's just make sure we don't panic.
-        //
-        // TODO: Use a scope guard to make sure we set the set value
-        //       flag is set
-        self.set_pipeline(None);
-
-        // Now confirm the response being set
-        self.state.set_value();
-
-        // And wake up all the response receivers.
-        self.waiters.wake_all();
-    }
-
-    unsafe fn respond(&self, result: C::Results) {
-        (*self.response.get()).write(result);
-        self.state.set_value();
-        self.waiters.wake_all();
-    }
-
-    unsafe fn set_pipeline(self: &Arc<Self>, dest: Option<C::Pipeline>) {
-        let dest = &*(*self.pipeline_dest.get()).write(dest);
-        let factory = ResponseReceiverFactory { shared: self };
-
-        match dest {
-            None => {
-                let r = self.response();
-                self.resolve_pipeline_map(|k, c| r.resolve(factory, k, c));
-            }
-            Some(dest) => self.resolve_pipeline_map(|k, c| dest.resolve(factory, k, c)),
-        }
-    }
-
-    fn resolve_pipeline_map<F: Fn(C::PipelineKey, mpsc::Receiver<C>)>(&self, resolver: F) {
         loop {
-            let mut lock = self.pipeline_map.lock();
+            lock = self.pipeline_map.lock();
             if lock.is_empty() {
                 // There's nothing in the map. We can now mark the pipeline as resolved.
-                // Set the flag with relaxed ordering since when we return the unlock will
-                // provide our synchronization.
-                self.state.set_pipeline(Relaxed);
                 return;
             }
 
@@ -417,12 +300,12 @@ impl<C: Chan> SharedRequest<C> {
 /// A tracked receiver type that manipulates the `receivers_count` of the shared
 /// request state. This is intended to make it obvious what types count as receivers
 /// and automate most of the work around tracking receivers.
-pub(crate) struct Receiver<C: Chan>(Arc<SharedRequest<C>>);
+pub(crate) struct Receiver<C: Chan>(Arc<RequestInner<C>>);
 
 impl<C: Chan> Receiver<C> {
-    pub fn track(req: Arc<SharedRequest<C>>) -> Self {
+    pub fn track(req: Arc<RequestInner<C>>) -> Self {
         unsafe {
-            req.add_receiver();
+            req.data.add_receiver();
         }
         Self(req)
     }
@@ -436,7 +319,7 @@ impl<C: Chan> Clone for Receiver<C> {
 
 impl<C: Chan> Drop for Receiver<C> {
     fn drop(&mut self) {
-        unsafe { self.0.remove_receiver() }
+        unsafe { self.0.data.remove_receiver() }
     }
 }
 
@@ -444,11 +327,11 @@ impl<C: Chan> Drop for Receiver<C> {
 pub fn request_response_pipeline<C: Chan>(
     msg: C::Parameters,
 ) -> (Request<C>, ResponseReceiver<C>, PipelineBuilder<C>) {
-    let request = Arc::new(SharedRequest::new(
+    let request = SharedRequest::new(
         msg,
         RequestUsage::ResponseAndPipeline,
         2,
-    ));
+    );
     (
         Request::new(request.clone()),
         ResponseReceiver {
@@ -462,7 +345,7 @@ pub fn request_response_pipeline<C: Chan>(
 
 /// Create a new request and response channel without pipelining.
 pub fn request_response<C: Chan>(msg: C::Parameters) -> (Request<C>, ResponseReceiver<C>) {
-    let request = Arc::new(SharedRequest::new(msg, RequestUsage::Response, 1));
+    let request = SharedRequest::new(msg, RequestUsage::Response, 1);
     (
         Request::new(request.clone()),
         ResponseReceiver {
@@ -473,7 +356,7 @@ pub fn request_response<C: Chan>(msg: C::Parameters) -> (Request<C>, ResponseRec
 
 /// Create a new request for pipelining.
 pub fn request_pipeline<C: Chan>(msg: C::Parameters) -> (Request<C>, PipelineBuilder<C>) {
-    let request = Arc::new(SharedRequest::new(msg, RequestUsage::Pipeline, 1));
+    let request = SharedRequest::new(msg, RequestUsage::Pipeline, 1);
     (
         Request::new(request.clone()),
         PipelineBuilder {
@@ -497,12 +380,22 @@ pub fn request_pipeline<C: Chan>(msg: C::Parameters) -> (Request<C>, PipelineBui
 /// can exist simultaniously and wait on the same request.
 #[pin_project(PinnedDrop)]
 pub struct Finished<C: Chan> {
-    shared: Arc<SharedRequest<C>>,
+    shared: Arc<RequestInner<C>>,
 
     #[pin]
     waiter: ClosedWaiter,
 
     state: Poll<()>,
+}
+
+impl<C: Chan> Finished<C> {
+    fn new(shared: Arc<RequestInner<C>>) -> Self {
+        Self {
+            shared,
+            waiter: ClosedWaiter::new(),
+            state: Poll::Pending,
+        }
+    }
 }
 
 impl<C: Chan> Future for Finished<C> {
@@ -515,7 +408,7 @@ impl<C: Chan> Future for Finished<C> {
             return this.state.clone();
         }
 
-        let finished = this.waiter.poll(ctx, &this.shared.state, &this.shared.finished_waiters);
+        let finished = this.waiter.poll(ctx, &this.shared.data.state, &this.shared.data.finished_waiters);
         if !finished {
             return Poll::Pending
         }
@@ -531,16 +424,16 @@ impl<C: Chan> PinnedDrop for Finished<C> {
     fn drop(self: Pin<&mut Self>) {
         let this = self.project();
 
-        this.waiter.pinned_drop(&this.shared.finished_waiters);
+        this.waiter.pinned_drop(&this.shared.data.finished_waiters);
     }
 }
 
 pub struct Request<C: Chan> {
-    shared: Marc<SharedRequest<C>>,
+    shared: Marc<RequestInner<C>>,
 }
 
 impl<C: Chan> Request<C> {
-    pub(crate) const fn new(inner: Arc<SharedRequest<C>>) -> Self {
+    pub(crate) const fn new(inner: Arc<RequestInner<C>>) -> Self {
         Self {
             shared: Marc::new(inner),
         }
@@ -548,11 +441,11 @@ impl<C: Chan> Request<C> {
 
     /// Get the inner request value.
     pub fn get(&self) -> &C::Parameters {
-        unsafe { self.shared.get().request() }
+        unsafe { self.shared.get().data.request() }
     }
 
     pub fn usage(&self) -> RequestUsage {
-        self.shared.get().usage
+        self.shared.get().data.usage
     }
 
     /// Respond to the request using a responder derived from it, taking the parameters in
@@ -560,7 +453,7 @@ impl<C: Chan> Request<C> {
     pub fn respond(mut self) -> (C::Parameters, Responder<C>) {
         unsafe {
             let shared = self.shared.take();
-            let params = shared.take_request();
+            let params = shared.data.take_request();
             let responder = Responder {
                 shared: Marc::new(shared),
             };
@@ -569,14 +462,14 @@ impl<C: Chan> Request<C> {
     }
 
     pub fn finished(&self) -> Finished<C> {
-        self.shared.inner().finished()
+        Finished::new(self.shared.get().clone())
     }
 
     pub fn is_finished(&self) -> bool {
-        self.shared.get().is_finished()
+        self.shared.get().data.is_finished()
     }
 
-    pub(crate) fn take_inner(mut self) -> Arc<SharedRequest<C>> {
+    pub(crate) fn take_inner(mut self) -> Arc<RequestInner<C>> {
         unsafe { self.shared.take() }
     }
 }
@@ -585,8 +478,8 @@ impl<C: Chan> Drop for Request<C> {
     fn drop(&mut self) {
         if let Some(shared) = self.shared.try_take() {
             unsafe {
-                shared.drop_request();
-                shared.close_sender();
+                shared.data.drop_request();
+                shared.data.close_sender();
             }
         }
     }
@@ -594,54 +487,79 @@ impl<C: Chan> Drop for Request<C> {
 
 /// Allows sending a response for a request.
 pub struct Responder<C: Chan> {
-    shared: Marc<SharedRequest<C>>,
+    shared: Marc<RequestInner<C>>,
 }
 
 impl<C: Chan> Responder<C> {
     /// Returns the given response.
     pub fn respond(mut self, resp: C::Results) {
-        unsafe {
-            let shared = self.shared.take();
-            shared.respond_and_resolve(resp);
-        }
+        // SAFETY: We're consuming the Responder and aren't in Drop.
+        let shared = unsafe { self.shared.take() };
+
+        // SAFETY: The responder owns this field until we mark that the response is set.
+        unsafe { (*shared.data.response.get()).write(resp); }
+
+        // Mark the response is set. We can't touch response anymore except to read it.
+        shared.data.state.set_value();
+
+        // Wake everyone up. If there's lots of pipelines to resolve, it might take a bit.
+        // Under tokio multi-threading this might mean some work can happen on other threads.
+        shared.data.waiters.wake_all();
+
+        // SAFETY: The responder owns this field until we mark that the pipeline has been written.
+        unsafe { let _ = &*(*shared.data.pipeline_dest.get()).write(None); }
+
+        // SAFETY: We're reading the response data we just wrote above.
+        let resp = unsafe { shared.data.response() };
+        let factory = ResponseReceiverFactory { shared: &shared };
+        shared.data.resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
+
+        // Pipeline resolution will mark the pipeline as written for us, even if we panic.
     }
 
     /// Reuse the request to perform a tail-call, turning the responder back into a request.
     pub fn tail_call(mut self, msg: C::Parameters) -> Request<C> {
-        unsafe {
-            let shared = self.shared.take();
-            *shared.request.get() = ManuallyDrop::new(msg);
-            Request {
-                shared: Marc::new(shared),
-            }
-        }
+        // SAFETY: We're consuming the Responder and aren't in Drop.
+        let shared = unsafe { self.shared.take() };
+
+        // SAFETY: The responder owns this field.
+        unsafe { *shared.data.request.get() = ManuallyDrop::new(msg); }
+
+        Request { shared: Marc::new(shared) }
     }
 
     /// Fulfill the pipeline portion of the request, allowing pipelined requests to flow though
     /// without waiting for the call to complete.
     pub fn set_pipeline(mut self, dst: C::Pipeline) -> ResultsSender<C> {
-        unsafe {
-            let shared = self.shared.take();
-            shared.set_pipeline(Some(dst));
-            ResultsSender {
-                shared: Marc::new(shared),
-            }
-        }
+        // SAFETY: We're consuming the Responder and aren't in Drop.
+        let shared = unsafe { self.shared.take() };
+
+        // SAFETY: The responder owns this field until we mark that the pipeline has been written.
+        unsafe { let _ = &*(*shared.data.pipeline_dest.get()).write(Some(dst)); }
+
+        // SAFETY: We're reading the response data we just wrote above.
+        let resp = unsafe { shared.data.response() };
+        let factory = ResponseReceiverFactory { shared: &shared };
+        shared.data.resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
+
+        // Pipeline resolution will mark the pipeline as written for us, even if we panic.
+
+        ResultsSender { shared: Marc::new(shared) }
     }
 
     pub fn finished(&self) -> Finished<C> {
-        self.shared.inner().finished()
+        Finished::new(self.shared.get().clone())
     }
 
     pub fn is_finished(&self) -> bool {
-        self.shared.get().is_finished()
+        self.shared.get().data.is_finished()
     }
 }
 
 impl<C: Chan> Drop for Responder<C> {
     fn drop(&mut self) {
         if let Some(shared) = self.shared.try_take() {
-            shared.close_sender()
+            shared.data.close_sender()
         }
     }
 }
@@ -649,31 +567,35 @@ impl<C: Chan> Drop for Responder<C> {
 /// The result of calling `Responder::set_pipeline`, a type that can only be used to send the
 /// results of a call.
 pub struct ResultsSender<C: Chan> {
-    shared: Marc<SharedRequest<C>>,
+    shared: Marc<RequestInner<C>>,
 }
 
 impl<C: Chan> ResultsSender<C> {
     /// Returns the given response.
     pub fn respond(mut self, resp: C::Results) {
-        unsafe {
-            let shared = self.shared.take();
-            shared.respond(resp);
-        }
+        // SAFETY: We're consuming the ResultsSender and aren't in Drop.
+        let shared = unsafe { self.shared.take() };
+
+        // SAFETY: The ResultsSender owns this field until we mark that the response is set.
+        unsafe { (*shared.data.response.get()).write(resp); }
+
+        shared.data.state.set_value();
+        shared.data.waiters.wake_all();
     }
 
     pub fn finished(&self) -> Finished<C> {
-        self.shared.inner().finished()
+        Finished::new(self.shared.get().clone())
     }
 
     pub fn is_finished(&self) -> bool {
-        self.shared.get().is_finished()
+        self.shared.get().data.is_finished()
     }
 }
 
 impl<C: Chan> Drop for ResultsSender<C> {
     fn drop(&mut self) {
         if let Some(shared) = self.shared.try_take() {
-            shared.close_sender();
+            shared.data.close_sender();
         }
     }
 }
@@ -686,7 +608,7 @@ pub struct ResponseReceiver<C: Chan> {
 impl<C: Chan> ResponseReceiver<C> {
     /// Attempts to receive the value. This returns an owned copy of the value that can be used separately from the receiver.
     pub fn try_recv(&self) -> Result<Response<C>, TryRecvError> {
-        match self.shared.0.state.state() {
+        match self.shared.0.data.state.state() {
             ShotState::Closed => Err(TryRecvError::Closed),
             ShotState::Empty => Err(TryRecvError::Empty),
             ShotState::Sent => Ok(Response {
@@ -696,10 +618,10 @@ impl<C: Chan> ResponseReceiver<C> {
     }
 
     pub fn try_ref(&self) -> Result<&C::Results, TryRecvError> {
-        match self.shared.0.state.state() {
+        match self.shared.0.data.state.state() {
             ShotState::Closed => Err(TryRecvError::Closed),
             ShotState::Empty => Err(TryRecvError::Empty),
-            ShotState::Sent => Ok(unsafe { self.shared.0.response() }),
+            ShotState::Sent => Ok(unsafe { self.shared.0.data.response() }),
         }
     }
 
@@ -753,6 +675,8 @@ impl<C: Chan> Future for Recv<C> {
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
+        let shared = &this.shot.0;
+        let req = &shared.data;
 
         if this.state.is_ready() {
             return this.state.clone();
@@ -760,11 +684,11 @@ impl<C: Chan> Future for Recv<C> {
 
         let value = match this
             .waiter
-            .poll(ctx, &this.shot.0.state, &this.shot.0.waiters)
+            .poll(ctx, &req.state, &req.waiters)
         {
             ShotState::Empty => return Poll::Pending,
             ShotState::Sent => Some(Response {
-                shared: this.shot.0.clone(),
+                shared: shared.clone(),
             }),
             ShotState::Closed => None,
         };
@@ -779,18 +703,18 @@ impl<C: Chan> PinnedDrop for Recv<C> {
     fn drop(self: Pin<&mut Self>) {
         let this = self.project();
 
-        this.waiter.pinned_drop(&this.shot.0.waiters);
+        this.waiter.pinned_drop(&this.shot.0.data.waiters);
     }
 }
 
 pub struct Response<C: Chan> {
-    shared: Arc<SharedRequest<C>>,
+    shared: Arc<RequestInner<C>>,
 }
 
 impl<C: Chan> Response<C> {
     fn get(&self) -> &C::Results {
         // SAFETY: We only construct a Response when we know the inner value is set.
-        unsafe { (*self.shared.response.get()).assume_init_ref() }
+        unsafe { (*self.shared.data.response.get()).assume_init_ref() }
     }
 }
 
@@ -838,7 +762,50 @@ impl<C: Chan> PipelineBuilder<C> {
         C::PipelineKey: From<K>,
         F: FnOnce() -> C,
     {
-        self.shared.0.pipeline(key, chan)
+        let shared = &self.shared.0;
+        let req = &shared.data;
+
+        if !req.state.load(Acquire).is_pipeline_set() {
+            // The pipeline hasn't been set yet. Lock the pipeline map so we can get a
+            // pipelined client.
+            let mut map = req.pipeline_map.lock();
+            // Load relaxed since the mutex lock provides the synchronization we need
+            // if the pipeline does get set.
+            if !req.state.load(Relaxed).is_pipeline_set() {
+                // It *still* hasn't been set, time to mutate the map
+                let sender = match map.raw_entry_mut().from_key(&key) {
+                    RawEntryMut::Occupied(mut occupied) => match occupied.get().sender() {
+                        Some(sender) => sender,
+                        None => {
+                            let receiver = Receiver::track(shared.clone());
+                            let (sender, weak_channel) = weak_channel(chan(), receiver);
+                            let _ = occupied.insert(weak_channel);
+                            sender
+                        }
+                    },
+                    RawEntryMut::Vacant(vacant) => {
+                        let receiver = Receiver::track(shared.clone());
+                        let (sender, weak_channel) = weak_channel(chan(), receiver);
+                        let _ = vacant.insert(C::PipelineKey::from(key), weak_channel);
+                        sender
+                    }
+                };
+
+                return sender;
+            }
+        }
+
+        let factory = ResponseReceiverFactory { shared };
+
+        let key = key.into();
+
+        // Ah, a pipeline was set, so we can apply the ops and resolve directly into the
+        // correct client.
+        let pipeline = unsafe { (*req.pipeline_dest.get()).assume_init_ref() };
+        match pipeline {
+            Some(p) => p.pipeline(factory, key),
+            None => unsafe { req.response().pipeline(factory, key) },
+        }
     }
 }
 

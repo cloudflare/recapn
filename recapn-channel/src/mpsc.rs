@@ -19,9 +19,11 @@ use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
 use std::future::{poll_fn, Future};
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::process::abort;
+use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Weak};
@@ -35,8 +37,129 @@ use crate::request::{self, Request, SharedRequest};
 use crate::util::array_vec::ArrayVec;
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::closed_task::ClosedTask;
-use crate::util::linked_list::LinkedList;
+use crate::util::linked_list::{Link, LinkedList, Pointers};
 use crate::util::wait_list::{RecvWaiter, WaitList};
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum LinkKind {
+    Request,
+    Event,
+}
+
+#[repr(C)]
+pub(crate) struct SharedLink<T: ?Sized> {
+    /// Intrusive linked-list pointers for request channels
+    ///
+    /// In order to maintain "one allocation per request", we intrusively link
+    /// requests together to build a request chain.
+    pointers: Pointers<SharedLink<()>>,
+
+    kind: LinkKind,
+
+    pub data: T,
+}
+
+impl<C: Chan> SharedLink<SharedRequest<C>> {
+    pub fn new(data: SharedRequest<C>) -> Arc<Self> {
+        Arc::new(Self {
+            pointers: Pointers::new(),
+            kind: LinkKind::Request,
+            data,
+        })
+    }
+}
+
+enum LinkItem<C: Chan> {
+    Request(Arc<SharedLink<SharedRequest<C>>>),
+    Event(Box<SharedLink<C::Event>>),
+}
+
+impl<C: Chan> LinkItem<C> {
+    #[inline]
+    pub fn into_item(self) -> Item<C> {
+        match self {
+            LinkItem::Request(r) => Item::Request(Request::new(r)),
+            LinkItem::Event(e) => Item::Event(Event { inner: e }),
+        }
+    }
+}
+
+struct LinkPtr<C: Chan> {
+    p: PhantomData<fn() -> C>,
+    ptr: *const SharedLink<()>,
+}
+
+impl<C: Chan> LinkPtr<C> {
+    pub fn from_item(item: LinkItem<C>) -> Self {
+        Self {
+            p: PhantomData,
+            ptr: match item {
+                LinkItem::Request(r) => Arc::into_raw(r).cast(),
+                LinkItem::Event(e) => Box::into_raw(e).cast(),
+            },
+        }
+    }
+
+    pub fn into_link_item(self) -> LinkItem<C> {
+        let kind = unsafe { (*self.ptr).kind };
+        match kind {
+            LinkKind::Request => {
+                let cast_ptr = self.ptr.cast::<SharedLink<SharedRequest<C>>>();
+                LinkItem::Request(unsafe { Arc::from_raw(cast_ptr) })
+            }
+            LinkKind::Event => {
+                let cast_ptr = self.ptr.cast::<SharedLink<C::Event>>().cast_mut();
+                LinkItem::Event(unsafe { Box::from_raw(cast_ptr) })
+            }
+        }
+    }
+
+    pub fn into_item(self) -> Item<C> {
+        self.into_link_item().into_item()
+    }
+}
+
+unsafe impl<C: Chan> Link for LinkPtr<C> {
+    type Handle = Self;
+    type Target = SharedLink<()>;
+
+    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
+        NonNull::new(handle.ptr.cast_mut()).unwrap()
+    }
+    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
+        Self { p: PhantomData, ptr: ptr.as_ptr().cast_const() }
+    }
+    unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>> {
+        let me = target.as_ptr();
+        let field = addr_of_mut!((*me).pointers);
+        NonNull::new_unchecked(field)
+    }
+}
+
+/// An message that can be sent on a mpsc channel. This follows the same ordering as requests, but
+/// without the drop behavior of requests, allowing simple messages to be sent along the
+/// request path.
+pub struct Event<E> {
+    inner: Box<SharedLink<E>>,
+}
+
+impl<E> Event<E> {
+    #[inline]
+    pub fn new(data: E) -> Self {
+        Self {
+            inner: Box::new(SharedLink {
+                pointers: Pointers::new(),
+                kind: LinkKind::Event,
+                data
+            })
+        }
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> E {
+        self.inner.data
+    }
+}
 
 pub enum Resolution<'a, C: Chan> {
     /// The channel was forwarded to another channel
@@ -140,20 +263,50 @@ impl<C: Chan> Sender<C> {
         };
 
         let req_shared = req.take_inner();
+        let link_ptr = LinkPtr::from_item(LinkItem::Request(req_shared.clone()));
 
         // Insert the request into the list.
-        channel.requests.push_back(req_shared.clone());
+        channel.requests.push_back(link_ptr);
 
         unsafe {
-            req_shared.set_parent(this.clone());
+            req_shared.data.set_parent(this.clone());
         }
 
-        if req_shared.is_finished() {
+        if req_shared.data.is_finished() {
             // Just drop the request nobody wants the result
-            let _ = channel.requests.pop_back();
-            unsafe { req_shared.take_parent(); }
+            let _ = channel.requests.pop_back().unwrap().into_item();
+            unsafe { req_shared.data.take_parent(); }
             return Ok(());
         }
+
+        let waker = channel.waker.take();
+
+        // Drop the lock before waking the receiver since the waker could do literally
+        // anything.
+        drop(channel);
+
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+
+        Ok(())
+    }
+
+    pub fn send_event(
+        &self,
+        event: Event<C::Event>,
+    ) -> Result<(), (Event<C::Event>, Option<&C::Error>)> {
+        let (_, mut channel) = match self.shared.resolve_and_lock() {
+            Ok(v) => v,
+            Err(r) => {
+                return match r {
+                    MostResolved::Dropped => Err((event, None)),
+                    MostResolved::Error(err) => return Err((event, Some(err))),
+                }
+            }
+        };
+
+        channel.requests.push_back(LinkPtr::from_item(LinkItem::Event(event.inner)));
 
         let waker = channel.waker.take();
 
@@ -288,6 +441,11 @@ impl<C: Chan + ?Sized> Hash for Sender<C> {
 unsafe impl<C: Chan> Send for Sender<C> where Request<C>: Send {}
 unsafe impl<C: Chan> Sync for Sender<C> where Request<C>: Send {}
 
+pub enum Item<C: Chan> {
+    Request(Request<C>),
+    Event(Event<C::Event>),
+}
+
 #[derive(Debug)]
 pub struct Receiver<C: Chan> {
     shared: Arc<SharedChannel<C>>,
@@ -392,11 +550,11 @@ impl<C: Chan> Receiver<C> {
         self.shared.resolution.is_receivers_closed()
     }
 
-    pub async fn recv(&mut self) -> Option<Request<C>> {
+    pub async fn recv(&mut self) -> Option<Item<C>> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<Request<C>>> {
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<Item<C>>> {
         if self.is_closed() {
             return Poll::Ready(None);
         }
@@ -404,11 +562,13 @@ impl<C: Chan> Receiver<C> {
         let waker = cx.waker().clone();
 
         let mut locked = self.shared.state.lock();
-        let next = locked.requests.pop_front();
+        let next = locked.requests.pop_front().map(LinkPtr::into_link_item);
 
         if let Some(n) = next {
-            unsafe { n.take_parent() };
-            return Poll::Ready(Some(Request::new(n)));
+            if let LinkItem::Request(req) = &n {
+                unsafe { req.data.take_parent() };
+            }
+            return Poll::Ready(Some(n.into_item()));
         }
 
         if let Some(w) = &locked.waker {
@@ -425,9 +585,10 @@ impl<C: Chan> Receiver<C> {
     }
 
     /// Tries to receive the next value for this receiver.
-    pub fn try_recv(&mut self) -> Option<Request<C>> {
+    pub fn try_recv(&mut self) -> Option<Item<C>> {
         let mut locked = self.shared.state.lock();
-        locked.requests.pop_front().map(Request::new)
+        let link = locked.requests.pop_front()?;
+        Some(link.into_item())
     }
 
     /// Close this channel with the given error.
@@ -441,32 +602,40 @@ impl<C: Chan> Receiver<C> {
         scopeguard::defer_on_unwind! {
             let mut self_lock = self.shared.state.lock();
             while let Some(r) = self_lock.requests.pop_front() {
-                unsafe {
-                    r.take_parent();
-                    r.drop_request();
-                    // TODO: Maybe signal that the request is over without waking everyone up?
+                if let LinkItem::Request(r) = r.into_link_item() {
+                    unsafe {
+                        r.data.take_parent();
+                        r.data.drop_request();
+                        // TODO: Maybe signal that the request is over without waking everyone up?
+                    }
                 }
             }
         };
 
-        let mut request_array = ArrayVec::<Request<C>, 32>::new();
+        let mut request_array = ArrayVec::<Item<C>, 32>::new();
 
-        let respond_with_err = |r: Request<C>| {
-            let (_, responder) = r.respond();
-            responder.respond(err.clone().into_results());
+        let respond_with_err = |i: Item<C>| {
+            if let Item::Request(r) = i {
+                let (_, responder) = r.respond();
+                responder.respond(err.clone().into_results());
+            }
         };
 
         'outer: loop {
             while request_array.can_push() {
-                let Some(req) = self_lock.requests.pop_front() else {
+                let Some(ptr) = self_lock.requests.pop_front() else {
                     break 'outer;
                 };
 
-                unsafe {
-                    req.take_parent();
+                let item = ptr.into_link_item();
+
+                if let LinkItem::Request(req) = &item {
+                    unsafe {
+                        req.data.take_parent();
+                    }
                 }
 
-                request_array.push(Request::new(req));
+                request_array.push(item.into_item());
             }
 
             drop(self_lock);
@@ -497,7 +666,7 @@ pub(crate) struct State<C: Chan> {
     /// to this channel to make sure the reference cycle is broken.
     parent_request: Option<request::Receiver<C>>,
 
-    requests: LinkedList<SharedRequest<C>, SharedRequest<C>>,
+    requests: LinkedList<LinkPtr<C>, SharedLink<()>>,
 
     /// The waker set by the receiver to wake up the receiver task.
     waker: Option<Waker>,
