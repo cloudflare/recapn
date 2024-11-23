@@ -1720,7 +1720,7 @@ impl<'a> ObjectReader<'a> {
                 // The landing pad is another far pointer. The next pointer is a tag describing our
                 // pointed-to object
                 // SAFETY: We know from the above that this landing pad is two words, so this is safe
-                let tag = unsafe { *pad.offset(1.into()).as_ref_unchecked().as_wire_ptr() };
+                let tag = unsafe { *pad.offset(1u8.into()).as_ref_unchecked().as_wire_ptr() };
 
                 let far_ptr = pad_ptr.try_far_ptr()?;
                 Ok(Content {
@@ -1838,7 +1838,7 @@ impl<'a> ObjectReader<'a> {
                 .ok_or(Error::UnsupportedInlineCompositeElementTag)?;
 
             // move past the tag pointer to get the start of the list
-            let first = unsafe { tag_ptr.offset(1.into()).as_ref_unchecked() };
+            let first = unsafe { tag_ptr.offset(1u8.into()).as_ref_unchecked() };
 
             let element_count = tag.inline_composite_element_count();
 
@@ -3226,7 +3226,7 @@ impl<'a> ObjectBuilder<'a> {
                 .expect("far pointer cannot point to a read-only segment");
 
             let content = if double_far {
-                let tag = unsafe { ptr.offset(1.into()).as_ref_unchecked() };
+                let tag = unsafe { ptr.offset(1u8.into()).as_ref_unchecked() };
                 let far_ptr = ptr
                     .as_wire_ptr()
                     .try_far_ptr()
@@ -3269,7 +3269,7 @@ impl<'a> ObjectBuilder<'a> {
 
             builder.set_ptr(pad_ptr, WirePtr::NULL);
             if far.double_far() {
-                let content_ptr = unsafe { pad_ptr.offset(1.into()).as_ref_unchecked() };
+                let content_ptr = unsafe { pad_ptr.offset(1u8.into()).as_ref_unchecked() };
                 builder.set_ptr(content_ptr, WirePtr::NULL);
             }
         }
@@ -3476,7 +3476,7 @@ impl<'a> ObjectBuilder<'a> {
             );
             // since the list has no size, any pointer is valid here, even one beyond the end of the segment
             return Ok((
-                unsafe { ptr.offset(1.into()).as_ref_unchecked() },
+                unsafe { ptr.offset(1u8.into()).as_ref_unchecked() },
                 ObjectLen::ZERO,
                 self.clone(),
             ));
@@ -3637,7 +3637,7 @@ impl<'a> ObjectBuilder<'a> {
                     .struct_ptr()
                     .expect("inline composite list with non-struct elements is not supported");
 
-                let list_start = unsafe { start.offset(1.into()).as_ref_unchecked() };
+                let list_start = unsafe { start.offset(1u8.into()).as_ref_unchecked() };
                 let size = tag.size();
 
                 ListContent {
@@ -5036,7 +5036,7 @@ impl<'a, T: Table> ListBuilder<'a, T> {
             builder,
             ptr,
             table,
-            element_count: 0.into(),
+            element_count: ElementCount::ZERO,
             element_size,
         }
     }
@@ -6697,7 +6697,7 @@ mod tests {
             let mut list = builder
                 .ptr_field_mut(1)
                 .unwrap()
-                .init_list(ElementSize::FourBytes, 3.into());
+                .init_list(ElementSize::FourBytes, 3u8.into());
             assert_eq!(list.len().get(), 3);
             unsafe {
                 list.set_data_unchecked::<i32>(0, 200);
@@ -6709,7 +6709,7 @@ mod tests {
         {
             let mut list = builder.ptr_field_mut(2).unwrap().init_list(
                 ElementSize::InlineComposite(StructSize { data: 1, ptrs: 1 }),
-                4.into(),
+                4u8.into(),
             );
             assert_eq!(list.len().get(), 4);
             for i in 0..4 {
@@ -6727,7 +6727,7 @@ mod tests {
             let mut list = builder
                 .ptr_field_mut(3)
                 .unwrap()
-                .init_list(ElementSize::Pointer, 5.into());
+                .init_list(ElementSize::Pointer, 5u8.into());
             assert_eq!(list.len().get(), 5);
             for i in 0..5 {
                 let mut element = unsafe {
