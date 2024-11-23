@@ -23,7 +23,7 @@ use crate::{Error, Family, IntoFamily, Result};
 
 use core::convert::TryFrom;
 use core::marker::PhantomData;
-use core::ops::Range;
+use core::ops::{Bound, Range, RangeBounds};
 
 pub use crate::ptr::{ElementCount, ElementSize};
 
@@ -301,6 +301,75 @@ impl<'a, V, T: Table> Builder<'a, V, T> {
         V: ListAccessable<Self>,
     {
         V::get(self, index)
+    }
+
+    /// Create a lending iterator for the whole list.
+    #[inline]
+    pub fn into_lender(self) -> Lender<Self> {
+        self.into_lender_range(..)
+    }
+
+    /// Create a lending iterator for a specified range in the list.
+    #[inline]
+    pub fn into_lender_range<R: RangeBounds<u32>>(self, range: R) -> Lender<Self> {
+        let len = self.len().get();
+        let start = match range.start_bound() {
+            Bound::Unbounded => 0,
+            Bound::Included(i) => *i,
+            Bound::Excluded(i) => (*i)
+                .min(ElementCount::MAX_VALUE)
+                .saturating_add(1),
+        }.min(len);
+        let end = match range.end_bound() {
+            Bound::Unbounded => len,
+            Bound::Included(i) => (*i)
+                .min(ElementCount::MAX_VALUE)
+                .saturating_add(1),
+            Bound::Excluded(i) => *i,
+        }.min(len);
+        Lender { range: start..end, list: self }
+    }
+}
+
+/// A lending iterator for list builders.
+pub struct Lender<L> {
+    range: Range<u32>,
+    list: L,
+}
+
+impl<L> Lender<L> {
+    /// Zip this lender with a normal `Iterator`
+    pub fn zip<I: IntoIterator>(self, iter: I) -> ZippedLender<L, I::IntoIter> {
+        ZippedLender { lender: self, iter: iter.into_iter() }
+    }
+}
+
+impl<'a, V, T: Table> Lender<Builder<'a, V, T>> {
+    pub fn next<'b>(&'b mut self) -> Option<ElementBuilder<'a, 'b, V, T>>
+    where
+        V: ListAccessable<&'b mut Builder<'a, V, T>>
+    {
+        let idx = self.range.next()?;
+        let list_item = self.list.at(idx);
+        Some(list_item)
+    }
+}
+
+/// A lender with an iterator. Useful for when you need to copy from a Rust type to a
+/// Cap'n Proto list.
+pub struct ZippedLender<L, I> {
+    lender: Lender<L>,
+    iter: I,
+}
+
+impl<'a, V, T: Table, I: Iterator> ZippedLender<Builder<'a, V, T>, I> {
+    pub fn next<'b>(&'b mut self) -> Option<(ElementBuilder<'a, 'b, V, T>, I::Item)>
+    where
+        V: ListAccessable<&'b mut Builder<'a, V, T>>
+    {
+        let list_item = self.lender.next()?;
+        let iter_item = self.iter.next()?;
+        Some((list_item, iter_item))
     }
 }
 

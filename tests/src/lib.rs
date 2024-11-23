@@ -7,6 +7,8 @@ pub mod build_gen {
     include!(concat!(env!("OUT_DIR"), "/build_rs/mod.rs"));
 }
 
+pub mod list;
+
 use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
 use recapn::message::Message;
 use recapn::text;
