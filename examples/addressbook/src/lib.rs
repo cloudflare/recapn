@@ -5,7 +5,7 @@ pub mod gen {
 use std::io::Write;
 
 use gen::addressbook_capnp::*;
-use recapn::io::{read_packed_from_stream, PackedStream, StreamOptions};
+use recapn::io::{self, StreamOptions};
 use recapn::message::{self, Message, ReaderOptions};
 use recapn::text;
 
@@ -52,8 +52,7 @@ pub fn write_address_book<W: Write>(target: &mut W) {
 }
 
 pub fn print_address_book<W: Write>(src: &[u8], output: &mut W) -> ::recapn::Result<()> {
-    let mut message_reader = PackedStream::new(src);
-    let segments = read_packed_from_stream(&mut message_reader, StreamOptions::default()).unwrap();
+    let segments = io::read_from_packed_stream(src, StreamOptions::default()).unwrap();
     let message = message::Reader::new(&segments, ReaderOptions::default());
     let address_book = message.read_as_struct::<AddressBook>();
 
