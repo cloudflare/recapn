@@ -29,6 +29,18 @@ macro_rules! text {
 
 const EMPTY_SLICE: &[u8] = &[0];
 
+/// An error returned when trying to set a text field to a string value if the value is too large.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct TryFromStrError(pub(crate) ());
+
+impl fmt::Display for TryFromStrError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str("attempted to create a text blob from too large a string")
+    }
+}
+
+impl core::error::Error for TryFromStrError {}
+
 #[derive(Clone, Copy)]
 pub struct Text<T = Family>(T);
 
