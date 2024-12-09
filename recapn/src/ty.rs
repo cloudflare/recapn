@@ -31,6 +31,11 @@ pub trait Capability: 'static {
     fn into_inner(self) -> Self::Client;
 }
 
+/// A type defined in a schema with an associated constant Cap'n Proto type ID.
+pub trait SchemaType {
+    const ID: u64;
+}
+
 /// Provides associated types for readers and builders of a struct with the given type.
 ///
 /// Note, this is applied to both structs and *groups* which are not values that you can read

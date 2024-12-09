@@ -3,6 +3,9 @@ use recapn::prelude::gen as _p;
 use super::{__file, __imports};
 #[derive(Clone)]
 pub struct TestImport<T = _p::Family>(T);
+impl _p::ty::SchemaType for TestImport {
+    const ID: u64 = 13570947164928695703u64;
+}
 impl<T> _p::IntoFamily for TestImport<T> {
     type Family = TestImport;
 }
