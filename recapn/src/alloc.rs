@@ -442,7 +442,8 @@ impl<const N: usize> Space<N> {
 ///
 /// # Example
 ///
-/// ```
+#[cfg_attr(feature = "alloc", doc = " ```")]
+#[cfg_attr(not(feature = "alloc"), doc = " ```ignore")]
 /// use recapn::alloc;
 /// use recapn::message::Message;
 ///

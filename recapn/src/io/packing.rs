@@ -707,6 +707,7 @@ impl Unpacker {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use std::io::BufReader;

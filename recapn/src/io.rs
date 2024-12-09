@@ -266,6 +266,7 @@ pub enum StreamError {
     Io(io::Error),
 }
 
+#[cfg(feature = "std")]
 impl Display for StreamError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -277,6 +278,7 @@ impl Display for StreamError {
     }
 }
 
+#[cfg(feature = "std")]
 impl core::error::Error for StreamError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
@@ -288,12 +290,14 @@ impl core::error::Error for StreamError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<io::Error> for StreamError {
     fn from(value: io::Error) -> Self {
         StreamError::Io(value)
     }
 }
 
+#[cfg(feature = "std")]
 impl From<TableReadError> for StreamError {
     fn from(value: TableReadError) -> Self {
         StreamError::Table(value)
@@ -342,6 +346,7 @@ pub fn read_from_slice(slice: &[Word]) -> Result<(SegmentSet<&[Word]>, &[Word]),
     Ok((set, remainder))
 }
 
+#[cfg(feature = "std")]
 #[inline]
 fn map_read_err(err: ReadError) -> StreamError {
     match err {

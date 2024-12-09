@@ -3018,7 +3018,7 @@ impl<'a> BlobReader<'a> {
 
     pub(crate) const unsafe fn new_unchecked(ptr: NonNull<u8>, len: ElementCount) -> Self {
         Self {
-            slice: std::slice::from_raw_parts(ptr.as_ptr(), len.get() as usize),
+            slice: core::slice::from_raw_parts(ptr.as_ptr(), len.get() as usize),
         }
     }
 
