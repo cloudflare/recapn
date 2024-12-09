@@ -545,7 +545,7 @@ impl WirePtr {
 
 impl<'a> From<&'a Word> for &'a WirePtr {
     fn from(w: &'a Word) -> Self {
-        unsafe { &*std::ptr::from_ref::<Word>(w).cast::<WirePtr>() }
+        unsafe { &*core::ptr::from_ref::<Word>(w).cast::<WirePtr>() }
     }
 }
 
@@ -2178,7 +2178,7 @@ impl<'a> PtrReader<'a, Empty> {
     pub const fn null() -> Self {
         unsafe {
             Self::new_unchecked(NonNull::new_unchecked(
-                std::ptr::from_ref(Word::null()).cast_mut(),
+                core::ptr::from_ref(Word::null()).cast_mut(),
             ))
         }
     }
