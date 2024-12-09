@@ -20,16 +20,12 @@ pub fn write_address_book<W: Write>(target: &mut W) {
     alice.id().set(123);
     alice.name().set(text!("Alice"));
     alice.email().set(text!("alice@example.com"));
+    alice.employment().school().set_str("MIT");
 
     let mut alice_phones = alice.phones().init(1);
     let mut phone = alice_phones.at(0).get();
     phone.number().set(text!("555-1212"));
     phone.r#type().set(person::phone_number::Type::Mobile);
-
-    let mut employment = alice.employment();
-    let school = employment.school();
-    let field = school.init_field();
-    field.set_str("MIT");
 
     let mut bob = people.at(1).get();
     bob.id().set(456);
