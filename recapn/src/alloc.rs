@@ -443,12 +443,13 @@ impl<const N: usize> Space<N> {
 /// # Example
 ///
 /// ```
+/// # #[cfg(feature = "alloc")] {
 /// use recapn::alloc;
 /// use recapn::message::Message;
 ///
 /// let mut space = alloc::space::<16>();
 /// let message = Message::with_scratch(&mut space);
-/// # drop(message);
+/// # drop(message); }
 /// ```
 #[inline]
 pub const fn space<const N: usize>() -> Space<N> {
