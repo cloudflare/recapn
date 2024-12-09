@@ -17,11 +17,11 @@
 
 use crate::sync::request::{Request, SharedRequest};
 use crate::sync::util::array_vec::ArrayVec;
-use std::fmt::{self, Debug};
-use std::future::poll_fn;
-use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Weak};
-use std::task::{Context, Poll, Waker};
+use core::fmt::{self, Debug};
+use core::future::poll_fn;
+use core::hash::{Hash, Hasher};
+use alloc::sync::{Arc, Weak};
+use core::task::{Context, Poll, Waker};
 
 use parking_lot::{Mutex, MutexGuard};
 
@@ -164,7 +164,7 @@ impl<C: Chan + ?Sized> Eq for Sender<C> {}
 
 impl<C: Chan + ?Sized> Hash for Sender<C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(Arc::as_ptr(&self.shared), state);
+        core::ptr::hash(Arc::as_ptr(&self.shared), state);
     }
 }
 

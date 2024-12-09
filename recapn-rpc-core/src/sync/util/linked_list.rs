@@ -13,6 +13,9 @@ use core::marker::{PhantomData, PhantomPinned};
 use core::mem;
 use core::ptr::NonNull;
 use core::ptr::{addr_of, addr_of_mut};
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::boxed::Box;
 
 /// An intrusive linked list.
 ///
@@ -398,7 +401,7 @@ impl<L: Link> GuardedLinkedList<L, L::Target> {
 pub(crate) mod tests {
     use super::*;
 
-    use std::pin::Pin;
+    use core::pin::Pin;
 
     #[derive(Debug)]
     #[repr(C)]

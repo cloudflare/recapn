@@ -10,9 +10,11 @@ use recapn::orphan::Orphan;
 use recapn::ptr::{ElementSize, ReturnErrors};
 use recapn::rpc::Capable;
 use recapn::{list, message, BuilderOf, NotInSchema, ReaderOf};
-use tokio::select;
-use tokio::sync::mpsc as tokio_mpsc;
-use tokio::sync::oneshot;
+use alloc::format;
+use alloc::string::String;
+// use tokio::select;
+// use tokio::sync::mpsc as tokio_mpsc;
+// use tokio::sync::oneshot;
 
 use crate::client::{
     Client, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget,
@@ -25,14 +27,15 @@ use crate::table::{CapTable, Table};
 use crate::{Error, ErrorKind, PipelineOp};
 use rpc_capnp::promised_answer::Op;
 use rpc_capnp::CapDescriptor;
-use std::borrow::Cow;
-use std::cmp::Reverse;
-use std::collections::btree_map::Entry;
-use std::collections::{BTreeMap, BinaryHeap};
-use std::convert::TryFrom;
-use std::fmt::Write;
-use std::mem::replace;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::vec::Vec;
+use core::cmp::Reverse;
+use alloc::collections::btree_map::Entry;
+use alloc::collections::{BTreeMap, BinaryHeap};
+// use std::convert::TryFrom;
+// use std::fmt::Write;
+use core::mem::replace;
+use alloc::sync::Arc;
 
 const MAX_OPS: usize = ElementSize::size_of::<Struct<Op>>().max_elements().get() as usize;
 const MAX_CAPS: usize = ElementSize::size_of::<Struct<CapDescriptor>>()

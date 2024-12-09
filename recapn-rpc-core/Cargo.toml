@@ -1,0 +1,19 @@
+[package]
+name = "recapn-rpc-core"
+version = "0.0.0"
+authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+recapn = { path = "../recapn" }
+fnv = "1.0"
+pin-project = "1.1"
+parking_lot = "0.12"
+hashbrown = "0.14"
+scopeguard = "1.2"
+
+[dev-dependencies]
+assert_matches2 = "0.1"
+
+[lints]
+workspace = true

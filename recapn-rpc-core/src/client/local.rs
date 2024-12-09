@@ -3,12 +3,13 @@
 //! * Request queueing
 //! * Response handling
 
-use std::convert;
-use std::future::Future;
-use std::marker::{PhantomData, PhantomPinned};
-use std::mem;
-use std::pin::Pin;
-use tokio::task::JoinHandle;
+use core::convert;
+use core::future::Future;
+use core::marker::{PhantomData, PhantomPinned};
+use core::mem;
+use core::pin::Pin;
+// use tokio::task::JoinHandle;
+use alloc::format;
 
 use crate::sync::mpsc::Receiver;
 use crate::{Error, Result};

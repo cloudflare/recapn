@@ -2,19 +2,19 @@
 //! multi-threaded primitive used as a replacement for forked promises in kj, but is
 //! more efficient and flexible than using tokio's Notified for at-most-once notifications.
 
-use std::borrow::Borrow;
-use std::cell::UnsafeCell;
-use std::future::{poll_fn, Future, IntoFuture};
-use std::marker::PhantomPinned;
-use std::mem::MaybeUninit;
-use std::ops::Deref;
-use std::pin::{pin, Pin};
-use std::process::abort;
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::Ordering::{self, *};
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize};
-use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
+use alloc::borrow::Borrow;
+use core::cell::UnsafeCell;
+use core::future::{poll_fn, Future, IntoFuture};
+use core::marker::PhantomPinned;
+use core::mem::MaybeUninit;
+use core::ops::Deref;
+use core::pin::{pin, Pin};
+// use std::process::abort;
+use core::ptr::{addr_of_mut, NonNull};
+use core::sync::atomic::Ordering::{self, *};
+use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize};
+use alloc::sync::Arc;
+use core::task::{Context, Poll, Waker};
 
 use super::util::array_vec::ArrayVec;
 use super::util::linked_list::{GuardedLinkedList, Link, LinkedList, Pointers};
@@ -157,7 +157,7 @@ impl WaitList {
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
         let mut list =
-            RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), self);
+            RecvWaitersList::new(core::mem::take(&mut *waiters), pinned_guard.as_ref(), self);
 
         const NUM_WAKERS: usize = 32;
 
@@ -310,7 +310,7 @@ impl RecvWaiter {
                                 || matches!(current, Some(w) if w.will_wake(polling_waker));
                             if should_update {
                                 old_waker =
-                                    std::mem::replace(&mut *current, Some(polling_waker.clone()));
+                                    core::mem::replace(&mut *current, Some(polling_waker.clone()));
                             }
                         }
 
@@ -922,6 +922,7 @@ impl<T> Deref for Value<T> {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -954,3 +955,4 @@ mod test {
         assert_eq!(*(recv.await.unwrap()), 123);
     }
 }
+ */

@@ -1,7 +1,8 @@
 pub mod array_vec;
 pub mod linked_list;
+use alloc::sync::Arc;
 
-use std::sync::Arc;
+// use std::sync::Arc;
 
 /// A **M**ovable **Arc**.
 ///

@@ -4,18 +4,18 @@
 //!
 //! Request, Response, Pipeline, all in one allocation.
 
-use std::cell::UnsafeCell;
-use std::fmt::{self, Debug};
-use std::future::{Future, IntoFuture};
-use std::hash::Hash;
-use std::mem::{ManuallyDrop, MaybeUninit};
-use std::ops::Deref;
-use std::pin::Pin;
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Relaxed};
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use core::cell::UnsafeCell;
+use core::fmt::{self, Debug};
+use core::future::{Future, IntoFuture};
+use core::hash::Hash;
+use core::mem::{ManuallyDrop, MaybeUninit};
+use core::ops::Deref;
+use core::pin::Pin;
+use core::ptr::{addr_of_mut, NonNull};
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering::{Acquire, Relaxed};
+use alloc::sync::Arc;
+use core::task::{Context, Poll};
 
 use hashbrown::hash_map::RawEntryMut;
 use hashbrown::{Equivalent, HashMap};

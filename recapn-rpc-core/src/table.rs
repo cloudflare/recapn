@@ -1,6 +1,7 @@
-use std::cell::UnsafeCell;
-use std::convert::TryFrom;
-use std::marker::PhantomData;
+use core::cell::UnsafeCell;
+use core::convert::TryFrom;
+use core::marker::PhantomData;
+use alloc::vec::Vec;
 
 use super::client::Client;
 

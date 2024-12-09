@@ -2,6 +2,7 @@
 members = [
     "recapn",
     "recapnc",
+    "recapn-rpc-core",
     "recapn-rpc",
     "tests",
     "fuzz",
