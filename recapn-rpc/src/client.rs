@@ -12,10 +12,9 @@ use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task;
-use tokio::select;
 
 async fn wait_and_resolve(future: impl Future<Output = Client>, mut receiver: Receiver) {
-    select! {
+    crate::tokio::select! {
         // if all the senders and requests drop, just cancel
         _ = receiver.closed() => {},
         client = future => {
@@ -54,7 +53,7 @@ impl Client {
     {
         let (client, resolver) = mpsc::channel(RpcChannel::Spawned);
 
-        let _ = tokio::task::spawn(wait_and_resolve(future, resolver));
+        let _ = crate::tokio::spawn(wait_and_resolve(future, resolver));
 
         Self(client)
     }
@@ -75,7 +74,7 @@ impl Client {
     {
         let (client, resolver) = mpsc::channel(RpcChannel::Spawned);
 
-        let _ = tokio::task::spawn_local(wait_and_resolve(future, resolver));
+        let _ = crate::tokio::spawn_local(wait_and_resolve(future, resolver));
 
         Self(client)
     }
