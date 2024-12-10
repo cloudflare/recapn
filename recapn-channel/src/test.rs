@@ -4,10 +4,10 @@ use tokio_test::assert_ready;
 use tokio_test::task::spawn;
 
 use crate::request::TryRecvError;
-use crate::{mpsc, Chan, IntoResults, PipelineResolver};
 use crate::request::{
-    request_response, request_response_pipeline, RequestUsage, ResponseReceiverFactory
+    request_response, request_response_pipeline, RequestUsage, ResponseReceiverFactory,
 };
+use crate::{mpsc, Chan, IntoResults, PipelineResolver};
 
 #[derive(Clone, Debug)]
 struct Error(#[allow(dead_code)] &'static str);
@@ -168,9 +168,7 @@ fn finished_after_response() {
     assert!(resolved.poll().is_pending());
 
     let (_, responder) = req.respond();
-    responder.respond(Ok(IntsResponse(HashMap::from([
-        (3, pipeline_channel)
-    ]))));
+    responder.respond(Ok(IntsResponse(HashMap::from([(3, pipeline_channel)]))));
 
     assert!(resolved.is_woken());
 

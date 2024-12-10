@@ -235,22 +235,28 @@ pub struct ConstPtr<T> {
 
 impl<T> ConstPtr<T> {
     /// Create a new constant value backed by the given static array of words.
-    /// 
+    ///
     /// This is normally used by the code generator to create constant pointer values.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// This must be a valid Cap'n Proto message contained within a single segment. The message is
     /// not checked for validity and as such an invalid message can cause Undefined Behavior.
     pub const unsafe fn new(w: &'static [Word]) -> Self {
-        Self { t: PhantomData, inner: Some(NonNull::new_unchecked(w.as_ptr().cast_mut())) }
+        Self {
+            t: PhantomData,
+            inner: Some(NonNull::new_unchecked(w.as_ptr().cast_mut())),
+        }
     }
 
     /// Create a constant value to a null pointer.
-    /// 
+    ///
     /// This will return the value's default when you `get()` its value.
     pub const fn null() -> Self {
-        Self { t: PhantomData, inner: None }
+        Self {
+            t: PhantomData,
+            inner: None,
+        }
     }
 
     /// Get the value of the constant as an untyped pointer.

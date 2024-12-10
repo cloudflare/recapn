@@ -10,9 +10,9 @@ use recapn::any;
 use recapn::arena::ReadArena;
 use recapn::message::{self, Message, ReaderOptions};
 use recapn::rpc::Capable;
-use recapn_channel::{Chan, IntoResults, PipelineResolver};
 use recapn_channel::mpsc;
 use recapn_channel::request::{self, ResponseReceiverFactory};
+use recapn_channel::{Chan, IntoResults, PipelineResolver};
 
 use crate::client::Client;
 use crate::connection;

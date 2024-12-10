@@ -2,17 +2,17 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::ptr::NonNull;
 
-use recapn::alloc::{self, Segment, AllocLen, Word};
+use recapn::alloc::{self, AllocLen, Segment, Word};
 use recapn::ptr::{PtrReader, ReturnErrors, StructSize};
 use recapn::{any, text, NotInSchema, ReaderOf};
 
 pub use crate::gen::capnp_schema_capnp as schema_capnp;
 
-use schema_capnp::{
-    Brand, Node, Field,
-    node::{Annotation, Const, Enum, Interface, Struct, Which as NodeKind},
-};
 use crate::Result;
+use schema_capnp::{
+    node::{Annotation, Const, Enum, Interface, Struct, Which as NodeKind},
+    Brand, Field, Node,
+};
 
 use self::schema_capnp::Value;
 
@@ -24,15 +24,17 @@ impl UncheckedNode {
     pub fn new(node: &ReaderOf<'_, Node>) -> Result<Self> {
         let size = node.as_ref().total_size()?;
         if size.caps != 0 {
-            return Err(recapn::Error::CapabilityNotAllowed)?
+            return Err(recapn::Error::CapabilityNotAllowed)?;
         }
 
-        let Some(len) = size.words
+        let Some(len) = size
+            .words
             .checked_add(1)
             .and_then(|s| u32::try_from(s).ok())
-            .and_then(AllocLen::new) else {
-                return Err(SchemaError::NodeTooLarge)?
-            };
+            .and_then(AllocLen::new)
+        else {
+            return Err(SchemaError::NodeTooLarge)?;
+        };
 
         let mut space = vec![Word::NULL; len.get() as usize].into_boxed_slice();
         let segment = Segment {
@@ -40,14 +42,14 @@ impl UncheckedNode {
             len: len.into(),
         };
         let alloc = unsafe { alloc::Scratch::with_segment(segment, alloc::Never) };
-    
+
         let mut message = recapn::message::Message::new(alloc);
         let mut builder = message.builder();
         builder
             .by_ref()
             .into_root()
             .try_set_struct::<Node, _, _>(node, ReturnErrors)?;
-    
+
         Ok(UncheckedNode { data: space })
     }
 
@@ -81,18 +83,22 @@ impl fmt::Display for SchemaError {
             SchemaError::DuplicateNode(id) => write!(f, "duplicate node {}", id),
             SchemaError::MissingNode(id) => write!(f, "missing node {}", id),
             SchemaError::InvalidNestedNode(id) => write!(f, "invalid nested node {}", id),
-            SchemaError::UnknownNodeType(NotInSchema(variant)) =>
-                write!(f, "unknown node type {}", variant),
-            SchemaError::UnknownType(NotInSchema(variant)) =>
-                write!(f, "unknown type {}", variant),
-            SchemaError::UnknownFieldType(NotInSchema(variant)) =>
-                write!(f, "unknown field type {}", variant),
-            SchemaError::UnknownAnyType(NotInSchema(variant)) =>
-                write!(f, "unknown any pointer type {}", variant),
-            SchemaError::UnknownPointerType(NotInSchema(variant)) =>
-                write!(f, "unknown unconstrained pointer type {}", variant),
-            SchemaError::UnknownScopeBinding(NotInSchema(variant)) =>
-                write!(f, "unknown scope binding {}", variant),
+            SchemaError::UnknownNodeType(NotInSchema(variant)) => {
+                write!(f, "unknown node type {}", variant)
+            }
+            SchemaError::UnknownType(NotInSchema(variant)) => write!(f, "unknown type {}", variant),
+            SchemaError::UnknownFieldType(NotInSchema(variant)) => {
+                write!(f, "unknown field type {}", variant)
+            }
+            SchemaError::UnknownAnyType(NotInSchema(variant)) => {
+                write!(f, "unknown any pointer type {}", variant)
+            }
+            SchemaError::UnknownPointerType(NotInSchema(variant)) => {
+                write!(f, "unknown unconstrained pointer type {}", variant)
+            }
+            SchemaError::UnknownScopeBinding(NotInSchema(variant)) => {
+                write!(f, "unknown scope binding {}", variant)
+            }
             SchemaError::UnexpectedNodeType => write!(f, "unexpected node type"),
             SchemaError::InvalidBrandType => write!(f, "invalid brand type"),
         }
@@ -110,13 +116,15 @@ pub struct SchemaLoader {
 
 impl SchemaLoader {
     pub fn new() -> Self {
-        Self { nodes: HashMap::new() }
+        Self {
+            nodes: HashMap::new(),
+        }
     }
 
     pub fn load(&mut self, node: &ReaderOf<'_, Node>) -> Result<()> {
         let id = node.id();
         if self.nodes.contains_key(&id) {
-            return Err(SchemaError::DuplicateNode(id))?
+            return Err(SchemaError::DuplicateNode(id))?;
         }
 
         let node = UncheckedNode::new(node)?;
@@ -126,7 +134,9 @@ impl SchemaLoader {
     }
 
     pub fn files(&self) -> impl Iterator<Item = FileSchema<'_>> + '_ {
-        self.nodes.values().filter_map(|n| FileSchema::from_node(n.get(), self))
+        self.nodes
+            .values()
+            .filter_map(|n| FileSchema::from_node(n.get(), self))
     }
 
     pub fn get(&self, id: Id) -> Option<ReaderOf<'_, Node>> {
@@ -155,20 +165,22 @@ impl SchemaLoader {
                         let mut bindings = Vec::new();
                         for (index, binding) in bind.into_iter().enumerate() {
                             use schema_capnp::brand::binding::Which;
-                            let binding = match binding.which().map_err(SchemaError::UnknownScopeBinding)? {
-                                Which::Type(ty) => {
-                                    let ty = ty.get();
-                                    self.resolve_type(&ty)?
-                                },
-                                Which::Unbound(()) => TypeKind::ScopeBound {
-                                    scope: scope_id,
-                                    index: index as u16,
-                                }.into(),
-                            };
+                            let binding =
+                                match binding.which().map_err(SchemaError::UnknownScopeBinding)? {
+                                    Which::Type(ty) => {
+                                        let ty = ty.get();
+                                        self.resolve_type(&ty)?
+                                    }
+                                    Which::Unbound(()) => TypeKind::ScopeBound {
+                                        scope: scope_id,
+                                        index: index as u16,
+                                    }
+                                    .into(),
+                                };
                             bindings.push(binding);
                         }
                         ScopeBranding::Bind(bindings)
-                    },
+                    }
                     Which::Inherit(()) => ScopeBranding::Inherit,
                 };
                 scopes.push((scope_id, branding));
@@ -179,13 +191,20 @@ impl SchemaLoader {
         Ok(Branding { scopes })
     }
 
-    pub fn gather_node_parameters<'a>(&'a self, node: &ReaderOf<'a, Node>) -> Result<VecDeque<Parameter<'a>>> {
+    pub fn gather_node_parameters<'a>(
+        &'a self,
+        node: &ReaderOf<'a, Node>,
+    ) -> Result<VecDeque<Parameter<'a>>> {
         let mut vec = VecDeque::new();
         let mut node = node.clone();
         while node.is_generic() {
             let scope = node.id();
             for (idx, p) in node.parameters().into_iter().enumerate().rev() {
-                vec.push_front(Parameter { scope, index: idx as u16, name: p.name().get() });
+                vec.push_front(Parameter {
+                    scope,
+                    index: idx as u16,
+                    name: p.name().get(),
+                });
             }
 
             let parent = node.scope_id();
@@ -208,16 +227,24 @@ impl SchemaLoader {
             match brand.find(scope) {
                 Some(ScopeBranding::Inherit) => {
                     for (idx, _) in params.into_iter().enumerate().rev() {
-                        vec.push_front(TypeKind::ScopeBound { scope, index: idx as u16 }.into());
+                        vec.push_front(
+                            TypeKind::ScopeBound {
+                                scope,
+                                index: idx as u16,
+                            }
+                            .into(),
+                        );
                     }
                 }
                 Some(ScopeBranding::Bind(bindings)) => {
                     assert_eq!(bindings.len(), params.len() as usize);
                     bindings.iter().for_each(|b| vec.push_front(b.clone()));
                 }
-                None => for _ in 0..params.len() {
-                    // no binding was found, so we just push any pointer for each generic
-                    vec.push_front(TypeKind::AnyPointer.into())
+                None => {
+                    for _ in 0..params.len() {
+                        // no binding was found, so we just push any pointer for each generic
+                        vec.push_front(TypeKind::AnyPointer.into())
+                    }
                 }
             }
 
@@ -228,10 +255,7 @@ impl SchemaLoader {
         Ok(vec)
     }
 
-    pub fn resolve_type<'a>(
-        &'a self,
-        ty: &ReaderOf<'a, schema_capnp::Type>,
-    ) -> Result<Type<'a>> {
+    pub fn resolve_type<'a>(&'a self, ty: &ReaderOf<'a, schema_capnp::Type>) -> Result<Type<'a>> {
         self.resolve_type_inner(ty, 0)
     }
 
@@ -258,40 +282,56 @@ impl SchemaLoader {
             Which::Data(()) => TypeKind::Data,
             Which::List(list) => {
                 let element_type = list.element_type().get();
-                return self.resolve_type_inner(&element_type, list_depth + 1)
-            },
+                return self.resolve_type_inner(&element_type, list_depth + 1);
+            }
             Which::Enum(e) => {
                 let ty = self.try_schema(e.type_id())?;
                 let brand = self.resolve_brand(&e.brand().get())?;
-                TypeKind::Enum { schema: Box::new(ty), parameters: brand }
-            },
+                TypeKind::Enum {
+                    schema: Box::new(ty),
+                    parameters: brand,
+                }
+            }
             Which::Struct(s) => {
                 let ty = self.try_schema(s.type_id())?;
                 let brand = self.resolve_brand(&s.brand().get())?;
-                TypeKind::Struct { schema: Box::new(ty), parameters: brand }
-            },
+                TypeKind::Struct {
+                    schema: Box::new(ty),
+                    parameters: brand,
+                }
+            }
             Which::Interface(i) => {
                 let ty = self.try_schema(i.type_id())?;
                 let brand = self.resolve_brand(&i.brand().get())?;
-                TypeKind::Interface { schema: Box::new(ty), parameters: brand }
-            },
+                TypeKind::Interface {
+                    schema: Box::new(ty),
+                    parameters: brand,
+                }
+            }
             Which::AnyPointer(any) => {
                 use schema_capnp::r#type::any_pointer::Which;
                 match any.which().map_err(SchemaError::UnknownPointerType)? {
                     Which::Unconstrained(unconstrained) => {
                         use schema_capnp::r#type::any_pointer::unconstrained::Which;
-                        match unconstrained.which().map_err(SchemaError::UnknownPointerType)? {
+                        match unconstrained
+                            .which()
+                            .map_err(SchemaError::UnknownPointerType)?
+                        {
                             Which::AnyKind(()) => TypeKind::AnyPointer,
                             Which::Struct(()) => TypeKind::AnyStruct,
                             Which::List(()) => TypeKind::AnyList,
                             Which::Capability(()) => TypeKind::AnyCapability,
                         }
-                    },
+                    }
                     Which::Parameter(param) => TypeKind::ScopeBound {
-                        scope: param.scope_id(), index: param.parameter_index(),
+                        scope: param.scope_id(),
+                        index: param.parameter_index(),
                     },
-                    Which::ImplicitMethodParameter(method_param) =>
-                        TypeKind::ImplicitMethodParameter { index: method_param.parameter_index() },
+                    Which::ImplicitMethodParameter(method_param) => {
+                        TypeKind::ImplicitMethodParameter {
+                            index: method_param.parameter_index(),
+                        }
+                    }
                 }
             }
         };
@@ -357,7 +397,11 @@ pub trait Schema<'a>: Sized {
 
             macro_rules! ctor {
                 ($ty:ident, $info:expr) => {
-                    $ty { node, info: $info, loader }
+                    $ty {
+                        node,
+                        info: $info,
+                        loader,
+                    }
                 };
             }
 
@@ -393,7 +437,10 @@ pub struct Type<'a> {
 
 impl<'a> From<TypeKind<'a>> for Type<'a> {
     fn from(value: TypeKind<'a>) -> Self {
-        Type { list_depth: 0, kind: value }
+        Type {
+            list_depth: 0,
+            kind: value,
+        }
     }
 }
 
@@ -450,14 +497,24 @@ impl Type<'_> {
     /// Returns whether a field of this type would be placed in the data section of a struct
     pub fn is_data_field(&self) -> bool {
         if self.list_depth != 0 {
-            return false
+            return false;
         }
 
         use TypeKind::*;
         matches!(
             &self.kind,
-            Void | Bool | Int8 | Int16 | Int32 | Int64 | Uint8 | Uint16 | Uint32 | Uint64 |
-            Float32 | Float64 | Enum { .. }
+            Void | Bool
+                | Int8
+                | Int16
+                | Int32
+                | Int64
+                | Uint8
+                | Uint16
+                | Uint32
+                | Uint64
+                | Float32
+                | Float64
+                | Enum { .. }
         )
     }
 
@@ -473,10 +530,7 @@ pub struct FileSchema<'a> {
 
 impl<'a> Schema<'a> for FileSchema<'a> {
     #[inline]
-    fn from_node(
-        node: ReaderOf<'a, Node>,
-        loader: &'a SchemaLoader,
-    ) -> Option<Self> {
+    fn from_node(node: ReaderOf<'a, Node>, loader: &'a SchemaLoader) -> Option<Self> {
         node.file().is_set().then(|| Self { node, loader })
     }
 
@@ -503,10 +557,7 @@ macro_rules! schema_type {
 
         impl<'a> Schema<'a> for $schema<'a> {
             #[inline]
-            fn from_node(
-                node: ReaderOf<'a, Node>,
-                loader: &'a SchemaLoader,
-            ) -> Option<Self> {
+            fn from_node(node: ReaderOf<'a, Node>, loader: &'a SchemaLoader) -> Option<Self> {
                 node.$fn().get().map(|info| Self { node, info, loader })
             }
 
@@ -526,7 +577,10 @@ schema_type!(StructSchema, Struct, r#struct);
 
 impl<'a> StructSchema<'a> {
     pub fn struct_size(&self) -> StructSize {
-        StructSize { data: self.info.data_word_count(), ptrs: self.info.pointer_count() }
+        StructSize {
+            data: self.info.data_word_count(),
+            ptrs: self.info.pointer_count(),
+        }
     }
 
     pub fn is_group(&self) -> bool {
@@ -534,7 +588,10 @@ impl<'a> StructSchema<'a> {
     }
 
     pub fn fields(&self) -> impl Iterator<Item = FieldSchema<'a, '_>> + '_ {
-        self.info.fields().into_iter().map(|info| FieldSchema { parent: self, info })
+        self.info
+            .fields()
+            .into_iter()
+            .map(|info| FieldSchema { parent: self, info })
     }
 }
 
@@ -551,22 +608,25 @@ impl<'a> FieldSchema<'a, '_> {
     }
 
     pub fn field_type(&self) -> Result<FieldType<'a>> {
-        Ok(match self.info.which().map_err(SchemaError::UnknownFieldType)? {
-            schema_capnp::field::Which::Slot(slot) => {
-                let ty = slot.r#type().get();
-                FieldType::Slot {
-                    offset: slot.offset(),
-                    field_type: self.parent.loader.resolve_type(&ty)?,
-                    default_value: slot.had_explicit_default()
-                        .then(|| slot.default_value().get_option())
-                        .flatten(),
+        Ok(
+            match self.info.which().map_err(SchemaError::UnknownFieldType)? {
+                schema_capnp::field::Which::Slot(slot) => {
+                    let ty = slot.r#type().get();
+                    FieldType::Slot {
+                        offset: slot.offset(),
+                        field_type: self.parent.loader.resolve_type(&ty)?,
+                        default_value: slot
+                            .had_explicit_default()
+                            .then(|| slot.default_value().get_option())
+                            .flatten(),
+                    }
+                }
+                schema_capnp::field::Which::Group(group) => {
+                    let ty = self.parent.loader.try_schema(group.type_id())?;
+                    FieldType::Group(ty)
                 }
             },
-            schema_capnp::field::Which::Group(group) => {
-                let ty = self.parent.loader.try_schema(group.type_id())?;
-                FieldType::Group(ty)
-            },
-        })
+        )
     }
 
     pub fn discriminant(&self) -> Option<u16> {
@@ -598,9 +658,7 @@ impl<'a> EnumSchema<'a> {
 
 schema_type!(InterfaceSchema, Interface, interface);
 
-impl<'a> InterfaceSchema<'a> {
-
-}
+impl<'a> InterfaceSchema<'a> {}
 
 schema_type!(ConstSchema, Const, r#const);
 

@@ -306,7 +306,7 @@ to_tokens!(
                 impl _p::ty::SchemaType for #name {
                     const ID: u64 = #id;
                 }
-    
+
                 impl<T> _p::IntoFamily for #name<T> {
                     type Family = #name;
                 }
@@ -695,7 +695,11 @@ pub struct GeneratedEnum {
 
 to_tokens!(
     GeneratedEnum | self | {
-        let GeneratedEnum { id, name, enumerants } = self;
+        let GeneratedEnum {
+            id,
+            name,
+            enumerants,
+        } = self;
         let enum_matches = self.enumerants.iter().enumerate().map(|(value, ident)| {
             let value = value as u16;
             quote!(#value => Ok(Self::#ident))

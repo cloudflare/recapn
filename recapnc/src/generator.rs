@@ -14,7 +14,6 @@ use recapn::{any, data, text, ReaderOf};
 use syn::punctuated::Punctuated;
 use syn::PathSegment;
 
-use crate::{Error, Result};
 use crate::quotes::{
     FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem,
     GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich,
@@ -22,8 +21,9 @@ use crate::quotes::{
 use crate::schema::{
     schema_capnp, AnnotationSchema, ConstSchema, EnumSchema, FieldType, FileSchema, Id,
     InterfaceSchema, NamedNestedItem, NestedItem, Schema, SchemaError, SchemaLoader, StructSchema,
-    Type, TypeKind
+    Type, TypeKind,
 };
+use crate::{Error, Result};
 
 pub mod ident;
 
@@ -165,7 +165,7 @@ impl NodeInfo {
             panic!("expected struct node info")
         }
     }
-    
+
     pub fn unwrap_enum(&self) -> &EnumInfo {
         if let Self::Enum(info) = self {
             info
@@ -188,24 +188,20 @@ type NodeInfoMap = HashMap<u64, NodeInfo>;
 #[derive(Debug)]
 pub enum NameContext {
     Node(Id),
-    Field {
-        type_id: Id,
-        index: u32,
-    },
-    Enumerant {
-        type_id: Id,
-        index: u32,
-    },
+    Field { type_id: Id, index: u32 },
+    Enumerant { type_id: Id, index: u32 },
 }
 
 impl fmt::Display for NameContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Node(id) => write!(f, "node {:0<#16x}", id),
-            Self::Field { type_id, index } =>
-                write!(f, "field @{} in struct @{:0<#16x}", index, type_id),
-            Self::Enumerant { type_id, index } =>
-                write!(f, "enumerant @{} in enum @{:0<#16x}", index, type_id),
+            Self::Field { type_id, index } => {
+                write!(f, "field @{} in struct @{:0<#16x}", index, type_id)
+            }
+            Self::Enumerant { type_id, index } => {
+                write!(f, "enumerant @{} in enum @{:0<#16x}", index, type_id)
+            }
         }
     }
 }
@@ -228,17 +224,19 @@ fn validate_file(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
-    let path = schema.node
-        .display_name()
-        .get()
-        .as_str()
-        .map_err(|error| GeneratorError::InvalidName {
-            context: NameContext::Node(id),
-            error,
-        })?;
+    let path =
+        schema
+            .node
+            .display_name()
+            .get()
+            .as_str()
+            .map_err(|error| GeneratorError::InvalidName {
+                context: NameContext::Node(id),
+                error,
+            })?;
     let mod_ident = identifiers.make_unique(None, &path)?;
     let file_path = format!("{path}.rs");
     entry.insert(NodeInfo::File(FileInfo {
@@ -246,10 +244,7 @@ fn validate_file(
         path: file_path,
     }));
 
-    let mut scope = Scope::file(ModScope {
-        id,
-        mod_ident,
-    });
+    let mut scope = Scope::file(ModScope { id, mod_ident });
 
     for nested in schema.nested_items() {
         let nested = match nested {
@@ -271,15 +266,23 @@ fn validate_item(
     identifiers: &mut ScopedIdentifierSet<ModScope>,
     scope: &mut TypeScope,
 ) -> Result<()> {
-    let name = node.name.as_str().map_err(|error| GeneratorError::InvalidName {
-        context: NameContext::Node(node.id), error
-    })?;
+    let name = node
+        .name
+        .as_str()
+        .map_err(|error| GeneratorError::InvalidName {
+            context: NameContext::Node(node.id),
+            error,
+        })?;
     match &node.item {
         NestedItem::Struct(schema) => validate_struct(schema, name, nodes, identifiers, scope),
         NestedItem::Enum(schema) => validate_enum(schema, name, nodes, identifiers, scope),
-        NestedItem::Interface(schema) => validate_interface(schema, name, nodes, identifiers, scope),
+        NestedItem::Interface(schema) => {
+            validate_interface(schema, name, nodes, identifiers, scope)
+        }
         NestedItem::Const(schema) => validate_const(schema, name, nodes, identifiers, scope),
-        NestedItem::Annotation(schema) => validate_annotation(schema, name, nodes, identifiers, scope),
+        NestedItem::Annotation(schema) => {
+            validate_annotation(schema, name, nodes, identifiers, scope)
+        }
     }
 }
 
@@ -292,7 +295,7 @@ fn validate_struct(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
     let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
@@ -324,9 +327,16 @@ fn validate_struct(
     // have to iter over all fields and find all the groups contained
     for (idx, field) in schema.fields().enumerate() {
         if let FieldType::Group(schema) = field.field_type()? {
-            let name = field.name().as_str().map_err(|error| GeneratorError::InvalidName {
-                context: NameContext::Field { type_id: id, index: idx as u32 }, error
-            })?;
+            let name = field
+                .name()
+                .as_str()
+                .map_err(|error| GeneratorError::InvalidName {
+                    context: NameContext::Field {
+                        type_id: id,
+                        index: idx as u32,
+                    },
+                    error,
+                })?;
             validate_struct(&schema, name, nodes, identifiers, scope)?;
         }
     }
@@ -344,20 +354,24 @@ fn validate_enum(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
-    let type_ident =
-        identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+    let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
 
     let enumerants = {
         let mut idents = IdentifierSet::new();
-        schema.enumerants()
+        schema
+            .enumerants()
             .into_iter()
             .enumerate()
             .map(|(idx, name)| {
                 let name = name.as_str().map_err(|error| GeneratorError::InvalidName {
-                    context: NameContext::Enumerant { type_id: id, index: idx as u32 }, error
+                    context: NameContext::Enumerant {
+                        type_id: id,
+                        index: idx as u32,
+                    },
+                    error,
                 })?;
                 let ident = idents.make_unique(AsPascalCase(name))?;
                 Ok(ident)
@@ -385,7 +399,7 @@ fn validate_interface(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
     entry.insert(NodeInfo::Interface(InterfaceInfo {}));
@@ -404,7 +418,7 @@ fn validate_const(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
     entry.insert(NodeInfo::Const(ConstInfo {
@@ -424,7 +438,7 @@ fn validate_annotation(
 ) -> Result<()> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
-        return Err(SchemaError::DuplicateNode(id))?
+        return Err(SchemaError::DuplicateNode(id))?;
     };
 
     entry.insert(NodeInfo::Annotation(AnnotationInfo {}));
@@ -434,7 +448,9 @@ fn validate_annotation(
 }
 
 macro_rules! quote_none {
-    () => { syn::parse_quote!(::core::option::Option::None) };
+    () => {
+        syn::parse_quote!(::core::option::Option::None)
+    };
 }
 
 /// Context related to generating a single file
@@ -473,7 +489,9 @@ impl GeneratorContext {
     }
 
     fn find_info(&self, id: Id) -> Result<&NodeInfo> {
-        self.info.get(&id).ok_or(SchemaError::MissingNode(id).into())
+        self.info
+            .get(&id)
+            .ok_or(SchemaError::MissingNode(id).into())
     }
 
     pub fn generate_file(&self, id: u64) -> Result<(GeneratedFile, GeneratedRootFile)> {
@@ -485,7 +503,9 @@ impl GeneratorContext {
             ident: info.mod_ident.clone(),
         };
 
-        let mut ctx = FileContext { required_imports: BTreeSet::new() };
+        let mut ctx = FileContext {
+            required_imports: BTreeSet::new(),
+        };
 
         for nested in schema.nested_items() {
             let nested = nested?;
@@ -518,15 +538,15 @@ impl GeneratorContext {
             NestedItem::Struct(schema) => {
                 let generated = self.generate_struct(&schema, info.unwrap_struct(), ctx)?;
                 Ok(Some(GeneratedItem::Struct(generated)))
-            },
+            }
             NestedItem::Enum(schema) => {
                 let generated = self.generate_enum(&schema, info.unwrap_enum(), ctx)?;
                 Ok(Some(GeneratedItem::Enum(generated)))
-            },
+            }
             NestedItem::Const(schema) => {
                 let generated = self.generate_const(&schema, info.unwrap_const(), ctx)?;
                 Ok(Some(GeneratedItem::Const(generated)))
-            },
+            }
             NestedItem::Interface(_) => Ok(None),
             NestedItem::Annotation(_) => Ok(None),
         }
@@ -565,7 +585,9 @@ impl GeneratorContext {
 
         generated.fields.reserve(fields.len());
         for (idx, field) in fields {
-            let name = field.name().as_str()
+            let name = field
+                .name()
+                .as_str()
                 .map_err(|error| GeneratorError::InvalidName {
                     context: NameContext::Field {
                         type_id: schema.node.id(),
@@ -602,7 +624,9 @@ impl GeneratorContext {
             };
             which.fields.reserve(variants.len());
             for (idx, field) in variants {
-                let name = field.name().as_str()
+                let name = field
+                    .name()
+                    .as_str()
                     .map_err(|error| GeneratorError::InvalidName {
                         context: NameContext::Field {
                             type_id: schema.node.id(),
@@ -611,7 +635,7 @@ impl GeneratorContext {
                         error,
                     })?;
                 let discriminant_ident = discriminant_idents.make_unique(AsPascalCase(name))?;
-                
+
                 let field_type = field.field_type()?;
                 let generated_field = self.generate_field(
                     &field_type,
@@ -673,22 +697,27 @@ impl GeneratorContext {
             FieldType::Group(..) => {
                 has_own_accessor = true;
                 descriptor = None;
-            },
-            FieldType::Slot { field_type, offset, default_value } => {
+            }
+            FieldType::Slot {
+                field_type,
+                offset,
+                default_value,
+            } => {
                 has_own_accessor = field_type.is_ptr_field();
                 let void_field = matches!(
                     field_type,
-                    Type { list_depth: 0, kind: TypeKind::Void },
+                    Type {
+                        list_depth: 0,
+                        kind: TypeKind::Void
+                    },
                 );
                 descriptor = if void_field {
                     None
                 } else {
                     let default_value = match default_value {
-                        Some(default) => self.generate_field_default_value(
-                            scope,
-                            &field_type,
-                            &default,
-                        ),
+                        Some(default) => {
+                            self.generate_field_default_value(scope, &field_type, &default)
+                        }
                         None => self.generate_field_default_for_type(scope, &field_type),
                     }?;
                     Some(FieldDescriptor {
@@ -696,7 +725,7 @@ impl GeneratorContext {
                         default: default_value,
                     })
                 };
-            },
+            }
         };
         let syn_type = self.resolve_field_type(scope, field_type, ctx)?;
         let own_accessor_ident = if has_own_accessor {
@@ -726,10 +755,10 @@ impl GeneratorContext {
                 let group_type = &self.find_info(group.node.id())?.unwrap_struct().type_info;
                 let path = group_type.resolve_path(scope);
                 Box::new(syn::parse_quote!(_p::Group<#path>))
-            },
+            }
             FieldType::Slot { field_type, .. } => {
                 self.resolve_type(scope, &field_type, TypeContext::Field, ctx)?
-            },
+            }
         })
     }
 
@@ -765,7 +794,7 @@ impl GeneratorContext {
                 } else {
                     syn::parse_quote!(_p::Enum<#path>)
                 }
-            },
+            }
             TypeKind::Data => syn::parse_quote!(_p::Data),
             TypeKind::Text => syn::parse_quote!(_p::Text),
             TypeKind::Struct { schema, .. } => {
@@ -776,7 +805,7 @@ impl GeneratorContext {
 
                 let path = type_info.resolve_path(scope);
                 syn::parse_quote!(_p::Struct<#path>)
-            },
+            }
             TypeKind::Interface { .. } => syn::parse_quote!(_p::AnyPtr), // TODO
             TypeKind::AnyPointer => syn::parse_quote!(_p::AnyPtr),
             TypeKind::AnyStruct => syn::parse_quote!(_p::AnyStruct),
@@ -800,7 +829,7 @@ impl GeneratorContext {
         info: &Type<'_>,
     ) -> Result<Box<syn::Expr>> {
         if info.list_depth != 0 {
-            return Ok(quote_none!())
+            return Ok(quote_none!());
         }
         use TypeKind::*;
         let tokens = match &info.kind {
@@ -822,9 +851,17 @@ impl GeneratorContext {
                 let enumerant = &info.enumerants[0];
 
                 syn::parse_quote!(#type_name::#enumerant)
-            },
-            Data | Text | Struct { .. } | Interface { .. } | AnyPointer | AnyStruct | AnyList |
-            AnyCapability | ScopeBound { .. } | ImplicitMethodParameter { .. } => quote_none!(),
+            }
+            Data
+            | Text
+            | Struct { .. }
+            | Interface { .. }
+            | AnyPointer
+            | AnyStruct
+            | AnyList
+            | AnyCapability
+            | ScopeBound { .. }
+            | ImplicitMethodParameter { .. } => quote_none!(),
         };
 
         Ok(tokens)
@@ -837,7 +874,8 @@ impl GeneratorContext {
         value: &ReaderOf<'_, schema_capnp::Value>,
     ) -> Result<Box<syn::Expr>> {
         if type_info.is_list() {
-            let value = value.list()
+            let value = value
+                .list()
                 .field()
                 .and_then(|v| v.ptr().read_option_as::<AnyList>())
                 .filter(|l| !l.is_empty());
@@ -859,15 +897,14 @@ impl GeneratorContext {
                         Int16 | Uint16 | Enum { .. } => ElementSize::TwoBytes,
                         Int32 | Uint32 | Float32 => ElementSize::FourBytes,
                         Int64 | Uint64 | Float64 => ElementSize::EightBytes,
-                        Struct { schema, .. } =>
-                            ElementSize::InlineComposite(schema.struct_size()),
+                        Struct { schema, .. } => ElementSize::InlineComposite(schema.struct_size()),
                         AnyStruct => {
                             assert!(
                                 value_element_size.is_inline_composite(),
                                 "expected inline composite elements for list of any struct"
                             );
                             value_element_size
-                        },
+                        }
                         _ => ElementSize::Pointer,
                     }
                 };
@@ -882,7 +919,7 @@ impl GeneratorContext {
         }
 
         if type_info.is_data_field() {
-            return self.generate_data_value(scope, &type_info.kind, value)
+            return self.generate_data_value(scope, &type_info.kind, value);
         }
 
         // Now we just need to handle the other pointer field types!
@@ -892,61 +929,79 @@ impl GeneratorContext {
                 .field()
                 .map(|v| v.get())
                 .filter(|t| !t.is_empty())
-                .map_or_else(|| quote_none!(), |text| {
-                    let expr = text_to_expr(text);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
+                .map_or_else(
+                    || quote_none!(),
+                    |text| {
+                        let expr = text_to_expr(text);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
             TypeKind::Data => value
                 .data()
                 .field()
                 .map(|v| v.get())
                 .filter(|d| !d.is_empty())
-                .map_or_else(|| quote_none!(), |data| {
-                    let expr = data_to_expr(data);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
+                .map_or_else(
+                    || quote_none!(),
+                    |data| {
+                        let expr = data_to_expr(data);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
             TypeKind::Struct { schema, .. } => value
                 .r#struct()
                 .field()
                 .and_then(|f| f.ptr().read_option_as::<AnyStruct>())
                 .filter(|s| !s.as_ref().size().is_empty())
-                .map_or_else(|| quote_none!(), |s| {
-                    assert_eq!(schema.struct_size(), s.as_ref().size());
+                .map_or_else(
+                    || quote_none!(),
+                    |s| {
+                        assert_eq!(schema.struct_size(), s.as_ref().size());
 
-                    let expr = generate_untyped_struct_value(&s);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
+                        let expr = generate_untyped_struct_value(&s);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
             TypeKind::AnyPointer => value
                 .any_pointer()
                 .field()
                 .map(|f| f.ptr())
                 .filter(|p| p.is_null())
-                .map_or_else(|| quote_none!(), |p| {
-                    let expr = generate_untyped_ptr_value(&p);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
+                .map_or_else(
+                    || quote_none!(),
+                    |p| {
+                        let expr = generate_untyped_ptr_value(&p);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
             TypeKind::AnyStruct => value
                 .any_pointer()
                 .field()
                 .and_then(|p| p.ptr().read_option_as::<AnyStruct>())
                 .filter(|s| !s.as_ref().size().is_empty())
-                .map_or_else(|| quote_none!(), |s| {
-                    let expr = generate_untyped_struct_value(&s);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
+                .map_or_else(
+                    || quote_none!(),
+                    |s| {
+                        let expr = generate_untyped_struct_value(&s);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
             TypeKind::AnyList => value
                 .any_pointer()
                 .field()
                 .and_then(|p| p.ptr().read_option_as::<AnyList>())
                 .filter(|s| !s.is_empty())
-                .map_or_else(|| quote_none!(), |l| {
-                    let expr = generate_untyped_list_value(&l);
-                    syn::parse_quote!(::core::option::Option::Some(#expr))
-                }),
-            TypeKind::Interface { .. } |
-            TypeKind::AnyCapability |
-            TypeKind::ScopeBound { .. } |
-            TypeKind::ImplicitMethodParameter { .. } => quote_none!(),
+                .map_or_else(
+                    || quote_none!(),
+                    |l| {
+                        let expr = generate_untyped_list_value(&l);
+                        syn::parse_quote!(::core::option::Option::Some(#expr))
+                    },
+                ),
+            TypeKind::Interface { .. }
+            | TypeKind::AnyCapability
+            | TypeKind::ScopeBound { .. }
+            | TypeKind::ImplicitMethodParameter { .. } => quote_none!(),
             _ => unimplemented!(),
         };
 
@@ -988,7 +1043,7 @@ impl GeneratorContext {
 
                 syn::parse_quote!(#type_path::#enumerant)
             }
-            _ => unimplemented!()
+            _ => unimplemented!(),
         };
 
         Ok(expr)
@@ -1032,44 +1087,34 @@ impl GeneratorContext {
         value: &ReaderOf<'_, schema_capnp::Value>,
     ) -> Result<Box<syn::Expr>> {
         if type_info.is_data_field() {
-            return self.generate_data_value(scope, &type_info.kind, value)
+            return self.generate_data_value(scope, &type_info.kind, value);
         }
 
         let ptr = if type_info.is_list() {
-            value.list()
+            value
+                .list()
                 .field()
-                .map_or_else(
-                    || any::PtrReader::default(),
-                    |f| f.ptr(),
-                )
+                .map_or_else(|| any::PtrReader::default(), |f| f.ptr())
         } else {
             // Extract the correct pointer value field.
             match type_info.kind {
-                TypeKind::Text => value.text()
+                TypeKind::Text => value
+                    .text()
                     .field()
-                    .map_or_else(
-                        || any::PtrReader::default(),
-                        |f| f.ptr(),
-                    ),
-                TypeKind::Data => value.data()
+                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                TypeKind::Data => value
+                    .data()
                     .field()
-                    .map_or_else(
-                        || any::PtrReader::default(),
-                        |f| f.ptr(),
-                    ),
-                TypeKind::Struct { .. } => value.r#struct()
+                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                TypeKind::Struct { .. } => value
+                    .r#struct()
                     .field()
-                    .map_or_else(
-                        || any::PtrReader::default(),
-                        |f| f.ptr(),
-                    ),
+                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
                 TypeKind::Interface { .. } => any::PtrReader::default(),
-                _ => value.any_pointer()
+                _ => value
+                    .any_pointer()
                     .field()
-                    .map_or_else(
-                        || any::PtrReader::default(),
-                        |f| f.ptr(),
-                    ),
+                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
             }
         };
 
@@ -1095,19 +1140,13 @@ fn words_lit(words: &[Word]) -> TokenStream {
 }
 
 fn text_to_expr(text: text::Reader<'_>) -> Box<syn::Expr> {
-    let bytes = syn::LitByteStr::new(
-        text.as_bytes_with_nul(),
-        proc_macro2::Span::call_site(),
-    );
+    let bytes = syn::LitByteStr::new(text.as_bytes_with_nul(), proc_macro2::Span::call_site());
 
     syn::parse_quote!(_p::text::Reader::from_slice(#bytes))
 }
 
 fn data_to_expr(data: data::Reader<'_>) -> Box<syn::Expr> {
-    let bytes = syn::LitByteStr::new(
-        data.as_ref(),
-        proc_macro2::Span::call_site(),
-    );
+    let bytes = syn::LitByteStr::new(data.as_ref(), proc_macro2::Span::call_site());
 
     syn::parse_quote!(_p::data::Reader::from_slice(#bytes))
 }
