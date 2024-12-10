@@ -7,7 +7,7 @@ use recapn::any;
 use recapn::message::{Message, ReaderOptions};
 use recapn::rpc::{Capable, Pipelinable, TypedPipeline};
 use recapn::{message, rpc, ty, BuilderOf, ReaderOf};
-use recapn_channel::{mpsc, request_response, request_pipeline, request_response_pipeline};
+use recapn_channel::{mpsc, request_pipeline, request_response, request_response_pipeline};
 use std::future::{Future, IntoFuture};
 use std::marker::PhantomData;
 use std::pin::Pin;

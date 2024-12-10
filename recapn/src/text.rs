@@ -77,9 +77,9 @@ impl<'a> Reader<'a> {
         match s {
             [.., 0] => match ptr::Reader::new(s) {
                 Some(r) => return Self(r),
-                None => {},
+                None => {}
             },
-            _ => {},
+            _ => {}
         }
 
         panic!("attempted to make invalid text blob from slice")
@@ -215,7 +215,7 @@ impl<'a> Builder<'a> {
     pub const fn as_bytes(&self) -> &[u8] {
         let Some((_, remainder)) = self.as_bytes_with_nul().split_last() else {
             // Originally we would panic here, but really anything is valid
-            return &[]
+            return &[];
         };
         remainder
     }

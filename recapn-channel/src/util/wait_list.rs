@@ -3,7 +3,7 @@ use std::marker::PhantomPinned;
 use std::pin::{pin, Pin};
 use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Acquire, Release, Relaxed};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::task::{Context, Waker};
 
 use parking_lot::Mutex;

@@ -409,17 +409,16 @@ pub mod generator;
 pub mod quotes;
 pub mod schema;
 
-
+use quote::ToTokens;
+use recapn::io::{self, StreamOptions};
+use recapn::message::{Reader, ReaderOptions};
+use recapn::ReaderOf;
 use std::ffi::{OsStr, OsString};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::{env, fs};
 use thiserror::Error;
-use quote::ToTokens;
-use recapn::io::{self, StreamOptions};
-use recapn::message::{Reader, ReaderOptions};
-use recapn::ReaderOf;
 
 use gen::capnp_schema_capnp::CodeGeneratorRequest;
 use generator::GeneratorContext;
@@ -467,7 +466,10 @@ pub fn generate_from_request(
         }
 
         if let Err(err) = fs::write(&out_path, printable) {
-            return Err(Error::FileWrite { path: out_path, error: err })
+            return Err(Error::FileWrite {
+                path: out_path,
+                error: err,
+            });
         }
 
         root_mod.files.push(root);
@@ -480,7 +482,10 @@ pub fn generate_from_request(
 
     let mod_path = out.join("mod.rs");
     if let Err(error) = fs::write(&mod_path, printable) {
-        return Err(Error::FileWrite { path: mod_path, error })
+        return Err(Error::FileWrite {
+            path: mod_path,
+            error,
+        });
     }
 
     Ok(())

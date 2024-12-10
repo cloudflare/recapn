@@ -81,7 +81,9 @@ mod internal {
     pub trait BuildAccessable: Accessable {
         unsafe fn set_variant(&mut self, variant: &VariantInfo);
 
-        type ByRef<'b> where Self: 'b;
+        type ByRef<'b>
+        where
+            Self: 'b;
         fn by_ref<'b>(&'b mut self) -> Self::ByRef<'b>;
     }
 
@@ -930,7 +932,10 @@ impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrField<V, B> {
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, B::Table>) -> Orphan<'c, V, B::Table> {
+    pub fn disown_into<'c>(
+        &mut self,
+        orphanage: &Orphanage<'c, B::Table>,
+    ) -> Orphan<'c, V, B::Table> {
         Orphan::new(self.raw_build_ptr().disown_into(orphanage))
     }
 
@@ -1022,7 +1027,9 @@ impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrVariant<V, B> {
     fn set_case(&mut self) -> bool {
         let is_set = self.is_set();
         if !is_set {
-            unsafe { self.repr.set_variant(self.variant); }
+            unsafe {
+                self.repr.set_variant(self.variant);
+            }
         }
         is_set
     }
@@ -1069,7 +1076,10 @@ impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrVariant<V, B> {
     }
 
     #[inline]
-    pub fn disown_into<'c>(&mut self, orphanage: &Orphanage<'c, B::Table>) -> Option<Orphan<'c, V, B::Table>> {
+    pub fn disown_into<'c>(
+        &mut self,
+        orphanage: &Orphanage<'c, B::Table>,
+    ) -> Option<Orphan<'c, V, B::Table>> {
         self.raw_build_ptr()
             .map(|mut p| Orphan::new(p.disown_into(orphanage)))
     }
@@ -1078,7 +1088,7 @@ impl<'b, B: BuildAccessablePtr<'b>, V: PtrValue> PtrVariant<V, B> {
     pub fn try_clear<E: ErrorHandler>(&mut self, err_handler: E) -> Result<(), E::Error> {
         match self.raw_build_ptr() {
             Some(mut ptr) => ptr.try_clear(err_handler),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 
@@ -1296,7 +1306,7 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>, V: ty::ListValue> PtrFi
     pub fn try_init(self, count: u32) -> Result<list::Builder<'b, V, T>, TooManyElementsError> {
         let size = V::ELEMENT_SIZE;
         if count > size.max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
         let count = ElementCount::new(count).unwrap();
 
@@ -1310,7 +1320,10 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>, V: ty::ListValue> PtrFi
     #[inline]
     pub fn init_with_size(self, count: u32, size: ElementSize) -> list::Builder<'b, V, T> {
         assert_eq!(V::ELEMENT_SIZE.upgrade_to(size), Some(size));
-        assert!(count < size.max_elements().get(), "too many elements for list");
+        assert!(
+            count < size.max_elements().get(),
+            "too many elements for list"
+        );
         let count = ElementCount::new(count).unwrap();
         List::new(self.into_raw_build_ptr().init_list(size, count))
     }
@@ -1323,15 +1336,13 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<List<AnyStruct
     pub fn get(self, size: StructSize) -> list::Builder<'b, AnyStruct, T> {
         let size = ElementSize::InlineComposite(size);
         let default = &self.descriptor.default;
-        let ptr = match self
-            .into_raw_build_ptr()
-            .to_list_mut(Some(size))
-        {
+        let ptr = match self.into_raw_build_ptr().to_list_mut(Some(size)) {
             Ok(ptr) => ptr,
             Err((_, ptr)) => {
                 if let Some(default) = default {
                     let default_size = default.element_size();
-                    let size = default_size.upgrade_to(size)
+                    let size = default_size
+                        .upgrade_to(size)
                         .expect("default value should be upgradable to struct list");
                     let mut builder = ptr.init_list(size, default.len());
                     builder.try_copy_from(default, UnwrapErrors).unwrap();
@@ -1350,11 +1361,8 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<List<AnyStruct
         value: &list::Reader<'_, AnyStruct, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.raw_build_ptr().try_set_list(
-            value.as_ref(),
-            CopySize::FromValue,
-            err_handler,
-        )
+        self.raw_build_ptr()
+            .try_set_list(value.as_ref(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -1376,7 +1384,7 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<List<AnyStruct
     ) -> Result<list::Builder<'b, AnyStruct, T>, TooManyElementsError> {
         let size = ElementSize::InlineComposite(size);
         if count > size.max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
         let count = ElementCount::new(count).unwrap();
 
@@ -1414,7 +1422,7 @@ where
     pub fn try_init(self, count: u32) -> Result<list::Builder<'b, V, T>, TooManyElementsError> {
         let size = V::ELEMENT_SIZE;
         if count > size.max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
 
         Ok(self.init_case().init(count))
@@ -1443,7 +1451,8 @@ where
 
     #[inline]
     pub fn init(self, size: StructSize, count: u32) -> list::Builder<'b, AnyStruct, T> {
-        self.try_init(size, count).expect("too many elements for list")
+        self.try_init(size, count)
+            .expect("too many elements for list")
     }
 
     #[inline]
@@ -1453,7 +1462,7 @@ where
         count: u32,
     ) -> Result<list::Builder<'b, AnyStruct, T>, TooManyElementsError> {
         if count > ElementSize::InlineComposite(size).max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
 
         Ok(self.init_case().init(size, count))
@@ -1656,8 +1665,11 @@ where
         value: &S::Reader<'_, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.set_case_and_build_ptr()
-            .try_set_struct(value.as_ptr(), CopySize::Minimum(S::SIZE), err_handler)
+        self.set_case_and_build_ptr().try_set_struct(
+            value.as_ptr(),
+            CopySize::Minimum(S::SIZE),
+            err_handler,
+        )
     }
 
     #[inline]
@@ -1713,8 +1725,7 @@ impl<'p, T: Table> PtrFieldReader<'_, 'p, T, text::Text> {
     pub fn try_get_option(&self) -> Result<Option<text::Reader<'p>>> {
         match self.raw_ptr().to_blob() {
             Ok(Some(ptr)) => {
-                let text =
-                    text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
+                let text = text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
 
                 Ok(Some(text))
             }
@@ -1827,8 +1838,7 @@ impl<'p, T: Table> PtrVariantReader<'_, 'p, T, text::Text> {
     pub fn try_get_option(&self) -> Result<Option<text::Reader<'p>>> {
         match self.raw_ptr_or_null().to_blob() {
             Ok(Some(ptr)) => {
-                let text =
-                    text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
+                let text = text::Reader::new(ptr).ok_or(Error::TextNotNulTerminated)?;
 
                 Ok(Some(text))
             }
@@ -2196,7 +2206,7 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<AnyStruct, B> 
                     builder
                 }
                 None => ptr.init_struct(size.unwrap_or_default()),
-            }
+            },
         };
         unsafe { ty::StructBuilder::from_ptr(ptr) }
     }
@@ -2225,8 +2235,11 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<AnyStruct, B> 
         size: Option<StructSize>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        let size = size.map(ptr::CopySize::Minimum).unwrap_or(CopySize::FromValue);
-        self.raw_build_ptr().try_set_struct(value.as_ptr(), size, err_handler)
+        let size = size
+            .map(ptr::CopySize::Minimum)
+            .unwrap_or(CopySize::FromValue);
+        self.raw_build_ptr()
+            .try_set_struct(value.as_ptr(), size, err_handler)
     }
 
     #[inline]
@@ -2295,8 +2308,11 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrVariant<AnyStruct, B
         size: Option<StructSize>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        let size = size.map(ptr::CopySize::Minimum).unwrap_or(CopySize::FromValue);
-        self.set_case_and_build_ptr().try_set_struct(value.as_ref(), size, err_handler)
+        let size = size
+            .map(ptr::CopySize::Minimum)
+            .unwrap_or(CopySize::FromValue);
+        self.set_case_and_build_ptr()
+            .try_set_struct(value.as_ref(), size, err_handler)
     }
 
     #[inline]
@@ -2393,11 +2409,8 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<AnyList, B> {
         value: &any::ListReader<'_, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.raw_build_ptr().try_set_list(
-            value.as_ref(),
-            CopySize::FromValue,
-            err_handler,
-        )
+        self.raw_build_ptr()
+            .try_set_list(value.as_ref(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -2407,7 +2420,8 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<AnyList, B> {
 
     #[inline]
     pub fn init(self, size: ElementSize, count: u32) -> any::ListBuilder<'b, T> {
-        self.try_init(size, count).expect("too many elements for list")
+        self.try_init(size, count)
+            .expect("too many elements for list")
     }
 
     #[inline]
@@ -2417,11 +2431,13 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrField<AnyList, B> {
         count: u32,
     ) -> Result<any::ListBuilder<'b, T>, TooManyElementsError> {
         if count > size.max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
         let count = ElementCount::new(count).unwrap();
 
-        Ok(AnyList::from(self.into_raw_build_ptr().init_list(size, count)))
+        Ok(AnyList::from(
+            self.into_raw_build_ptr().init_list(size, count),
+        ))
     }
 }
 
@@ -2475,11 +2491,8 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrVariant<AnyList, B> 
         value: &any::ListReader<'_, impl InsertableInto<T>>,
         err_handler: E,
     ) -> Result<(), E::Error> {
-        self.set_case_and_build_ptr().try_set_list(
-            value.as_ref(),
-            CopySize::FromValue,
-            err_handler,
-        )
+        self.set_case_and_build_ptr()
+            .try_set_list(value.as_ref(), CopySize::FromValue, err_handler)
     }
 
     #[inline]
@@ -2489,7 +2502,8 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrVariant<AnyList, B> 
 
     #[inline]
     pub fn init(self, size: ElementSize, count: u32) -> any::ListBuilder<'b, T> {
-        self.try_init(size, count).expect("too many elements for list")
+        self.try_init(size, count)
+            .expect("too many elements for list")
     }
 
     #[inline]
@@ -2499,11 +2513,13 @@ impl<'b, T: Table, B: BuildAccessablePtr<'b, Table = T>> PtrVariant<AnyList, B> 
         count: u32,
     ) -> Result<any::ListBuilder<'b, T>, TooManyElementsError> {
         if count > size.max_elements().get() {
-            return Err(TooManyElementsError(()))
+            return Err(TooManyElementsError(()));
         }
         let count = ElementCount::new(count).unwrap();
 
-        Ok(AnyList::from(self.init_case().into_raw_build_ptr().init_list(size, count)))
+        Ok(AnyList::from(
+            self.init_case().into_raw_build_ptr().init_list(size, count),
+        ))
     }
 }
 
@@ -2601,7 +2617,10 @@ where
 
     #[inline]
     pub fn try_get(&self) -> Result<C> {
-        let cap = self.raw_ptr_or_null().try_to_capability()?.unwrap_or_else(T::null);
+        let cap = self
+            .raw_ptr_or_null()
+            .try_to_capability()?
+            .unwrap_or_else(T::null);
         Ok(C::from_client(cap))
     }
 }

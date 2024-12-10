@@ -85,8 +85,8 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
             mpsc::Item::Event(event) => {
                 // I want this to explode when I actually make an event value.
                 let () = event.into_inner();
-                return Ok(true)
-            },
+                return Ok(true);
+            }
         };
         let (request, responder) = req.respond();
         let RpcCall {

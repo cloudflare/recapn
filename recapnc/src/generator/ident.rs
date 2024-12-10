@@ -16,7 +16,7 @@ fn make_ident(s: &str) -> Result<syn::Ident> {
 // Convert a string into a valid identifier string by replacing invalid characters with underscores.
 fn make_ident_str(s: &str) -> Result<String> {
     if s.is_empty() {
-        return Err(GeneratorError::EmptyName.into())
+        return Err(GeneratorError::EmptyName.into());
     }
 
     let mut output = String::with_capacity(s.len());

@@ -8,7 +8,7 @@ mod util;
 mod test;
 
 pub use mpsc::channel;
-pub use request::{request_response, request_pipeline, request_response_pipeline};
+pub use request::{request_pipeline, request_response, request_response_pipeline};
 
 /// An abstract channel. This is associated data stored in a mpsc channel that
 /// also references associated types with the request-response system.
@@ -44,7 +44,11 @@ pub trait PipelineResolver<C: Chan> {
 
     /// Returns the pipeline channel with the given key. If the key doesn't match,
     /// this may return an already broken channel.
-    fn pipeline(&self, recv: request::ResponseReceiverFactory<'_, C>, key: C::PipelineKey) -> mpsc::Sender<C>;
+    fn pipeline(
+        &self,
+        recv: request::ResponseReceiverFactory<'_, C>,
+        key: C::PipelineKey,
+    ) -> mpsc::Sender<C>;
 }
 
 /// Describes a conversion from a type into "results".
