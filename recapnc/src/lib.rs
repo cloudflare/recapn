@@ -544,7 +544,7 @@ impl CapnpCommand {
         if let Some(path) = &self.exe_path {
             Command::new(path)
         } else {
-            Command::new("capnp")
+            Command::new(recapn_sys::CAPNP_TOOL_PATH)
         }
     }
 

@@ -1,0 +1,9 @@
+[package]
+name = "recapn-sys"
+version = "0.1.0"
+authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
+edition = "2021"
+
+[lints]
+workspace = true
+
