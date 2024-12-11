@@ -21,6 +21,7 @@ use crate::chan::{
 use crate::client::Client;
 use crate::gen::capnp_rpc_capnp as rpc_capnp;
 use crate::pipeline::PipelineOp;
+use crate::rt::{Receiver, Sender};
 use crate::table::{CapTable, Table};
 use crate::{Error, ErrorKind};
 use rpc_capnp::promised_answer::Op;
@@ -427,7 +428,7 @@ pub struct ConnectionOptions {
     pub reader_options: ReaderOptions,
 }
 
-pub struct Connection<T: ?Sized> {
+pub struct Connection<T: ?Sized, Rt: crate::rt::Rt> {
     exports: ExportTable<Export>,
     questions: ExportTable<Question>,
     answers: ImportTable<Answer>,
@@ -439,8 +440,8 @@ pub struct Connection<T: ?Sized> {
     conn_events_sender: EventSender,
     conn_events: EventReceiver,
 
-    cap_messages_sender: crate::tokio::Sender<CapMessage>,
-    cap_messages: crate::tokio::Receiver<CapMessage>,
+    cap_messages_sender: Rt::Sender<CapMessage>,
+    cap_messages: Rt::Receiver<CapMessage>,
 
     call_words_in_flight: usize,
 
@@ -451,10 +452,10 @@ pub struct Connection<T: ?Sized> {
     outbound: T,
 }
 
-impl<T> Connection<T> {
+impl<T, Rt: crate::rt::Rt> Connection<T, Rt> {
     pub fn new(outbound: T, bootstrap: Client, options: ConnectionOptions) -> Self {
         let (conn_events_sender, conn_events) = crate::tokio::unbounded_channel();
-        let (cap_messages_sender, cap_messages) = crate::tokio::channel(8);
+        let (cap_messages_sender, cap_messages) = Rt::channel(8);
         Connection {
             exports: ExportTable::new(),
             questions: ExportTable::new(),
@@ -474,7 +475,7 @@ impl<T> Connection<T> {
     }
 }
 
-impl<T: MessageOutbound + ?Sized> Connection<T> {
+impl<T: MessageOutbound + ?Sized, Rt: crate::rt::Rt + 'static> Connection<T, Rt> {
     #[inline]
     fn same_connection(&self, id: &ConnectionId) -> bool {
         id.0.same_channel(&self.conn_events_sender)
@@ -498,7 +499,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         self.outbound.send(OutboundMessage { message });
 
         let (sender, receiver) = mpsc::channel(chan::RpcChannel::Bootstrap(id));
-        let cap_handler = ReceivedCap {
+        let cap_handler = ReceivedCap::<Rt> {
             target: CapTarget::bootstrap(id),
             resolution: resolve_receiver,
 
@@ -506,7 +507,8 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             outbound: self.cap_messages_sender.clone(),
         };
 
-        crate::tokio::spawn(cap_handler.handle());
+        let fut = cap_handler.handle();
+        crate::tokio::spawn(fut);
 
         Client(sender)
     }
@@ -1134,16 +1136,16 @@ enum CapResolution {
 }
 
 /// Handles forwarding messages from an internal mpsc into a connection mpsc.
-struct ReceivedCap {
+struct ReceivedCap<Rt: crate::rt::Rt> {
     target: CapTarget,
     resolution: crate::tokio::oneshot::Receiver<CapResolution>,
 
     inbound: chan::Receiver,
-    outbound: crate::tokio::Sender<CapMessage>,
+    outbound: Rt::Sender<CapMessage>,
 }
 
-impl ReceivedCap {
-    pub async fn handle(mut self) {
+impl<Rt: crate::rt::Rt> ReceivedCap<Rt> {
+    pub async fn handle(mut self) -> () {
         let mut handled_message = false;
         loop {
             crate::tokio::select! {

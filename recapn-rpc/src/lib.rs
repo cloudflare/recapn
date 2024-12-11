@@ -22,6 +22,7 @@ pub mod pipeline;
 pub mod server;
 pub mod table;
 mod tokio;
+mod rt;
 
 pub(crate) use gen::capnp_rpc_capnp as rpc_capnp;
 pub use rpc_capnp::exception::Type as ErrorKind;
