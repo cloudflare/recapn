@@ -399,7 +399,7 @@ impl<'a, C: Chan> Future for Resolved<'a, C> {
         let this = self.project();
 
         if this.state.is_ready() {
-            return this.state.clone();
+            return *this.state;
         }
 
         let poll = this.waiter.poll(
@@ -776,7 +776,7 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
     }
 
     unsafe fn get_ref_unchecked(&self) -> &ChannelResolution<C> {
-        (&*self.value.get()).assume_init_ref()
+        (*self.value.get()).assume_init_ref()
     }
 
     unsafe fn resolve(&self, value: ChannelResolution<C>) {

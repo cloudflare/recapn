@@ -1278,7 +1278,7 @@ where
     pub fn try_get_option(&self) -> Result<Option<text::Reader<'a>>> {
         match self.ptr_reader().to_blob() {
             Ok(Some(b)) => text::Reader::new(b)
-                .ok_or_else(|| Error::from(Error::TextNotNulTerminated))
+                .ok_or_else(|| Error::TextNotNulTerminated)
                 .map(Some),
             Ok(None) => Ok(None),
             Err(err) => Err(err),
@@ -1322,7 +1322,7 @@ where
         match self.into_ptr_builder().to_blob_mut() {
             Ok(blob) => match text::Builder::new(blob) {
                 Some(text) => Ok(Some(text)),
-                None => Err(Error::TextNotNulTerminated.into()),
+                None => Err(Error::TextNotNulTerminated),
             },
             Err((None, _)) => Ok(None),
             Err((Some(err), _)) => Err(err),

@@ -237,7 +237,7 @@ fn validate_file(
                 context: NameContext::Node(id),
                 error,
             })?;
-    let mod_ident = identifiers.make_unique(None, &path)?;
+    let mod_ident = identifiers.make_unique(None, path)?;
     let file_path = format!("{path}.rs");
     entry.insert(NodeInfo::File(FileInfo {
         mod_ident: mod_ident.clone(),
@@ -363,7 +363,6 @@ fn validate_enum(
         let mut idents = IdentifierSet::new();
         schema
             .enumerants()
-            .into_iter()
             .enumerate()
             .map(|(idx, name)| {
                 let name = name.as_str().map_err(|error| GeneratorError::InvalidName {
@@ -560,7 +559,6 @@ impl GeneratorContext {
     ) -> Result<GeneratedStruct> {
         let (fields, variants) = schema
             .fields()
-            .into_iter()
             .enumerate() // enumerate the fields so we can report name errors better
             .partition::<Vec<_>, _>(|(_, field)| field.discriminant().is_none());
 
@@ -716,9 +714,9 @@ impl GeneratorContext {
                 } else {
                     let default_value = match default_value {
                         Some(default) => {
-                            self.generate_field_default_value(scope, &field_type, &default)
+                            self.generate_field_default_value(scope, field_type, default)
                         }
-                        None => self.generate_field_default_for_type(scope, &field_type),
+                        None => self.generate_field_default_for_type(scope, field_type),
                     }?;
                     Some(FieldDescriptor {
                         slot: *offset,
@@ -757,7 +755,7 @@ impl GeneratorContext {
                 Box::new(syn::parse_quote!(_p::Group<#path>))
             }
             FieldType::Slot { field_type, .. } => {
-                self.resolve_type(scope, &field_type, TypeContext::Field, ctx)?
+                self.resolve_type(scope, field_type, TypeContext::Field, ctx)?
             }
         })
     }
@@ -1094,27 +1092,27 @@ impl GeneratorContext {
             value
                 .list()
                 .field()
-                .map_or_else(|| any::PtrReader::default(), |f| f.ptr())
+                .map_or_else(any::PtrReader::default, |f| f.ptr())
         } else {
             // Extract the correct pointer value field.
             match type_info.kind {
                 TypeKind::Text => value
                     .text()
                     .field()
-                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                    .map_or_else(any::PtrReader::default, |f| f.ptr()),
                 TypeKind::Data => value
                     .data()
                     .field()
-                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                    .map_or_else(any::PtrReader::default, |f| f.ptr()),
                 TypeKind::Struct { .. } => value
                     .r#struct()
                     .field()
-                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                    .map_or_else(any::PtrReader::default, |f| f.ptr()),
                 TypeKind::Interface { .. } => any::PtrReader::default(),
                 _ => value
                     .any_pointer()
                     .field()
-                    .map_or_else(|| any::PtrReader::default(), |f| f.ptr()),
+                    .map_or_else(any::PtrReader::default, |f| f.ptr()),
             }
         };
 

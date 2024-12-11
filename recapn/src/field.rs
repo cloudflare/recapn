@@ -84,7 +84,7 @@ mod internal {
         type ByRef<'b>
         where
             Self: 'b;
-        fn by_ref<'b>(&'b mut self) -> Self::ByRef<'b>;
+        fn by_ref(&mut self) -> Self::ByRef<'_>;
     }
 
     pub trait BuildAccessablePtr<'a>: BuildAccessable {
@@ -171,7 +171,7 @@ mod internal {
         }
         type ByRef<'c> = StructBuilder<'c, 'p, T> where Self: 'c;
         #[inline]
-        fn by_ref<'c>(&'c mut self) -> Self::ByRef<'c> {
+        fn by_ref(&mut self) -> Self::ByRef<'_> {
             &mut *self
         }
     }
@@ -229,7 +229,7 @@ mod internal {
         }
         type ByRef<'b> = OwnedStructBuilder<'b, T> where Self: 'b;
         #[inline]
-        fn by_ref<'b>(&'b mut self) -> Self::ByRef<'b> {
+        fn by_ref(&mut self) -> Self::ByRef<'_> {
             self.by_ref()
         }
     }
@@ -886,7 +886,7 @@ impl<V: PtrValue, Repr: BuildAccessable> PtrField<V, Repr> {
     /// Create a new field builder "by reference". This allows a field builder to be reused
     /// as many builder functions consume the builder.
     #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrField<V, Repr::ByRef<'c>> {
+    pub fn by_ref(&mut self) -> PtrField<V, Repr::ByRef<'_>> {
         PtrField {
             descriptor: self.descriptor,
             repr: self.repr.by_ref(),
@@ -962,7 +962,7 @@ impl<V: PtrValue, Repr: Accessable> PtrVariant<V, Repr> {
     /// Returns a bool indicating whether or not this field is set in the union
     #[inline]
     pub fn is_set(&self) -> bool {
-        unsafe { self.repr.is_variant_set(&self.variant) }
+        unsafe { self.repr.is_variant_set(self.variant) }
     }
 
     #[inline]
@@ -979,7 +979,7 @@ impl<V: PtrValue, Repr: BuildAccessable> PtrVariant<V, Repr> {
     /// Create a new field builder "by reference". This allows a field builder to be reused
     /// as many builder functions consume the builder.
     #[inline]
-    pub fn by_ref<'c>(&'c mut self) -> PtrVariant<V, Repr::ByRef<'c>> {
+    pub fn by_ref(&mut self) -> PtrVariant<V, Repr::ByRef<'_>> {
         PtrVariant {
             variant: self.variant,
             descriptor: self.descriptor,
