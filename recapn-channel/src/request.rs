@@ -11,8 +11,8 @@ use std::hash::Hash;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::atomic::Ordering::{Acquire, Relaxed};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
@@ -21,11 +21,11 @@ use hashbrown::{Equivalent, HashMap};
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
-use crate::{Chan, PipelineResolver};
 use crate::mpsc::{self, weak_channel, Sender, SharedChannel, SharedLink, WeakChannel};
-use crate::util::Marc;
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
+use crate::util::Marc;
+use crate::{Chan, PipelineResolver};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TryRecvError {
@@ -44,7 +44,9 @@ pub struct ResponseReceiverFactory<'a, C: Chan> {
 
 impl<'a, C: Chan> Clone for ResponseReceiverFactory<'a, C> {
     fn clone(&self) -> Self {
-        Self { shared: self.shared }
+        Self {
+            shared: self.shared,
+        }
     }
 }
 
@@ -164,7 +166,11 @@ impl<C: Chan> Drop for SharedRequest<C> {
 }
 
 impl<C: Chan> SharedRequest<C> {
-    pub fn new(request: C::Parameters, usage: RequestUsage, receivers: usize) -> Arc<SharedLink<Self>> {
+    pub fn new(
+        request: C::Parameters,
+        usage: RequestUsage,
+        receivers: usize,
+    ) -> Arc<SharedLink<Self>> {
         SharedLink::new(Self {
             parent: Mutex::new(None),
             request: UnsafeCell::new(ManuallyDrop::new(request)),
@@ -273,7 +279,9 @@ impl<C: Chan> SharedRequest<C> {
         let mut lock;
         // Set the flag with relaxed ordering since when we return the unlock will
         // provide our synchronization.
-        scopeguard::defer!({ self.state.set_pipeline(Ordering::Relaxed); });
+        scopeguard::defer!({
+            self.state.set_pipeline(Ordering::Relaxed);
+        });
 
         loop {
             lock = self.pipeline_map.lock();
@@ -327,11 +335,7 @@ impl<C: Chan> Drop for Receiver<C> {
 pub fn request_response_pipeline<C: Chan>(
     msg: C::Parameters,
 ) -> (Request<C>, ResponseReceiver<C>, PipelineBuilder<C>) {
-    let request = SharedRequest::new(
-        msg,
-        RequestUsage::ResponseAndPipeline,
-        2,
-    );
+    let request = SharedRequest::new(msg, RequestUsage::ResponseAndPipeline, 2);
     (
         Request::new(request.clone()),
         ResponseReceiver {
@@ -408,9 +412,13 @@ impl<C: Chan> Future for Finished<C> {
             return this.state.clone();
         }
 
-        let finished = this.waiter.poll(ctx, &this.shared.data.state, &this.shared.data.finished_waiters);
+        let finished = this.waiter.poll(
+            ctx,
+            &this.shared.data.state,
+            &this.shared.data.finished_waiters,
+        );
         if !finished {
-            return Poll::Pending
+            return Poll::Pending;
         }
 
         *this.state = Poll::Ready(());
@@ -497,7 +505,9 @@ impl<C: Chan> Responder<C> {
         let shared = unsafe { self.shared.take() };
 
         // SAFETY: The responder owns this field until we mark that the response is set.
-        unsafe { (*shared.data.response.get()).write(resp); }
+        unsafe {
+            (*shared.data.response.get()).write(resp);
+        }
 
         // Mark the response is set. We can't touch response anymore except to read it.
         shared.data.state.set_value();
@@ -507,12 +517,16 @@ impl<C: Chan> Responder<C> {
         shared.data.waiters.wake_all();
 
         // SAFETY: The responder owns this field until we mark that the pipeline has been written.
-        unsafe { let _ = &*(*shared.data.pipeline_dest.get()).write(None); }
+        unsafe {
+            let _ = &*(*shared.data.pipeline_dest.get()).write(None);
+        }
 
         // SAFETY: We're reading the response data we just wrote above.
         let resp = unsafe { shared.data.response() };
         let factory = ResponseReceiverFactory { shared: &shared };
-        shared.data.resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
+        shared
+            .data
+            .resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
 
         // Pipeline resolution will mark the pipeline as written for us, even if we panic.
     }
@@ -523,9 +537,13 @@ impl<C: Chan> Responder<C> {
         let shared = unsafe { self.shared.take() };
 
         // SAFETY: The responder owns this field.
-        unsafe { *shared.data.request.get() = ManuallyDrop::new(msg); }
+        unsafe {
+            *shared.data.request.get() = ManuallyDrop::new(msg);
+        }
 
-        Request { shared: Marc::new(shared) }
+        Request {
+            shared: Marc::new(shared),
+        }
     }
 
     /// Fulfill the pipeline portion of the request, allowing pipelined requests to flow though
@@ -535,16 +553,22 @@ impl<C: Chan> Responder<C> {
         let shared = unsafe { self.shared.take() };
 
         // SAFETY: The responder owns this field until we mark that the pipeline has been written.
-        unsafe { let _ = &*(*shared.data.pipeline_dest.get()).write(Some(dst)); }
+        unsafe {
+            let _ = &*(*shared.data.pipeline_dest.get()).write(Some(dst));
+        }
 
         // SAFETY: We're reading the response data we just wrote above.
         let resp = unsafe { shared.data.response() };
         let factory = ResponseReceiverFactory { shared: &shared };
-        shared.data.resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
+        shared
+            .data
+            .resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
 
         // Pipeline resolution will mark the pipeline as written for us, even if we panic.
 
-        ResultsSender { shared: Marc::new(shared) }
+        ResultsSender {
+            shared: Marc::new(shared),
+        }
     }
 
     pub fn finished(&self) -> Finished<C> {
@@ -577,7 +601,9 @@ impl<C: Chan> ResultsSender<C> {
         let shared = unsafe { self.shared.take() };
 
         // SAFETY: The ResultsSender owns this field until we mark that the response is set.
-        unsafe { (*shared.data.response.get()).write(resp); }
+        unsafe {
+            (*shared.data.response.get()).write(resp);
+        }
 
         shared.data.state.set_value();
         shared.data.waiters.wake_all();
@@ -682,10 +708,7 @@ impl<C: Chan> Future for Recv<C> {
             return this.state.clone();
         }
 
-        let value = match this
-            .waiter
-            .poll(ctx, &req.state, &req.waiters)
-        {
+        let value = match this.waiter.poll(ctx, &req.state, &req.waiters) {
             ShotState::Empty => return Poll::Pending,
             ShotState::Sent => Some(Response {
                 shared: shared.clone(),

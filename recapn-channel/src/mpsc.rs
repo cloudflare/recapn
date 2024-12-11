@@ -32,13 +32,13 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::{Mutex, MutexGuard};
 use pin_project::{pin_project, pinned_drop};
 
-use crate::{Chan, IntoResults};
 use crate::request::{self, Request, SharedRequest};
 use crate::util::array_vec::ArrayVec;
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::closed_task::ClosedTask;
 use crate::util::linked_list::{Link, LinkedList, Pointers};
 use crate::util::wait_list::{RecvWaiter, WaitList};
+use crate::{Chan, IntoResults};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum LinkKind {
@@ -127,7 +127,10 @@ unsafe impl<C: Chan> Link for LinkPtr<C> {
         NonNull::new(handle.ptr.cast_mut()).unwrap()
     }
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
-        Self { p: PhantomData, ptr: ptr.as_ptr().cast_const() }
+        Self {
+            p: PhantomData,
+            ptr: ptr.as_ptr().cast_const(),
+        }
     }
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>> {
         let me = target.as_ptr();
@@ -150,8 +153,8 @@ impl<E> Event<E> {
             inner: Box::new(SharedLink {
                 pointers: Pointers::new(),
                 kind: LinkKind::Event,
-                data
-            })
+                data,
+            }),
         }
     }
 
@@ -173,7 +176,7 @@ pub enum Resolution<'a, C: Chan> {
 impl<'a, C: Chan> Resolution<'a, C> {
     pub fn forwarded(self) -> Option<&'a Sender<C>> {
         let Self::Forwarded(f) = self else {
-            return None
+            return None;
         };
         Some(f)
     }
@@ -187,9 +190,7 @@ impl<'a, C: Chan> Resolution<'a, C> {
     }
 
     pub fn error(self) -> Option<&'a C::Error> {
-        let Self::Error(e) = self else {
-            return None
-        };
+        let Self::Error(e) = self else { return None };
         Some(e)
     }
 
@@ -246,7 +247,9 @@ impl<C: Chan + ?Sized> Clone for Sender<C> {
 
 impl<C: Chan + ?Sized> Drop for Sender<C> {
     fn drop(&mut self) {
-        unsafe { self.shared.resolution.remove_sender(); }
+        unsafe {
+            self.shared.resolution.remove_sender();
+        }
     }
 }
 
@@ -275,7 +278,9 @@ impl<C: Chan> Sender<C> {
         if req_shared.data.is_finished() {
             // Just drop the request nobody wants the result
             let _ = channel.requests.pop_back().unwrap().into_item();
-            unsafe { req_shared.data.take_parent(); }
+            unsafe {
+                req_shared.data.take_parent();
+            }
             return Ok(());
         }
 
@@ -306,7 +311,9 @@ impl<C: Chan> Sender<C> {
             }
         };
 
-        channel.requests.push_back(LinkPtr::from_item(LinkItem::Event(event.inner)));
+        channel
+            .requests
+            .push_back(LinkPtr::from_item(LinkItem::Event(event.inner)));
 
         let waker = channel.waker.take();
 
@@ -396,7 +403,10 @@ impl<'a, C: Chan> Future for Resolved<'a, C> {
         }
 
         let poll = this.waiter.poll(
-            ctx, &this.shared.resolution.state, &this.shared.resolution.waiters);
+            ctx,
+            &this.shared.resolution.state,
+            &this.shared.resolution.waiters,
+        );
 
         let value = match poll {
             ShotState::Empty => return Poll::Pending,
@@ -407,7 +417,7 @@ impl<'a, C: Chan> Future for Resolved<'a, C> {
                     ChannelResolution::Error(err) => Resolution::Error(err),
                     ChannelResolution::Forward(fwd) => Resolution::Forwarded(fwd),
                 }
-            },
+            }
         };
 
         *this.state = Poll::Ready(value);
@@ -475,7 +485,7 @@ impl<C: Chan> Receiver<C> {
                     MostResolved::Dropped => drop(self),
                     MostResolved::Error(err) => self.close(err.clone()),
                 }
-                return Ok(())
+                return Ok(());
             }
 
             // Declare the lock variables separately from the named locks. This is done to make sure
@@ -495,13 +505,13 @@ impl<C: Chan> Receiver<C> {
                     lock_b = other_shared.state.lock();
                     self_lock = &mut lock_a;
                     other_lock = &mut lock_b;
-                },
+                }
                 std::cmp::Ordering::Greater => {
                     lock_a = other_shared.state.lock();
                     lock_b = this.state.lock();
                     self_lock = &mut lock_b;
                     other_lock = &mut lock_a;
-                },
+                }
                 std::cmp::Ordering::Equal => return Err(self),
             };
 
@@ -513,7 +523,9 @@ impl<C: Chan> Receiver<C> {
             }
 
             unsafe {
-                self.shared.resolution.resolve(ChannelResolution::Forward(other.clone()));
+                self.shared
+                    .resolution
+                    .resolve(ChannelResolution::Forward(other.clone()));
             }
 
             // There's no requests to forward, so just return early. This way we won't wake up the
@@ -596,7 +608,9 @@ impl<C: Chan> Receiver<C> {
         let mut self_lock = self.shared.state.lock();
         drop(self_lock.waker.take());
         unsafe {
-            self.shared.resolution.resolve(ChannelResolution::Error(err.clone()))
+            self.shared
+                .resolution
+                .resolve(ChannelResolution::Error(err.clone()))
         }
 
         scopeguard::defer_on_unwind! {
@@ -655,7 +669,9 @@ impl<C: Chan> Drop for Receiver<C> {
     fn drop(&mut self) {
         let state = self.shared.resolution.state.load(Relaxed);
         if !state.is_set() {
-            unsafe { self.shared.resolution.close_receiver(); }
+            unsafe {
+                self.shared.resolution.close_receiver();
+            }
         }
     }
 }
@@ -770,8 +786,8 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         let prev = self.state.try_set_value();
         if prev.is_recv_closed() {
             value_store.assume_init_drop();
-            
-            return
+
+            return;
         }
 
         self.waiters.wake_all();
@@ -787,7 +803,9 @@ impl<C: Chan + ?Sized> Drop for ResolutionState<C> {
         }
 
         if state.is_closed_task_set() {
-            unsafe { self.closed_task.drop(); }
+            unsafe {
+                self.closed_task.drop();
+            }
         }
     }
 }
@@ -944,7 +962,9 @@ pub struct WeakChannel<C: Chan> {
 impl<C: Chan> WeakChannel<C> {
     pub fn sender(&self) -> Option<Sender<C>> {
         let shared = self.shared.upgrade()?;
-        unsafe { shared.resolution.add_sender(); }
+        unsafe {
+            shared.resolution.add_sender();
+        }
         Some(Sender { shared })
     }
 

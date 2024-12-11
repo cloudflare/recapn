@@ -572,7 +572,10 @@ pub fn read_with_packed_stream<R: io::BufRead>(
 }
 
 #[cfg(feature = "std")]
-pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments<'_>) -> Result<(), io::Error> {
+pub fn write_message<W: io::Write>(
+    mut w: W,
+    segments: &MessageSegments<'_>,
+) -> Result<(), io::Error> {
     use std::io::IoSlice;
 
     let stream_table = StreamTable::from_segments(segments);
@@ -590,7 +593,10 @@ pub fn write_message<W: io::Write>(mut w: W, segments: &MessageSegments<'_>) -> 
     while !bufs.is_empty() {
         match w.write_vectored(bufs) {
             Ok(0) => {
-                return Err(io::Error::new(io::ErrorKind::WriteZero, "failed to write whole buffer"));
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "failed to write whole buffer",
+                ));
             }
             Ok(n) => IoSlice::advance_slices(&mut bufs, n),
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}

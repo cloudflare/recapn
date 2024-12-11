@@ -10,19 +10,20 @@ use recapn::orphan::Orphan;
 use recapn::ptr::{ElementSize, ReturnErrors};
 use recapn::rpc::Capable;
 use recapn::{list, message, BuilderOf, NotInSchema, ReaderOf};
-use recapn_channel::{mpsc, request, PipelineResolver};
 use recapn_channel::request::{RequestUsage, ResponseReceiverFactory};
+use recapn_channel::{mpsc, request, PipelineResolver};
 use tokio::select;
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::sync::oneshot;
 
+use crate::chan::{
+    self, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget,
+    RpcChannel, RpcResults, SetPipeline,
+};
 use crate::client::Client;
 use crate::gen::capnp_rpc_capnp as rpc_capnp;
-use crate::table::{CapTable, Table};
 use crate::pipeline::PipelineOp;
-use crate::chan::{
-    self, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget, RpcChannel, RpcResults, SetPipeline
-};
+use crate::table::{CapTable, Table};
 use crate::{Error, ErrorKind};
 use rpc_capnp::promised_answer::Op;
 use rpc_capnp::CapDescriptor;

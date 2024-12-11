@@ -2003,7 +2003,11 @@ unsafe fn step_by_unchecked(
     })
 }
 
-fn target_size(reader: &ObjectReader<'_>, ptr: SegmentRef<'_>, nesting_limit: u32) -> Result<MessageSize> {
+fn target_size(
+    reader: &ObjectReader<'_>,
+    ptr: SegmentRef<'_>,
+    nesting_limit: u32,
+) -> Result<MessageSize> {
     let mut reader = reader.clone();
     let target_size = match reader.try_read_typed(ptr)? {
         TypedContent::Struct(content) => {
