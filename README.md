@@ -48,6 +48,10 @@ work.r#type().set(person::phone_number::Type::Work);
 recapn::io::write_message_packed(target, &builder.segments()).unwrap();
 ```
 
+# Dependencies
+
+- `capnpc` version 1.x should be installed on the system.
+
 # Getting started
 
 Add `recapn` to your crate dependencies.

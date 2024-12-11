@@ -20,4 +20,12 @@ fn main() {
 
     // Test that we ignore missing nodes when generating
     run!("missing_annotation": "foo.capnp");
+
+    recapnc::CapnpCommand::new()
+        .src_prefix("schemas")
+        .import_path("schemas")
+        .file("schemas/test.capnp")
+        .file("schemas/test-import.capnp")
+        .file("schemas/test-import2.capnp")
+        .write_to_out_dir();
 }
