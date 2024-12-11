@@ -409,7 +409,7 @@ impl<C: Chan> Future for Finished<C> {
         let this = self.project();
 
         if this.state.is_ready() {
-            return this.state.clone();
+            return *this.state;
         }
 
         let finished = this.waiter.poll(

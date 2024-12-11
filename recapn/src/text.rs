@@ -74,13 +74,7 @@ impl<'a> Reader<'a> {
     /// that the slice is a valid text blob and can be used in a constant context.
     #[inline]
     pub const fn from_slice(s: &'a [u8]) -> Self {
-        match s {
-            [.., 0] => match ptr::Reader::new(s) {
-                Some(r) => return Self(r),
-                None => {}
-            },
-            _ => {}
-        }
+        if let [.., 0] = s { if let Some(r) = ptr::Reader::new(s) { return Self(r) } }
 
         panic!("attempted to make invalid text blob from slice")
     }

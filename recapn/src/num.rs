@@ -232,7 +232,7 @@ get_cmp!(u29, NonZeroU29);
 pub struct i30(i32);
 
 impl i30 {
-    pub const MIN_VALUE: i32 = (2i32.pow(30) / 2) * -1;
+    pub const MIN_VALUE: i32 = -(2i32.pow(30) / 2);
     pub const MAX_VALUE: i32 = (2i32.pow(30) / 2) - 1;
 
     pub const MIN: Self = Self(Self::MIN_VALUE);
