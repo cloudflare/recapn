@@ -398,7 +398,10 @@ impl<L: Link> GuardedLinkedList<L, L::Target> {
 pub(crate) mod tests {
     use super::*;
 
-    use std::pin::Pin;
+    use alloc::boxed::Box;
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use core::pin::Pin;
 
     #[derive(Debug)]
     #[repr(C)]

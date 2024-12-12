@@ -4,17 +4,17 @@
 //!
 //! Request, Response, Pipeline, all in one allocation.
 
-use std::cell::UnsafeCell;
-use std::fmt::{self, Debug};
-use std::future::{Future, IntoFuture};
-use std::hash::Hash;
-use std::mem::{ManuallyDrop, MaybeUninit};
-use std::ops::Deref;
-use std::pin::Pin;
-use std::sync::atomic::Ordering::{Acquire, Relaxed};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use alloc::sync::Arc;
+use core::cell::UnsafeCell;
+use core::fmt::{self, Debug};
+use core::future::{Future, IntoFuture};
+use core::hash::Hash;
+use core::mem::{ManuallyDrop, MaybeUninit};
+use core::ops::Deref;
+use core::pin::Pin;
+use core::sync::atomic::Ordering::{Acquire, Relaxed};
+use core::sync::atomic::{AtomicUsize, Ordering};
+use core::task::{Context, Poll};
 
 use hashbrown::hash_map::RawEntryMut;
 use hashbrown::{Equivalent, HashMap};
@@ -250,7 +250,7 @@ impl<C: Chan> SharedRequest<C> {
         let old = self.receivers_count.fetch_add(1, Relaxed);
 
         if old == usize::MAX {
-            std::process::abort();
+            panic!("out of receiver counters");
         }
 
         // Make sure I don't accidentally attempt to re-open the channel.

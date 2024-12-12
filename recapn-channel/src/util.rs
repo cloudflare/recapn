@@ -4,7 +4,7 @@ pub mod closed_task;
 pub mod linked_list;
 pub mod wait_list;
 
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// A **M**ovable **Arc**.
 ///
