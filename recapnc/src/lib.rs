@@ -500,6 +500,9 @@ pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> Resu
     generate_from_request(&request, out)
 }
 
+const CAPNP_TOOL_PATH: &str = env!("CAPNP_TOOL_PATH");
+const CAPNP_TOOL_VERSION: &str = env!("CAPNP_TOOL_VERSION");
+
 pub struct CapnpCommand {
     files: Vec<Box<Path>>,
     src_prefixes: Vec<Box<Path>>,
@@ -509,6 +512,10 @@ pub struct CapnpCommand {
 }
 
 impl CapnpCommand {
+    pub fn version() -> &'static str {
+        CAPNP_TOOL_VERSION
+    }
+
     pub fn new() -> Self {
         Self {
             files: Vec::new(),
@@ -544,7 +551,7 @@ impl CapnpCommand {
         if let Some(path) = &self.exe_path {
             Command::new(path)
         } else {
-            Command::new(recapn_sys::CAPNP_TOOL_PATH)
+            Command::new(CAPNP_TOOL_PATH)
         }
     }
 

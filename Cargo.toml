@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "recapn",
-    "recapn-sys",
     "recapnc",
     "recapn-channel",
     "recapn-rpc",
