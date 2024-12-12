@@ -12,7 +12,6 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::mem;
 use std::pin::Pin;
-use tokio::task::JoinHandle;
 
 use crate::chan::{self, LocalMessage, RpcCall, RpcChannel};
 use crate::client::{self, Client};
@@ -404,7 +403,7 @@ impl<R> Responder<R> {
         F: Send + 'static,
     {
         let fut = async move { with_context!(self, |ctx| (f)(ctx).await) };
-        tokio::task::spawn(fut);
+        crate::tokio::spawn(fut);
         CallResult(DispatchResult::Done)
     }
 
@@ -414,7 +413,7 @@ impl<R> Responder<R> {
         F: 'static,
     {
         let fut = async move { with_context!(self, |ctx| (f)(ctx).await) };
-        tokio::task::spawn_local(fut);
+        crate::tokio::spawn_local(fut);
         CallResult(DispatchResult::Done)
     }
 
@@ -450,7 +449,7 @@ impl StreamResponder {
     where
         Fu: Future<Output = Result<()>> + Send + 'static,
     {
-        let task = tokio::task::spawn(async move {
+        let task = crate::tokio::spawn(async move {
             let result = f.await;
             let response = match &result {
                 Ok(()) => Ok(chan::RpcResponse {
@@ -572,7 +571,7 @@ enum DispatchResult {
     Broken(Error),
     /// The request is streaming, so the task must be waited to completion before handling
     /// the next request
-    Streaming(JoinHandle<Result<()>>),
+    Streaming(crate::tokio::JoinHandle<Result<()>>),
 }
 
 pub struct DispatchResponse(DispatchResult);
