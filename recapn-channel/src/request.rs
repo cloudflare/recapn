@@ -236,7 +236,7 @@ impl<C: Chan> SharedRequest<C> {
             return;
         };
 
-        let Some(most_resolved) = parent.most_unresolved() else {
+        let Some(_most_resolved) = parent.most_unresolved() else {
             // If the channel is resolved by dropping or erroring permanently, we assume the
             // channel is actually in the middle of dropping requests, but just hasn't detached us
             // yet. We just return so that the channel can drop us itself.

@@ -394,7 +394,6 @@ impl<L: Link> GuardedLinkedList<L, L::Target> {
 }
 
 #[cfg(any(test, fuzzing))]
-#[cfg(not(loom))]
 pub(crate) mod tests {
     use super::*;
 
