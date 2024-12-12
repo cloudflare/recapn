@@ -13,7 +13,6 @@ use recapn::{list, message, BuilderOf, NotInSchema, ReaderOf};
 use recapn_channel::request::{RequestUsage, ResponseReceiverFactory};
 use recapn_channel::{mpsc, request, PipelineResolver};
 
-
 use crate::chan::{
     self, ExternalMessage, LocalMessage, MessagePayload, Params, ParamsRoot, ResponseTarget,
     RpcChannel, RpcResults, SetPipeline,
