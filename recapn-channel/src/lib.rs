@@ -1,4 +1,8 @@
-use std::hash::Hash;
+#![cfg_attr(not(feature = "std"), no_std)]
+
+use core::hash::Hash;
+
+extern crate alloc;
 
 pub mod mpsc;
 pub mod request;

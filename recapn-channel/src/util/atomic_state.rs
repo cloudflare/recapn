@@ -1,7 +1,7 @@
 //! Atomic state shared by channels and requests.
 
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
+use core::sync::atomic::AtomicU8;
+use core::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 
 const STATE_SET: u8 = 0b0000_0001;
 const STATE_SEND_CLOSED: u8 = 0b0000_0010;
