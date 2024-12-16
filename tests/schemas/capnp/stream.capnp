@@ -25,7 +25,7 @@
 # generate code that functions, leaving it up to the application to implement flow control
 # manually.
 
-$import "/capnp/c++.capnp".namespace("capnp");
+$import "c++.capnp".namespace("capnp");
 
 struct StreamResult @0x995f9a3377c0b16e {
   # Empty struct that serves as the return type for "streaming" methods.

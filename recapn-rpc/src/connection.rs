@@ -21,7 +21,7 @@ use crate::chan::{
     RpcChannel, RpcResults, SetPipeline,
 };
 use crate::client::Client;
-use crate::gen::capnp_rpc_capnp as rpc_capnp;
+use crate::gen::rpc_capnp;
 use crate::pipeline::PipelineOp;
 use crate::table::{CapTable, Table};
 use crate::{Error, ErrorKind};

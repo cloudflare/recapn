@@ -4,6 +4,11 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo::rerun-if-changed=schemas");
 
+    let capnp_version = recapnc::CapnpCommand::version();
+    if !capnp_version.starts_with("1.") && capnp_version != "(unknown)" {
+        panic!("capnp tool 1.x is required, got: {capnp_version}");
+    }
+
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     macro_rules! run {
@@ -20,4 +25,12 @@ fn main() {
 
     // Test that we ignore missing nodes when generating
     run!("missing_annotation": "foo.capnp");
+
+    recapnc::CapnpCommand::new()
+        .src_prefix("schemas")
+        .import_path("schemas")
+        .file("schemas/test.capnp")
+        .file("schemas/test-import.capnp")
+        .file("schemas/test-import2.capnp")
+        .write_to_out_dir();
 }

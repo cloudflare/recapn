@@ -16,13 +16,15 @@ use std::borrow::Cow;
 pub(crate) mod chan;
 pub mod client;
 pub mod connection;
-#[rustfmt::skip]
-pub mod gen;
 pub mod pipeline;
 pub mod server;
 pub mod table;
 
-pub(crate) use gen::capnp_rpc_capnp as rpc_capnp;
+pub mod gen {
+    include!(concat!(env!("OUT_DIR"), "/mod.rs"));
+}
+
+pub(crate) use gen::rpc_capnp;
 pub use rpc_capnp::exception::Type as ErrorKind;
 
 #[derive(Clone, Debug)]
