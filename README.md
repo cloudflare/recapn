@@ -5,7 +5,7 @@
 # Example
 
 ```rust
-pub mod gen {
+pub mod generated {
     //! Auto-generated code module!
     include!(concat!(env!("OUT_DIR"), "/mod.rs"));
 }
@@ -83,7 +83,7 @@ fn main() {
 This generated code can be imported using `include!` from anywhere in the module tree, there is no dependence on the module being imported from a specific location.
 
 ```rust
-pub mod gen {
+pub mod generated {
     include!(concat!(env!("OUT_DIR"), "/mod.rs"));
 }
 ```

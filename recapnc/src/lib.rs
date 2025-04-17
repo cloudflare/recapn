@@ -1,10 +1,10 @@
 extern crate self as recapnpc;
 
-pub mod gen;
+pub mod generated;
 
 #[doc(hidden)]
 pub mod prelude {
-    pub mod gen {
+    pub mod generated {
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
@@ -420,7 +420,7 @@ use std::process::{Command, Stdio};
 use std::{env, fs};
 use thiserror::Error;
 
-use gen::capnp_schema_capnp::CodeGeneratorRequest;
+use generated::capnp_schema_capnp::CodeGeneratorRequest;
 use generator::GeneratorContext;
 use quotes::GeneratedRoot;
 

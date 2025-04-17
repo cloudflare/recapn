@@ -17,12 +17,12 @@ pub(crate) mod chan;
 pub mod client;
 pub mod connection;
 #[rustfmt::skip]
-pub mod gen;
+pub mod generated;
 pub mod pipeline;
 pub mod server;
 pub mod table;
 
-pub(crate) use gen::capnp_rpc_capnp as rpc_capnp;
+pub(crate) use generated::capnp_rpc_capnp as rpc_capnp;
 pub use rpc_capnp::exception::Type as ErrorKind;
 
 #[derive(Clone, Debug)]

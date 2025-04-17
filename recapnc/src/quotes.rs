@@ -86,7 +86,7 @@ to_tokens!(
         quote! {
             #![allow(unused, unsafe_code)]
 
-            use recapn::prelude::gen as _p;
+            use recapn::prelude::generated as _p;
             use super::{__file, __imports};
 
             #(#items)*

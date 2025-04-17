@@ -1,10 +1,10 @@
-pub mod gen {
+pub mod generated {
     include!(concat!(env!("OUT_DIR"), "/mod.rs"));
 }
 
 use std::io::Write;
 
-use gen::addressbook_capnp::*;
+use generated::addressbook_capnp::*;
 use recapn::io::{self, StreamOptions};
 use recapn::message::{self, Message, ReaderOptions};
 use recapn::text;

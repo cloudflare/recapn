@@ -1,5 +1,5 @@
 #![allow(unused, unsafe_code)]
-use recapn::prelude::gen as _p;
+use recapn::prelude::generated as _p;
 use super::{__file, __imports};
 #[derive(Clone)]
 pub struct Message<T = _p::Family>(T);

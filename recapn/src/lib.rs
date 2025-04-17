@@ -54,7 +54,7 @@ pub type ReaderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Reader<'a,
 pub type BuilderOf<'a, T, Table = rpc::Empty> = <T as ty::StructView>::Builder<'a, Table>;
 
 pub mod prelude {
-    pub mod gen {
+    pub mod generated {
         pub use recapn::alloc::Word;
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
