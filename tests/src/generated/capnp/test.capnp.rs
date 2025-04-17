@@ -1,5 +1,5 @@
 #![allow(unused, unsafe_code)]
-use recapn::prelude::gen as _p;
+use recapn::prelude::generated as _p;
 use super::{__file, __imports};
 #[repr(u16)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]

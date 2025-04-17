@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 #[rustfmt::skip]
-pub mod gen;
+pub mod generated;
 
 pub mod build_gen {
     include!(concat!(env!("OUT_DIR"), "/build_rs/mod.rs"));
@@ -9,7 +9,7 @@ pub mod build_gen {
 
 use std::time::Instant;
 
-use gen::capnp_test_capnp::{TestAllTypes, TestEnum};
+use generated::capnp_test_capnp::{TestAllTypes, TestEnum};
 use recapn::message::Message;
 use recapn::{text, ty};
 use recapn_rpc::client::{Client, Request};

@@ -341,7 +341,7 @@ pub type Descriptor<V> = <V as FieldType>::Descriptor;
 /// AccessableMut type.
 ///
 /// ```
-/// # use recapn::prelude::gen::*;
+/// # use recapn::prelude::generated::*;
 /// pub enum Which<T: Viewable> {
 ///     Foo(ViewOf<T, u32>),
 ///     Bar(ViewOf<T, u64>),

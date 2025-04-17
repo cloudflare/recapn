@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use recapnpc::prelude::gen as _p;
+use recapnpc::prelude::generated as _p;
 
 use super::capnp_schema_capnp as __file;
 

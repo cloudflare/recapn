@@ -6,7 +6,7 @@ use recapn::alloc::{self, AllocLen, Segment, Word};
 use recapn::ptr::{PtrReader, ReturnErrors, StructSize};
 use recapn::{any, text, NotInSchema, ReaderOf};
 
-pub use crate::gen::capnp_schema_capnp as schema_capnp;
+pub use crate::generated::capnp_schema_capnp as schema_capnp;
 
 use crate::Result;
 use schema_capnp::{
