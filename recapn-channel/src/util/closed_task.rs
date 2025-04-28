@@ -1,7 +1,7 @@
-use std::cell::UnsafeCell;
-use std::mem::MaybeUninit;
-use std::sync::atomic::Ordering::Acquire;
-use std::task::{Context, Poll, Waker};
+use core::cell::UnsafeCell;
+use core::mem::MaybeUninit;
+use core::sync::atomic::Ordering::Acquire;
+use core::task::{Context, Poll, Waker};
 
 use super::atomic_state::AtomicState;
 
