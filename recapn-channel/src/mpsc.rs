@@ -25,7 +25,7 @@ use std::pin::Pin;
 use std::process::abort;
 use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::Ordering::{Acquire, Relaxed};
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
@@ -373,6 +373,13 @@ impl<C: Chan> Sender<C> {
             shared: &self.shared,
             waiter: RecvWaiter::new(),
             state: Poll::Pending,
+        }
+    }
+
+    #[inline]
+    pub fn downgrade(&self) -> WeakSender<C> {
+        WeakSender {
+            shared: Arc::downgrade(&self.shared)
         }
     }
 
@@ -752,6 +759,16 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         debug_assert_ne!(old, 0);
     }
 
+    pub fn try_add_sender(&self) -> bool {
+        self.sender_count.fetch_update(Acquire, Relaxed, |c| {
+            if c == 0 {
+                return None
+            }
+
+            Some(c + 1)
+        }).is_ok()
+    }
+
     pub fn sender_poll_closed(&self, cx: &mut Context<'_>) -> Poll<()> {
         self.closed_task.poll(&self.state, cx)
     }
@@ -955,15 +972,15 @@ pub fn broken<C: Chan>(chan: C, err: C::Error) -> Sender<C> {
 ///
 /// When the pipeline is resolved, a weak channel is upgraded into a strong Receiver.
 #[derive(Debug)]
-pub struct WeakChannel<C: Chan> {
+pub struct WeakReceiver<C: Chan> {
     shared: Weak<SharedChannel<C>>,
 }
 
-impl<C: Chan> WeakChannel<C> {
+impl<C: Chan> WeakReceiver<C> {
     pub fn sender(&self) -> Option<Sender<C>> {
         let shared = self.shared.upgrade()?;
-        unsafe {
-            shared.resolution.add_sender();
+        if !shared.resolution.try_add_sender() {
+            return None
         }
         Some(Sender { shared })
     }
@@ -976,10 +993,24 @@ impl<C: Chan> WeakChannel<C> {
     }
 }
 
+pub struct WeakSender<C: Chan> {
+    shared: Weak<SharedChannel<C>>,
+}
+
+impl<C: Chan> WeakSender<C> {
+    pub fn upgrade(&self) -> Option<Sender<C>> {
+        let shared = self.shared.upgrade()?;
+        if !shared.resolution.try_add_sender() {
+            return None
+        }
+        Some(Sender { shared })
+    }
+}
+
 pub(crate) fn weak_channel<C: Chan>(
     chan: C,
     parent: request::Receiver<C>,
-) -> (Sender<C>, WeakChannel<C>) {
+) -> (Sender<C>, WeakReceiver<C>) {
     let channel = Arc::new(SharedChannel {
         state: Mutex::new(State {
             parent_request: Some(parent),
@@ -990,7 +1021,7 @@ pub(crate) fn weak_channel<C: Chan>(
         resolution: ResolutionState::new(1),
         chan,
     });
-    let weak_channel = WeakChannel {
+    let weak_channel = WeakReceiver {
         shared: Arc::downgrade(&channel),
     };
     let sender = Sender { shared: channel };

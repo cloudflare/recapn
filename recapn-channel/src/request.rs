@@ -21,7 +21,7 @@ use hashbrown::{Equivalent, HashMap};
 use parking_lot::Mutex;
 use pin_project::{pin_project, pinned_drop};
 
-use crate::mpsc::{self, weak_channel, Sender, SharedChannel, SharedLink, WeakChannel};
+use crate::mpsc::{self, weak_channel, Sender, SharedChannel, SharedLink, WeakReceiver};
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
 use crate::util::Marc;
@@ -118,7 +118,7 @@ pub(crate) struct SharedRequest<C: Chan> {
     response: UnsafeCell<MaybeUninit<C::Results>>,
 
     /// The map to queued clients waiting to be resolved.
-    pipeline_map: Mutex<HashMap<C::PipelineKey, WeakChannel<C>>>,
+    pipeline_map: Mutex<HashMap<C::PipelineKey, WeakReceiver<C>>>,
 
     /// The destination pipeline value. If set to None, the response holds the pipeline
     pipeline_dest: UnsafeCell<MaybeUninit<Option<C::Pipeline>>>,
