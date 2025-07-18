@@ -24,7 +24,6 @@ use pin_project::{pin_project, pinned_drop};
 use crate::mpsc::{self, weak_channel, Sender, SharedChannel, SharedLink, WeakReceiver};
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::wait_list::{ClosedWaiter, RecvWaiter, WaitList};
-use crate::util::Marc;
 use crate::{Chan, PipelineResolver};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -437,72 +436,82 @@ impl<C: Chan> PinnedDrop for Finished<C> {
 }
 
 pub struct Request<C: Chan> {
-    shared: Marc<RequestInner<C>>,
+    shared: ManuallyDrop<Arc<RequestInner<C>>>,
 }
 
 impl<C: Chan> Request<C> {
     pub(crate) const fn new(inner: Arc<RequestInner<C>>) -> Self {
         Self {
-            shared: Marc::new(inner),
+            shared: ManuallyDrop::new(inner),
         }
     }
 
     /// Get the inner request value.
     pub fn get(&self) -> &C::Parameters {
-        unsafe { self.shared.get().data.request() }
+        unsafe { self.shared.data.request() }
     }
 
     pub fn usage(&self) -> RequestUsage {
-        self.shared.get().data.usage
+        self.shared.data.usage
     }
 
     /// Respond to the request using a responder derived from it, taking the parameters in
     /// the process.
-    pub fn respond(mut self) -> (C::Parameters, Responder<C>) {
+    pub fn respond(self) -> (C::Parameters, Responder<C>) {
         unsafe {
-            let shared = self.shared.take();
+            let shared = self.into_inner();
             let params = shared.data.take_request();
             let responder = Responder {
-                shared: Marc::new(shared),
+                shared: ManuallyDrop::new(shared),
             };
             (params, responder)
         }
     }
 
+    #[inline]
     pub fn finished(&self) -> Finished<C> {
-        Finished::new(self.shared.get().clone())
+        Finished::new((*self.shared).clone())
     }
 
+    #[inline]
     pub fn is_finished(&self) -> bool {
-        self.shared.get().data.is_finished()
+        self.shared.data.is_finished()
     }
 
-    pub(crate) fn take_inner(mut self) -> Arc<RequestInner<C>> {
-        unsafe { self.shared.take() }
+    #[inline]
+    pub(crate) fn into_inner(mut self) -> Arc<RequestInner<C>> {
+        let inner = unsafe { ManuallyDrop::take(&mut self.shared) };
+        std::mem::forget(self);
+        inner
     }
 }
 
 impl<C: Chan> Drop for Request<C> {
     fn drop(&mut self) {
-        if let Some(shared) = self.shared.try_take() {
-            unsafe {
-                shared.data.drop_request();
-                shared.data.close_sender();
-            }
+        unsafe {
+            self.shared.data.drop_request();
+            self.shared.data.close_sender();
+            ManuallyDrop::drop(&mut self.shared);
         }
     }
 }
 
 /// Allows sending a response for a request.
 pub struct Responder<C: Chan> {
-    shared: Marc<RequestInner<C>>,
+    shared: ManuallyDrop<Arc<RequestInner<C>>>,
 }
 
 impl<C: Chan> Responder<C> {
+    #[inline]
+    fn into_inner(mut self) -> Arc<RequestInner<C>> {
+        let inner = unsafe { ManuallyDrop::take(&mut self.shared) };
+        std::mem::forget(self);
+        inner
+    }
+
     /// Returns the given response.
-    pub fn respond(mut self, resp: C::Results) {
-        // SAFETY: We're consuming the Responder and aren't in Drop.
-        let shared = unsafe { self.shared.take() };
+    pub fn respond(self, resp: C::Results) -> Response<C> {
+        let shared = self.into_inner();
 
         // SAFETY: The responder owns this field until we mark that the response is set.
         unsafe {
@@ -529,12 +538,12 @@ impl<C: Chan> Responder<C> {
             .resolve_pipeline_map(|k, c| resp.resolve(factory, k, c));
 
         // Pipeline resolution will mark the pipeline as written for us, even if we panic.
+        Response { shared }
     }
 
     /// Reuse the request to perform a tail-call, turning the responder back into a request.
-    pub fn tail_call(mut self, msg: C::Parameters) -> Request<C> {
-        // SAFETY: We're consuming the Responder and aren't in Drop.
-        let shared = unsafe { self.shared.take() };
+    pub fn tail_call(self, msg: C::Parameters) -> Request<C> {
+        let shared = self.into_inner();
 
         // SAFETY: The responder owns this field.
         unsafe {
@@ -542,15 +551,14 @@ impl<C: Chan> Responder<C> {
         }
 
         Request {
-            shared: Marc::new(shared),
+            shared: ManuallyDrop::new(shared),
         }
     }
 
     /// Fulfill the pipeline portion of the request, allowing pipelined requests to flow though
     /// without waiting for the call to complete.
-    pub fn set_pipeline(mut self, dst: C::Pipeline) -> ResultsSender<C> {
-        // SAFETY: We're consuming the Responder and aren't in Drop.
-        let shared = unsafe { self.shared.take() };
+    pub fn set_pipeline(self, dst: C::Pipeline) -> ResultsSender<C> {
+        let shared = self.into_inner();
 
         // SAFETY: The responder owns this field until we mark that the pipeline has been written.
         unsafe {
@@ -567,23 +575,24 @@ impl<C: Chan> Responder<C> {
         // Pipeline resolution will mark the pipeline as written for us, even if we panic.
 
         ResultsSender {
-            shared: Marc::new(shared),
+            shared: ManuallyDrop::new(shared),
         }
     }
 
     pub fn finished(&self) -> Finished<C> {
-        Finished::new(self.shared.get().clone())
+        Finished::new((*self.shared).clone())
     }
 
     pub fn is_finished(&self) -> bool {
-        self.shared.get().data.is_finished()
+        self.shared.data.is_finished()
     }
 }
 
 impl<C: Chan> Drop for Responder<C> {
     fn drop(&mut self) {
-        if let Some(shared) = self.shared.try_take() {
-            shared.data.close_sender()
+        self.shared.data.close_sender();
+        unsafe {
+            ManuallyDrop::drop(&mut self.shared);
         }
     }
 }
@@ -591,14 +600,21 @@ impl<C: Chan> Drop for Responder<C> {
 /// The result of calling `Responder::set_pipeline`, a type that can only be used to send the
 /// results of a call.
 pub struct ResultsSender<C: Chan> {
-    shared: Marc<RequestInner<C>>,
+    shared: ManuallyDrop<Arc<RequestInner<C>>>,
 }
 
 impl<C: Chan> ResultsSender<C> {
+    #[inline]
+    fn into_inner(mut self) -> Arc<RequestInner<C>> {
+        let inner = unsafe { ManuallyDrop::take(&mut self.shared) };
+        std::mem::forget(self);
+        inner
+    }
+
     /// Returns the given response.
-    pub fn respond(mut self, resp: C::Results) {
+    pub fn respond(self, resp: C::Results) -> Response<C> {
         // SAFETY: We're consuming the ResultsSender and aren't in Drop.
-        let shared = unsafe { self.shared.take() };
+        let shared = self.into_inner();
 
         // SAFETY: The ResultsSender owns this field until we mark that the response is set.
         unsafe {
@@ -607,21 +623,24 @@ impl<C: Chan> ResultsSender<C> {
 
         shared.data.state.set_value();
         shared.data.waiters.wake_all();
+
+        Response { shared }
     }
 
     pub fn finished(&self) -> Finished<C> {
-        Finished::new(self.shared.get().clone())
+        Finished::new((*self.shared).clone())
     }
 
     pub fn is_finished(&self) -> bool {
-        self.shared.get().data.is_finished()
+        self.shared.data.is_finished()
     }
 }
 
 impl<C: Chan> Drop for ResultsSender<C> {
     fn drop(&mut self) {
-        if let Some(shared) = self.shared.try_take() {
-            shared.data.close_sender();
+        self.shared.data.close_sender();
+        unsafe {
+            ManuallyDrop::drop(&mut self.shared);
         }
     }
 }

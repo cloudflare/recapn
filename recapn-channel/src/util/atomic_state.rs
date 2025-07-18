@@ -3,12 +3,13 @@
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 
-const STATE_SET: u8 = 0b0000_0001;
-const STATE_SEND_CLOSED: u8 = 0b0000_0010;
-const STATE_RECV_CLOSED: u8 = 0b0000_0100;
+const STATE_SET            : u8 = 0b0000_0001;
+const STATE_SEND_CLOSED    : u8 = 0b0000_0010;
+const STATE_RECV_CLOSED    : u8 = 0b0000_0100;
 const STATE_CLOSED_TASK_SET: u8 = 0b0000_1000;
 
-const STATE_SET_PIPELINE: u8 = 0b0001_0000;
+const STATE_SET_PIPELINE   : u8 = 0b0001_0000;
+const STATE_READY          : u8 = 0b0010_0000;
 
 /// The state of the sharedshot.
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -116,6 +117,16 @@ impl AtomicState {
         let val = self.0.fetch_or(STATE_SET_PIPELINE, order);
         StateFlags(val | STATE_SET_PIPELINE)
     }
+
+    #[inline]
+    pub fn set_ready(&self, order: Ordering) -> StateFlags {
+        StateFlags(self.0.fetch_or(STATE_READY, order))
+    }
+
+    #[inline]
+    pub fn clear_ready(&self, order: Ordering) -> StateFlags {
+        StateFlags(self.0.fetch_and(!STATE_READY, order))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -145,6 +156,11 @@ impl StateFlags {
     #[inline]
     pub fn is_pipeline_set(self) -> bool {
         self.0 & STATE_SET_PIPELINE != 0
+    }
+
+    #[inline]
+    pub fn is_ready_set(self) -> bool {
+        self.0 & STATE_READY != 0
     }
 
     #[inline]
