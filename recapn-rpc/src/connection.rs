@@ -578,15 +578,15 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
             usage == RequestUsage::Pipeline && self.options.use_pipeline_hints;
 
         let (request, responder) = req.respond();
-        macro_rules! err_response {
+        macro_rules! return_err_response {
             ($expr:expr) => {
                 responder.respond(RpcResults::Owned(Err($expr)));
+                return
             };
         }
 
         if let Some(err) = &self.disconnect {
-            err_response!(err.clone());
-            return;
+            return_err_response!(err.clone());
         }
 
         let Params {
@@ -675,10 +675,9 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
                 let mut content = payload.content().ptr().imbue::<CapTable<'_>>(table_builder);
 
                 if let Err(err) = content.try_set(&params, false, ReturnErrors) {
-                    err_response!(Error::failed(format!(
+                    return_err_response!(Error::failed(format!(
                         "failed to copy params into call: {err:}"
                     )));
-                    return;
                 }
             }
             ParamsToFill::LocalOrphan(orphan) => {
@@ -690,8 +689,7 @@ impl<T: MessageOutbound + ?Sized> Connection<T> {
         let cap_table = table_to_write.into_inner();
         let table_len = cap_table.len() as u32;
         let Ok(mut payload_table) = payload.cap_table().try_init(table_len) else {
-            err_response!(Error::failed("too many caps in message"));
-            return;
+            return_err_response!(Error::failed("too many caps in message"));
         };
         for (i, cap) in (0..table_len).zip(cap_table.iter()) {
             let Some(cap) = cap else { continue };
