@@ -425,12 +425,17 @@ impl<const N: usize> Space<N> {
     }
 
     #[inline]
-    pub(crate) fn segment(&mut self) -> Segment {
+    pub(crate) fn use_scratch(&mut self) -> Segment {
         if self.dirty {
             self.space.fill(Word::NULL);
         }
 
         self.dirty = true;
+        self.segment()
+    }
+
+    #[inline]
+    fn segment(&mut self) -> Segment {
         let len = AllocLen::new(N as u32).unwrap().into();
         let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
 
@@ -475,12 +480,17 @@ impl DynSpace {
     }
 
     #[inline]
-    pub(crate) fn segment(&mut self) -> Segment {
+    pub(crate) fn use_scratch(&mut self) -> Segment {
         if self.dirty {
             self.space.fill(Word::NULL);
         }
 
         self.dirty = true;
+        self.segment()
+    }
+
+    #[inline]
+    fn segment(&mut self) -> Segment {
         let len = AllocLen::new(self.space.len() as u32).unwrap().into();
         let data = NonNull::new(self.space.as_mut_ptr()).unwrap();
 
@@ -504,7 +514,7 @@ impl<'s, A> Scratch<'s, A> {
     pub fn with_space<const N: usize>(space: &'s mut Space<N>, alloc: A) -> Self {
         Self {
             s: PhantomData,
-            segment: space.segment(),
+            segment: space.use_scratch(),
             used: false,
             next: alloc,
         }
@@ -516,7 +526,7 @@ impl<'s, A> Scratch<'s, A> {
     pub fn with_dyn_space(space: &'s mut DynSpace, alloc: A) -> Self {
         Self {
             s: PhantomData,
-            segment: space.segment(),
+            segment: space.use_scratch(),
             used: false,
             next: alloc,
         }

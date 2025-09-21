@@ -21,14 +21,42 @@ struct SingleSegmentArena {
 }
 
 impl SingleSegmentArena {
+    #[inline]
     fn new(segment: Segment) -> Self {
         Self {
             segment: UnsafeCell::new(unsafe { ArenaSegment::new(segment, AllocLen::ONE, 0) }),
         }
     }
 
+    #[inline]
     fn segment(&self) -> &ArenaSegment {
         unsafe { &*self.segment.get() }
+    }
+
+    #[inline]
+    fn replace_segment(&mut self, segment: Segment) -> Segment {
+        core::mem::replace(
+            self.segment.get_mut(),
+            unsafe { ArenaSegment::new(segment, AllocLen::ONE, 0) }
+        ).segment()
+    }
+
+    fn replace_and_copy_segment(&mut self, mut new_segment: Segment) -> Segment {
+        let segment = self.segment.get_mut();
+        let old_segment = segment.segment();
+        assert!(old_segment.len < new_segment.len);
+
+        let len = AllocLen::new_unwrap(segment.used_len().get());
+        let len_usize = len.get() as usize;
+        let new_slice;
+        let old_slice;
+        unsafe {
+            new_slice = &mut new_segment.as_mut_bytes_unchecked()[..len_usize];
+            old_slice = &old_segment.as_bytes_unchecked()[..len_usize];
+        }
+        new_slice.copy_from_slice(old_slice);
+        *segment = unsafe { ArenaSegment::new(new_segment, len, 0) };
+        old_segment
     }
 }
 
@@ -75,26 +103,34 @@ unsafe impl ReadArena for SingleSegmentArena {
     }
 }
 
-/// A fixed sized message that can write to one segment.
-pub struct SingleSegmentMessage<'a> {
+/// A fixed size message that can only write to one segment provided by scratch space.
+pub struct ScratchMessage<'a> {
     a: PhantomData<&'a mut [Word]>,
     arena: SingleSegmentArena,
 }
 
-impl<'a> SingleSegmentMessage<'a> {
+impl<'a> ScratchMessage<'a> {
+    #[inline]
     pub fn with_space<const N: usize>(space: &'a mut Space<N>) -> Self {
         Self {
             a: PhantomData,
-            arena: SingleSegmentArena::new(space.segment()),
+            arena: SingleSegmentArena::new(space.use_scratch()),
         }
     }
 
     #[cfg(feature = "alloc")]
+    #[inline]
     pub fn with_dyn_space(space: &'a mut DynSpace) -> Self {
         Self {
             a: PhantomData,
-            arena: SingleSegmentArena::new(space.segment()),
+            arena: SingleSegmentArena::new(space.use_scratch()),
         }
+    }
+
+    /// Return the message's internal arena as a `ReadArena` trait object reference.
+    #[inline]
+    pub fn as_read_arena(&self) -> &dyn ReadArena {
+        &self.arena
     }
 
     /// Creates a new reader for this message. This reader has no limits placed on it.
@@ -122,21 +158,153 @@ impl<'a> SingleSegmentMessage<'a> {
     }
 
     /// Return the used space of the message as a slice of [`Word`]s.
+    #[inline]
     pub fn as_words(&self) -> &[Word] {
         unsafe { self.arena.segment().used_segment().as_slice_unchecked() }
     }
 
     /// Return the used space of the message as a slice of bytes.
+    #[inline]
     pub fn as_bytes(&self) -> &[u8] {
         Word::slice_to_bytes(self.as_words())
+    }
+
+    #[inline]
+    pub fn free_words(&self) -> u32 {
+        let segment = self.arena.segment();
+        let original = segment.segment().len.get();
+        let used = segment.used_len().get();
+        original - used
+    }
+
+    #[inline]
+    pub fn is_full(&self) -> bool {
+        self.free_words() == 0
     }
 }
 
 // These are safe since, even though this type has interior mutability, we don't expose any of
 // it from this level of the API. So a user can pass instances of this type between threads
 // as much as they want (though they probably won't).
-unsafe impl Send for SingleSegmentMessage<'_> {}
-unsafe impl Sync for SingleSegmentMessage<'_> {}
+unsafe impl Send for ScratchMessage<'_> {}
+unsafe impl Sync for ScratchMessage<'_> {}
+
+/// A fixed sized message that can only write to one segment allocated by the given allocator.
+/// 
+/// Allocators are not guaranteed to allocate the length provided, so if that behavior is required,
+/// make sure to use an allocator that does have that behavior.
+pub struct SingleSegmentMessage<A: Alloc + ?Sized> {
+    arena: SingleSegmentArena,
+    alloc: A,
+}
+
+impl<A: Alloc> SingleSegmentMessage<A> {
+    pub fn new(mut alloc: A, init_len: AllocLen) -> Option<Self> {
+        Some(Self {
+            arena: unsafe { SingleSegmentArena::new(alloc.alloc(init_len)?) },
+            alloc,
+        })
+    }
+}
+
+impl<A: Alloc + ?Sized> SingleSegmentMessage<A> {
+    /// Increases the size of the message, reallocating the segment and copying data if necessary.
+    /// 
+    /// If the existing segment is larger than the given length, this returns true.
+    /// 
+    /// Note: to prevent the message from being in a bad state on allocation failure, the new
+    /// segment is allocated *before* deallocating the old one.
+    pub fn grow(&mut self, new_len: AllocLen) -> bool {
+        if self.arena.segment.get_mut().segment().len >= new_len {
+            return true
+        }
+
+        let Some(new_segment) = (unsafe { self.alloc.alloc(new_len) }) else { return false };
+        let old = self.arena.replace_and_copy_segment(new_segment);
+        unsafe {
+            self.alloc.dealloc(old);
+        }
+        true
+    }
+
+    /// Replace the segment with a new one, clearing the message and allocating a new segment with
+    /// the allocator.
+    /// 
+    /// Note: to prevent the message from being in a bad state on allocation failure, the new
+    /// segment is allocated *before* deallocating the old one.
+    pub fn replace(&mut self, new_len: AllocLen) -> bool {
+        let Some(new) = (unsafe { self.alloc.alloc(new_len) }) else { return false };
+        let old = self.arena.replace_segment(new);
+        unsafe {
+            self.alloc.dealloc(old);
+        }
+        true
+    }
+
+    /// Return the message's internal arena as a `ReadArena` trait object reference.
+    #[inline]
+    pub fn as_read_arena(&self) -> &dyn ReadArena {
+        &self.arena
+    }
+
+    /// Creates a new reader for this message. This reader has no limits placed on it.
+    ///
+    /// If you want a limited reader, use [`Message::reader_with_options`].
+    #[inline]
+    pub fn reader(&self) -> Reader<'_> {
+        Reader::limitless(&self.arena)
+    }
+
+    /// Creates a new reader for this message with the specified reader options.
+    #[inline]
+    pub fn reader_with_options(&self, options: ReaderOptions) -> Reader<'_> {
+        Reader::new(&self.arena, options)
+    }
+
+    /// Gets the builder for this message.
+    #[inline]
+    pub fn builder(&mut self) -> Builder<'_, 'static> {
+        Builder {
+            e: PhantomData,
+            root: self.arena.segment(),
+            arena: &self.arena,
+        }
+    }
+
+    /// Return the used space of the message as a slice of [`Word`]s.
+    #[inline]
+    pub fn as_words(&self) -> &[Word] {
+        unsafe { self.arena.segment().used_segment().as_slice_unchecked() }
+    }
+
+    /// Return the used space of the message as a slice of bytes.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        Word::slice_to_bytes(self.as_words())
+    }
+
+    #[inline]
+    pub fn free_words(&self) -> u32 {
+        let segment = self.arena.segment();
+        let original = segment.segment().len.get();
+        let used = segment.used_len().get();
+        original - used
+    }
+
+    #[inline]
+    pub fn is_full(&self) -> bool {
+        self.free_words() == 0
+    }
+}
+
+impl<T: Alloc + ?Sized> Drop for SingleSegmentMessage<T> {
+    fn drop(&mut self) {
+        unsafe { self.alloc.dealloc(self.arena.segment.get_mut().segment()) }
+    }
+}
+
+unsafe impl<T: Alloc + Send + ?Sized> Send for SingleSegmentMessage<T> {}
+unsafe impl<T: Alloc + ?Sized> Sync for SingleSegmentMessage<T> {}
 
 /// A message. Can be used to create multiple readers or one builder at a time.
 ///
