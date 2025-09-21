@@ -1629,6 +1629,19 @@ pub(crate) struct ObjectReader<'a> {
 
 impl<'a> ObjectReader<'a> {
     #[inline]
+    pub fn clone_limiter(&self) -> Option<ReadLimiter> {
+        self.limiter.cloned()
+    }
+
+    #[inline]
+    pub fn with_limiter<'b>(&self, limiter: Option<&'b ReadLimiter>) -> ObjectReader<'b>
+    where
+        'a: 'b
+    {
+        ObjectReader { segment: self.segment.clone(), limiter }
+    }
+
+    #[inline]
     pub unsafe fn section_slice(&self, ptr: SegmentRef<'a>, len: SegmentOffset) -> &[Word] {
         if let Some(segment) = &self.segment {
             debug_assert!(segment.try_get_section(ptr.into(), len).is_some());
@@ -2204,7 +2217,10 @@ impl<'a, T: Table> PtrReader<'a, T> {
             .checked_sub(1)
             .ok_or(Error::NestingLimitExceeded)?;
 
-        target_size(&self.reader, self.ptr, nesting_limit)
+        let limiter = self.reader.clone_limiter();
+        let reader = self.reader.with_limiter(limiter.as_ref());
+
+        target_size(&reader, self.ptr, nesting_limit)
     }
 
     #[inline]
@@ -2213,7 +2229,8 @@ impl<'a, T: Table> PtrReader<'a, T> {
             return Ok(PtrType::Null);
         }
 
-        let mut reader = self.reader.clone();
+        let limiter = self.reader.clone_limiter();
+        let mut reader = self.reader.with_limiter(limiter.as_ref());
         let Content { ptr, .. } = reader.location_of(self.ptr)?;
         if ptr.is_struct() {
             Ok(PtrType::Struct)
@@ -2228,7 +2245,11 @@ impl<'a, T: Table> PtrReader<'a, T> {
 
     #[inline]
     pub fn equality<T2: Table>(&self, other: &PtrReader<'_, T2>) -> Result<PtrEquality> {
-        cmp_ptr(self.ptr, &self.reader, other.ptr, &other.reader)
+        let self_limiter = self.reader.clone_limiter();
+        let self_reader = self.reader.with_limiter(self_limiter.as_ref());
+        let other_limiter = other.reader.clone_limiter();
+        let other_reader = other.reader.with_limiter(other_limiter.as_ref());
+        cmp_ptr(self.ptr, &self_reader, other.ptr, &other_reader)
     }
 
     #[inline]
@@ -2531,8 +2552,10 @@ impl<'a, T: Table> StructReader<'a, T> {
             caps: 0,
         };
 
+        let limiter = self.reader.clone_limiter();
+        let reader = self.reader.with_limiter(limiter.as_ref());
         let ptrs_targets_size = total_ptrs_size(
-            &self.reader,
+            &reader,
             self.ptrs_start,
             self.ptrs_len.into(),
             self.nesting_limit,
@@ -2549,13 +2572,17 @@ impl<'a, T: Table> StructReader<'a, T> {
             return Ok(PtrEquality::NotEqual);
         }
 
+        let self_limiter = self.reader.clone_limiter();
+        let self_reader = self.reader.with_limiter(self_limiter.as_ref());
+        let other_limiter = other.reader.clone_limiter();
+        let other_reader = other.reader.with_limiter(other_limiter.as_ref());
         cmp_ptr_sections(
             self.ptrs_start,
             self.ptrs_len.into(),
-            &self.reader,
+            &self_reader,
             other.ptrs_start,
             other.ptrs_len.into(),
-            &other.reader,
+            &other_reader,
         )
     }
 
@@ -2813,16 +2840,18 @@ impl<'a, T: Table> ListReader<'a, T> {
             caps: 0,
         };
 
+        let limiter = self.reader.clone_limiter();
+        let reader = self.reader.with_limiter(limiter.as_ref());
         match self.element_size {
             ElementSize::Pointer => {
                 let target_sizes =
-                    total_ptrs_size(&self.reader, self.ptr, len, self.nesting_limit)?;
+                    total_ptrs_size(&reader, self.ptr, len, self.nesting_limit)?;
 
                 Ok(list_size + target_sizes)
             }
             ElementSize::InlineComposite(size) => {
                 let target_sizes = total_inline_composites_targets_size(
-                    &self.reader,
+                    &reader,
                     self.ptr,
                     len,
                     size,
@@ -2837,19 +2866,23 @@ impl<'a, T: Table> ListReader<'a, T> {
 
     #[inline]
     pub fn equality<T2: Table>(&self, other: &ListReader<'_, T2>) -> Result<PtrEquality> {
+        let self_limiter = self.reader.clone_limiter();
+        let self_reader = self.reader.with_limiter(self_limiter.as_ref());
+        let other_limiter = other.reader.clone_limiter();
+        let other_reader = other.reader.with_limiter(other_limiter.as_ref());
         cmp_list(
             &ListContent {
                 ptr: self.ptr,
                 element_size: self.element_size,
                 element_count: self.element_count,
             },
-            &self.reader,
+            &self_reader,
             &ListContent {
                 ptr: other.ptr,
                 element_size: other.element_size,
                 element_count: other.element_count,
             },
-            &other.reader,
+            &other_reader,
         )
     }
 

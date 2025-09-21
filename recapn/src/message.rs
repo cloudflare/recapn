@@ -453,7 +453,7 @@ impl Default for ReaderOptions {
 }
 
 /// Controls how far a single message reader can read into a message.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReadLimiter {
     limit: Cell<u64>,
 }
