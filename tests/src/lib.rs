@@ -3,6 +3,9 @@
 #[rustfmt::skip]
 pub mod generated;
 
+#[rustfmt::skip]
+pub mod ports;
+
 pub mod build_gen {
     include!(concat!(env!("OUT_DIR"), "/build_rs/mod.rs"));
 }
@@ -12,6 +15,7 @@ use std::time::Instant;
 use generated::capnp_test_capnp::{TestAllTypes, TestEnum};
 use recapn::message::Message;
 use recapn::{text, ty};
+use recapn_port::{DeserializeAnyPtrExt, DeserializePtr, SerializeAnyPtrExt, SerializePtr};
 use recapn_rpc::client::{Client, Request};
 use recapn_rpc::server::{
     CallContext, CallResult, Dispatch, DispatchRequest, DispatchResponse, Dispatcher, FromServer,
@@ -39,6 +43,46 @@ fn make_all_types() {
     inner.float32_field().set(32.32);
     inner.float64_field().set(64.64);
     builder.enum_field().set(TestEnum::Bar);
+}
+
+#[test]
+fn make_port() {
+    let src_value = ports::capnp_test_capnp::TestAllTypes {
+        bool_field: true,
+        int8_field: 7,
+        int16_field: 15,
+        int32_field: 31,
+        int64_field: 63,
+        u_int8_field: 8,
+        u_int16_field: 16,
+        u_int32_field: 32,
+        u_int64_field: 64,
+        float32_field: -32.32,
+        float64_field: -64.64,
+        text_field: Some(recapn_port::text::Text::new("Hello world!")),
+        data_field: Some(
+            recapn_port::data::Data::new(Box::from(b"Hello bytes!".as_slice())).unwrap()
+        ),
+        struct_field: Some(Box::new(ports::capnp_test_capnp::TestAllTypes {
+            float32_field: 32.32,
+            float64_field: 64.64,
+            ..Default::default()
+        })),
+        enum_field: recapn_port::Enum::from_type(ports::capnp_test_capnp::TestEnum::Bar),
+        ..Default::default()
+    };
+    let mut message = Message::global();
+    message.builder().into_root().serialize::<_, Box<dyn core::error::Error>>(&src_value).unwrap();
+    let dst_value: ports::capnp_test_capnp::TestAllTypes =
+        message.reader().root().deserialize::<_, Box<dyn core::error::Error>>().unwrap();
+
+    assert_eq!(src_value.bool_field, dst_value.bool_field);
+    assert_eq!(src_value.int8_field, dst_value.int8_field);
+    assert_eq!(src_value.int16_field, dst_value.int16_field);
+    assert_eq!(src_value.int32_field, dst_value.int32_field);
+    assert_eq!(src_value.int64_field, dst_value.int64_field);
+    assert_eq!(src_value.u_int32_field, dst_value.u_int32_field);
+    assert_eq!(src_value.float64_field, dst_value.float64_field);
 }
 
 #[test]

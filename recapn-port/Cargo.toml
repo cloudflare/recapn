@@ -1,0 +1,10 @@
+[package]
+name = "recapn-port"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+recapn = { path = "../recapn" }
+
+[lints]
+workspace = true
