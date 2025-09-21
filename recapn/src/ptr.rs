@@ -221,6 +221,35 @@ impl core::ops::AddAssign for MessageSize {
     }
 }
 
+impl MessageSize {
+    #[inline]
+    pub fn has_caps(&self) -> bool {
+        self.caps != 0
+    }
+
+    /// Get the `AllocLen` of this message size, if it fits within a single capnp allocation,
+    /// without accounting for the root pointer.
+    #[inline]
+    pub fn alloc_words(&self) -> Option<AllocLen> {
+        if self.words > AllocLen::MAX_VALUE as u64 {
+            return None
+        }
+
+        AllocLen::new(self.words as u32)
+    }
+
+    /// Get the `AllocLen` of this message size, if it fits within a single capnp allocation,
+    /// including a root pointer.
+    #[inline]
+    pub fn alloc_words_with_root(&self) -> Option<AllocLen> {
+        if self.words >= AllocLen::MAX_VALUE as u64 {
+            return None
+        }
+
+        AllocLen::new(self.words as u32 + 1)
+    }
+}
+
 /// The size of a struct in data words and pointers.
 ///
 /// A struct in Cap'n Proto is made up of a "data" section and a pointer section. Space in each

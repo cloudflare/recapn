@@ -4,15 +4,15 @@ use core::convert::TryFrom;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 
-use crate::alloc::Word;
-use crate::any::{self, PtrReader};
+use crate::alloc::{Word, Global};
+use crate::any;
 use crate::field;
 use crate::internal::Sealed;
 use crate::list::{self, ElementSize, List};
-use crate::ptr::{self, MessageSize, StructSize};
+use crate::message::SingleSegmentMessage;
+use crate::ptr::{self, MessageSize, StructSize, ReturnErrors};
 use crate::rpc::{Capable, Table};
-use crate::ReaderOf;
-use crate::{IntoFamily, NotInSchema, Result};
+use crate::{Error, IntoFamily, NotInSchema, ReaderOf, Result};
 
 /// An enum marker trait.
 pub trait Enum: Copy + TryFrom<u16, Error = NotInSchema> + Into<u16> + Default + 'static {}
@@ -261,7 +261,7 @@ impl<T> ConstPtr<T> {
 
     /// Get the value of the constant as an untyped pointer.
     #[inline]
-    pub fn root(&self) -> PtrReader<'static> {
+    pub fn root(&self) -> any::PtrReader<'static> {
         let ptr = match self.inner {
             Some(ptr) => unsafe { ptr::PtrReader::new_unchecked(ptr) },
             None => ptr::PtrReader::null(),
@@ -270,12 +270,70 @@ impl<T> ConstPtr<T> {
     }
 }
 
-impl<T: FromPtr<PtrReader<'static>>> ConstPtr<T> {
+impl<T: FromPtr<any::PtrReader<'static>>> ConstPtr<T> {
     /// Get the value of the constant.
     #[inline]
     pub fn get(&self) -> T::Output {
         self.root().read_as::<T>()
     }
+}
+
+#[cfg(feature = "alloc")]
+pub struct DeepClone<S> {
+    s: PhantomData<fn() -> S>,
+    message: SingleSegmentMessage<Global>,
+}
+
+#[cfg(feature = "alloc")]
+impl<S: StructView> DeepClone<S> {
+    #[inline]
+    pub fn new(s: &ReaderOf<'_, S>) -> Result<Self> {
+        Self::from_ptr(s.as_ref())
+    }
+
+    fn from_ptr(s: &ptr::StructReader<'_>) -> Result<Self> {
+        let size = s.total_size()?;
+        if size.has_caps() {
+            return Err(Error::CapabilityNotAllowed);
+        }
+
+        let Some(len) = size.alloc_words_with_root() else {
+            return Err(Error::AllocTooLarge);
+        };
+
+        let mut message = SingleSegmentMessage::new(Global, len).unwrap();
+        let result = message.builder()
+            .into_root()
+            .as_mut()
+            .try_set_struct(s, ptr::CopySize::FromValue, ReturnErrors);
+
+        match result {
+            Err(Error::AllocFailed(_)) => unreachable!(),
+            r => r?,
+        }
+
+        assert!(message.is_full());
+
+        Ok(Self { s: PhantomData, message })
+    }
+
+    #[inline]
+    pub fn get(&self) -> ReaderOf<'_, S> {
+        let ptr = ptr::PtrReader::root(self.message.as_read_arena(), None, u32::MAX)
+            .expect("the message has a root pointer");
+        let reader = match ptr.to_struct() {
+            Ok(Some(ptr)) => ptr,
+            _ => ptr::StructReader::empty(),
+        };
+        StructReader::from_ptr(reader)
+    }
+}
+
+/// Create a deep clone of the given struct.
+#[inline]
+#[cfg(feature = "alloc")]
+pub fn deep_clone<S: StructView>(s: &ReaderOf<'_, S>) -> Result<DeepClone<S>> {
+    DeepClone::new(s)
 }
 
 pub type Void = ();
