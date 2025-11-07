@@ -1558,29 +1558,16 @@ impl<'a> SegmentReader<'a> {
     }
 
     #[inline]
-    fn contains(&self, ptr: SegmentPtr<'a>) -> bool {
-        let start = self.start_ptr();
-        let end = self.end();
-
-        start <= ptr && ptr < end
-    }
-
-    /// Checks if the pointer is a valid location in this segment, and if so,
-    /// returns a ref for it.
-    #[inline]
-    pub fn try_get(&self, ptr: SegmentPtr<'a>) -> Option<SegmentRef<'a>> {
-        if self.contains(ptr) {
-            Some(unsafe { ptr.as_ref_unchecked() })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
     pub fn try_get_section(&self, start: SegmentPtr<'a>, len: ObjectLen) -> Option<SegmentRef<'a>> {
         let end = start.offset(len);
         if end < start {
             // the pointer wrapped around the address space? should only happen on 32 bit
+            return None;
+        }
+
+        let segment_start = self.start_ptr();
+        if segment_start > start {
+            // the start is before the segment
             return None;
         }
 
@@ -1589,7 +1576,7 @@ impl<'a> SegmentReader<'a> {
             return None;
         }
 
-        self.try_get(start)
+        Some(unsafe { start.as_ref_unchecked() })
     }
 
     #[inline]
@@ -6993,5 +6980,19 @@ mod tests {
         assert_eq!(8, segments[3].len());
         assert_eq!(8, segments[4].len());
         assert_eq!(7, segments[5].len());
+    }
+
+    #[test]
+    // Test that we can allocate and read an empty list at the end of a segment.
+    fn empty_list_roundtrip() {
+        // Use the Global allocator so we only allocate a single word segment.
+        let mut message = Message::new(Global);
+        let mut root = message.builder().into_root();
+        let list = root.by_ref().init_list::<u8>(0);
+        assert_eq!(list.len().get(), 0);
+
+        let reader = root.as_reader();
+        let list = reader.try_read_as::<crate::list::List<u8>>().expect("to read an empty list");
+        assert_eq!(list.len(), 0);
     }
 }
