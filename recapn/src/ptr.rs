@@ -1946,6 +1946,7 @@ enum Location<'a> {
     },
 }
 
+#[derive(Debug)]
 struct StructContent<'a> {
     pub ptr: SegmentRef<'a>,
     pub size: StructSize,
@@ -1960,12 +1961,14 @@ impl<'a> StructContent<'a> {
     }
 }
 
+#[derive(Debug)]
 struct ListContent<'a> {
     pub ptr: SegmentRef<'a>,
     pub element_size: ElementSize,
     pub element_count: ElementCount,
 }
 
+#[derive(Debug)]
 enum TypedContent<'a> {
     Struct(StructContent<'a>),
     List(ListContent<'a>),
