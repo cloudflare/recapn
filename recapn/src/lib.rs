@@ -74,6 +74,9 @@ pub mod prelude {
     }
 }
 
+#[cfg(feature = "alloc")]
+pub use ty::deep_clone;
+
 /// A marker type used in place of a concrete generic implementation for a message's representation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Family;
