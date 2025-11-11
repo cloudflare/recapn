@@ -1,4 +1,6 @@
-use crate::chan::{self, LocalMessage, Receiver, RpcCall, RpcChannel, Sender};
+use crate::chan::{
+    self, MostResolved, Resolution, LocalMessage, Receiver, RpcCall, RpcChannel, Sender,
+};
 use crate::pipeline::{Pipeline, PipelineOf};
 use crate::table::{CapTable, Table};
 use crate::{Error, Result};
@@ -100,7 +102,35 @@ impl Client {
     }
 
     pub async fn when_resolved(&self) -> Result<(), Error> {
-        todo!()
+        // Walk the forwarding chain until we hit a final cap or error.
+        let mut client = &self.0;
+
+        loop {
+            // First check if the channel has already resolved to another
+            // channel or an error.
+            let (chan, resolution) = client.most_resolved();
+            client = chan;
+
+            match resolution {
+                Some(MostResolved::Dropped) => return Err(dropped_cap()),
+                Some(MostResolved::Error(err)) => return Err(err.clone()),
+                None => {
+                    match client.chan() {
+                        RpcChannel::Spawned | RpcChannel::Bootstrap(_) | RpcChannel::LocalShortening => {
+                            match client.resolution().await {
+                                Resolution::Forwarded(next) => {
+                                    client = next;
+                                }
+                                Resolution::Dropped => return Err(dropped_cap()),
+                                Resolution::Error(err) => return Err(err.clone()),
+                            }
+                            tokio::task::yield_now().await;
+                        }
+                        _ => return Ok(()),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -251,10 +281,11 @@ impl<P: ty::Struct> StreamingRequest<P> {
 
 impl<P> StreamingRequest<P> {
     pub async fn send(self) -> Result<()> {
+        // Wait until the client is ready; avoids flooding the remote vat.
+        self.client.when_resolved().await?;
+
         let call = self.request.build();
         let (req, resp) = request_response::<RpcChannel>(call);
-
-        // TODO handle flow control.
 
         if let Err((_, err)) = self.client.0.send(req) {
             return Err(err.map_or_else(dropped_cap, |e| e.clone()));

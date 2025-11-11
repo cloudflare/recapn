@@ -11,6 +11,7 @@ use recapn::arena::ReadArena;
 use recapn::message::{self, Message, ReaderOptions};
 use recapn::rpc::Capable;
 use recapn_channel::mpsc;
+pub use recapn_channel::mpsc::{MostResolved, Resolution};
 use recapn_channel::request::{self, ResponseReceiverFactory};
 use recapn_channel::{Chan, IntoResults, PipelineResolver};
 
