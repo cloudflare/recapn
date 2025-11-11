@@ -15,19 +15,19 @@
 //! this set of types combines the channel queue with the oneshot mechanism and makes it
 //! so one request makes one allocation.
 
-use std::cell::UnsafeCell;
-use std::fmt::{self, Debug};
-use std::future::{poll_fn, Future};
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
-use std::pin::Pin;
-use std::process::abort;
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::{Arc, Weak};
-use std::task::{Context, Poll, Waker};
+use alloc::boxed::Box;
+use alloc::sync::{Arc, Weak};
+use core::cell::UnsafeCell;
+use core::fmt::{self, Debug};
+use core::future::{poll_fn, Future};
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::mem::MaybeUninit;
+use core::pin::Pin;
+use core::ptr::{addr_of_mut, NonNull};
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering::Relaxed;
+use core::task::{Context, Poll, Waker};
 
 use parking_lot::{Mutex, MutexGuard};
 use pin_project::{pin_project, pinned_drop};
@@ -444,7 +444,7 @@ impl<C: Chan + ?Sized> Eq for Sender<C> {}
 
 impl<C: Chan + ?Sized> Hash for Sender<C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(Arc::as_ptr(&self.shared), state);
+        core::ptr::hash(Arc::as_ptr(&self.shared), state);
     }
 }
 
@@ -500,19 +500,19 @@ impl<C: Chan> Receiver<C> {
             let self_ptr = core::ptr::from_ref(this.as_ref());
             let other_ptr = core::ptr::from_ref(other_shared.as_ref());
             match self_ptr.cmp(&other_ptr) {
-                std::cmp::Ordering::Less => {
+                core::cmp::Ordering::Less => {
                     lock_a = this.state.lock();
                     lock_b = other_shared.state.lock();
                     self_lock = &mut lock_a;
                     other_lock = &mut lock_b;
                 }
-                std::cmp::Ordering::Greater => {
+                core::cmp::Ordering::Greater => {
                     lock_a = other_shared.state.lock();
                     lock_b = this.state.lock();
                     self_lock = &mut lock_b;
                     other_lock = &mut lock_a;
                 }
-                std::cmp::Ordering::Equal => return Err(self),
+                core::cmp::Ordering::Equal => return Err(self),
             };
 
             (other, resolution) = other.most_resolved();
@@ -745,7 +745,7 @@ impl<C: Chan + ?Sized> ResolutionState<C> {
         let old = self.sender_count.fetch_add(1, Relaxed);
 
         if old == usize::MAX {
-            abort();
+            panic!("out of sender counters");
         }
 
         // Make sure I don't accidentally attempt to re-open the channel.

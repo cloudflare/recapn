@@ -1,10 +1,10 @@
-use std::cell::UnsafeCell;
-use std::marker::PhantomPinned;
-use std::pin::{pin, Pin};
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
-use std::task::{Context, Waker};
+use core::cell::UnsafeCell;
+use core::marker::PhantomPinned;
+use core::pin::{pin, Pin};
+use core::ptr::{addr_of_mut, NonNull};
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use core::task::{Context, Waker};
 
 use parking_lot::Mutex;
 use pin_project::pin_project;
@@ -146,7 +146,7 @@ impl WaitList {
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
         let mut list =
-            RecvWaitersList::new(std::mem::take(&mut *waiters), pinned_guard.as_ref(), self);
+            RecvWaitersList::new(core::mem::take(&mut *waiters), pinned_guard.as_ref(), self);
 
         const NUM_WAKERS: usize = 32;
 
@@ -305,7 +305,7 @@ impl RecvWaiter {
                                 || matches!(current, Some(w) if w.will_wake(polling_waker));
                             if should_update {
                                 old_waker =
-                                    std::mem::replace(&mut *current, Some(polling_waker.clone()));
+                                    core::mem::replace(&mut *current, Some(polling_waker.clone()));
                             }
                         }
 
@@ -485,7 +485,7 @@ impl ClosedWaiter {
                             || matches!(current, Some(w) if w.will_wake(polling_waker));
                         if should_update {
                             old_waker =
-                                std::mem::replace(&mut *current, Some(polling_waker.clone()));
+                                core::mem::replace(&mut *current, Some(polling_waker.clone()));
                         }
                     }
 
