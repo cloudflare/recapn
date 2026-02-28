@@ -98,6 +98,18 @@ impl _p::ty::Struct for Message {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Message {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = message::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for message::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Message {
     const UNIMPLEMENTED: _p::VariantDescriptor<_p::Struct<Message>> = _p::VariantDescriptor::<
         _p::Struct<Message>,
@@ -618,6 +630,7 @@ pub mod message {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Message<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Message<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Message<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Unimplemented(_p::ViewOf<T, _p::Struct<super::Message>>),
         Abort(_p::ViewOf<T, _p::Struct<super::Exception>>),
@@ -641,166 +654,166 @@ pub mod message {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Unimplemented(
+                        Which::Unimplemented(unsafe {
                             <_p::Struct<
                                 super::Message,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Abort(
+                        Which::Abort(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ABORT.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::Call(
+                        Which::Call(unsafe {
                             <_p::Struct<
                                 super::Call,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::CALL.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::Return(
+                        Which::Return(unsafe {
                             <_p::Struct<
                                 super::Return,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RETURN.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::Finish(
+                        Which::Finish(unsafe {
                             <_p::Struct<
                                 super::Finish,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::FINISH.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::Resolve(
+                        Which::Resolve(unsafe {
                             <_p::Struct<
                                 super::Resolve,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RESOLVE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 6u16 => {
                     Ok(
-                        Which::Release(
+                        Which::Release(unsafe {
                             <_p::Struct<
                                 super::Release,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::RELEASE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 7u16 => {
                     Ok(
-                        Which::ObsoleteSave(
+                        Which::ObsoleteSave(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::OBSOLETE_SAVE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 8u16 => {
                     Ok(
-                        Which::Bootstrap(
+                        Which::Bootstrap(unsafe {
                             <_p::Struct<
                                 super::Bootstrap,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::BOOTSTRAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 9u16 => {
                     Ok(
-                        Which::ObsoleteDelete(
+                        Which::ObsoleteDelete(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::OBSOLETE_DELETE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 10u16 => {
                     Ok(
-                        Which::Provide(
+                        Which::Provide(unsafe {
                             <_p::Struct<
                                 super::Provide,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::PROVIDE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 11u16 => {
                     Ok(
-                        Which::Accept(
+                        Which::Accept(unsafe {
                             <_p::Struct<
                                 super::Accept,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::ACCEPT.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 12u16 => {
                     Ok(
-                        Which::Join(
+                        Which::Join(unsafe {
                             <_p::Struct<
                                 super::Join,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::JOIN.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 13u16 => {
                     Ok(
-                        Which::Disembargo(
+                        Which::Disembargo(unsafe {
                             <_p::Struct<
                                 super::Disembargo,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Message::DISEMBARGO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -817,166 +830,166 @@ pub mod message {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Unimplemented(
+                        Which::Unimplemented(unsafe {
                             <_p::Struct<
                                 super::Message,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::UNIMPLEMENTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Abort(
+                        Which::Abort(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ABORT.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::Call(
+                        Which::Call(unsafe {
                             <_p::Struct<
                                 super::Call,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::CALL.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::Return(
+                        Which::Return(unsafe {
                             <_p::Struct<
                                 super::Return,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RETURN.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::Finish(
+                        Which::Finish(unsafe {
                             <_p::Struct<
                                 super::Finish,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::FINISH.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::Resolve(
+                        Which::Resolve(unsafe {
                             <_p::Struct<
                                 super::Resolve,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RESOLVE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 6u16 => {
                     Ok(
-                        Which::Release(
+                        Which::Release(unsafe {
                             <_p::Struct<
                                 super::Release,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::RELEASE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 7u16 => {
                     Ok(
-                        Which::ObsoleteSave(
+                        Which::ObsoleteSave(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::OBSOLETE_SAVE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 8u16 => {
                     Ok(
-                        Which::Bootstrap(
+                        Which::Bootstrap(unsafe {
                             <_p::Struct<
                                 super::Bootstrap,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::BOOTSTRAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 9u16 => {
                     Ok(
-                        Which::ObsoleteDelete(
+                        Which::ObsoleteDelete(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::OBSOLETE_DELETE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 10u16 => {
                     Ok(
-                        Which::Provide(
+                        Which::Provide(unsafe {
                             <_p::Struct<
                                 super::Provide,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::PROVIDE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 11u16 => {
                     Ok(
-                        Which::Accept(
+                        Which::Accept(unsafe {
                             <_p::Struct<
                                 super::Accept,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::ACCEPT.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 12u16 => {
                     Ok(
-                        Which::Join(
+                        Which::Join(unsafe {
                             <_p::Struct<
                                 super::Join,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::JOIN.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 13u16 => {
                     Ok(
-                        Which::Disembargo(
+                        Which::Disembargo(unsafe {
                             <_p::Struct<
                                 super::Disembargo,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Message::DISEMBARGO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -1081,6 +1094,19 @@ impl _p::ty::Struct for Bootstrap {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Bootstrap {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = bootstrap::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for bootstrap::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Bootstrap {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -1142,6 +1168,7 @@ pub mod bootstrap {
     pub type Builder<'a, T = _p::rpc::Empty> = super::Bootstrap<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::Bootstrap<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Call<T = _p::Family>(T);
@@ -1239,6 +1266,18 @@ impl _p::ty::Struct for Call {
         data: 3u16,
         ptrs: 3u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for Call {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = call::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for call::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl Call {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
@@ -1447,6 +1486,7 @@ pub mod call {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Call<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Call<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Call<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct SendResultsTo<T = _p::Family>(T);
     impl _p::ty::SchemaType for SendResultsTo {
@@ -1544,8 +1584,25 @@ pub mod call {
     }
     impl _p::FieldGroup for SendResultsTo {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(3usize, 0);
-            <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
+            unsafe {
+                s.set_field_unchecked(3usize, 0);
+            }
+            unsafe {
+                <() as _p::field::FieldType>::clear(s, &SendResultsTo::CALLER.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for SendResultsTo {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = send_results_to::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for send_results_to::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl SendResultsTo {
@@ -1655,6 +1712,7 @@ pub mod call {
         pub type Builder<'a, T = _p::rpc::Empty> = super::SendResultsTo<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::SendResultsTo<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Caller(_p::ViewOf<T, ()>),
             Yourself(_p::ViewOf<T, ()>),
@@ -1670,32 +1728,32 @@ pub mod call {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Caller(
+                            Which::Caller(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::CALLER.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Yourself(
+                            Which::Yourself(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::YOURSELF.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::ThirdParty(
+                            Which::ThirdParty(unsafe {
                                 <_p::AnyPtr as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::SendResultsTo::THIRD_PARTY.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -1712,32 +1770,32 @@ pub mod call {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Caller(
+                            Which::Caller(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::CALLER.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Yourself(
+                            Which::Yourself(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::YOURSELF.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::ThirdParty(
+                            Which::ThirdParty(unsafe {
                                 <_p::AnyPtr as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::SendResultsTo::THIRD_PARTY.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -1842,6 +1900,19 @@ impl _p::ty::Struct for Return {
         data: 2u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for Return {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = r#return::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for r#return::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl Return {
     const ANSWER_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
@@ -2099,6 +2170,7 @@ pub mod r#return {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Return<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Return<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Return<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Results(_p::ViewOf<T, _p::Struct<super::Payload>>),
         Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
@@ -2114,66 +2186,66 @@ pub mod r#return {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Results(
+                        Which::Results(unsafe {
                             <_p::Struct<
                                 super::Payload,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::RESULTS.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Exception(
+                        Which::Exception(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::EXCEPTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::Canceled(
+                        Which::Canceled(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::CANCELED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::ResultsSentElsewhere(
+                        Which::ResultsSentElsewhere(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::RESULTS_SENT_ELSEWHERE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::TakeFromOtherQuestion(
+                        Which::TakeFromOtherQuestion(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::TAKE_FROM_OTHER_QUESTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::AcceptFromThirdParty(
+                        Which::AcceptFromThirdParty(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Return::ACCEPT_FROM_THIRD_PARTY.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -2190,66 +2262,66 @@ pub mod r#return {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Results(
+                        Which::Results(unsafe {
                             <_p::Struct<
                                 super::Payload,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::RESULTS.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Exception(
+                        Which::Exception(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::EXCEPTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::Canceled(
+                        Which::Canceled(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::CANCELED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::ResultsSentElsewhere(
+                        Which::ResultsSentElsewhere(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::RESULTS_SENT_ELSEWHERE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::TakeFromOtherQuestion(
+                        Which::TakeFromOtherQuestion(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::TAKE_FROM_OTHER_QUESTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::AcceptFromThirdParty(
+                        Which::AcceptFromThirdParty(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Return::ACCEPT_FROM_THIRD_PARTY.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -2354,6 +2426,18 @@ impl _p::ty::Struct for Finish {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Finish {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = finish::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for finish::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Finish {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -2400,6 +2484,7 @@ pub mod finish {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Finish<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Finish<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Finish<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Resolve<T = _p::Family>(T);
@@ -2497,6 +2582,18 @@ impl _p::ty::Struct for Resolve {
         data: 1u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for Resolve {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = resolve::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for resolve::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl Resolve {
     const PROMISE_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
@@ -2602,6 +2699,7 @@ pub mod resolve {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Resolve<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Resolve<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Cap(_p::ViewOf<T, _p::Struct<super::CapDescriptor>>),
         Exception(_p::ViewOf<T, _p::Struct<super::Exception>>),
@@ -2613,26 +2711,26 @@ pub mod resolve {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Cap(
+                        Which::Cap(unsafe {
                             <_p::Struct<
                                 super::CapDescriptor,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::CAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Exception(
+                        Which::Exception(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::Resolve::EXCEPTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -2649,26 +2747,26 @@ pub mod resolve {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Cap(
+                        Which::Cap(unsafe {
                             <_p::Struct<
                                 super::CapDescriptor,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::CAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Exception(
+                        Which::Exception(unsafe {
                             <_p::Struct<
                                 super::Exception,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::Resolve::EXCEPTION.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -2773,6 +2871,18 @@ impl _p::ty::Struct for Release {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Release {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = release::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for release::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Release {
     const ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -2814,6 +2924,7 @@ pub mod release {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Release<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Release<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Release<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Disembargo<T = _p::Family>(T);
@@ -2912,6 +3023,19 @@ impl _p::ty::Struct for Disembargo {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Disembargo {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = disembargo::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for disembargo::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Disembargo {
     const TARGET: _p::Descriptor<_p::Struct<MessageTarget>> = _p::Descriptor::<
         _p::Struct<MessageTarget>,
@@ -2983,6 +3107,7 @@ pub mod disembargo {
     pub type Builder<'a, T = _p::rpc::Empty> = super::Disembargo<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::Disembargo<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Context<T = _p::Family>(T);
     impl _p::ty::SchemaType for Context {
@@ -3079,8 +3204,25 @@ pub mod disembargo {
     }
     impl _p::FieldGroup for Context {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(2usize, 0);
-            <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
+            unsafe {
+                s.set_field_unchecked(2usize, 0);
+            }
+            unsafe {
+                <u32 as _p::field::FieldType>::clear(s, &Context::SENDER_LOOPBACK.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Context {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = context::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for context::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Context {
@@ -3202,6 +3344,7 @@ pub mod disembargo {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Context<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Context<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             SenderLoopback(_p::ViewOf<T, u32>),
             ReceiverLoopback(_p::ViewOf<T, u32>),
@@ -3218,42 +3361,42 @@ pub mod disembargo {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::SenderLoopback(
+                            Which::SenderLoopback(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::SENDER_LOOPBACK.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::ReceiverLoopback(
+                            Which::ReceiverLoopback(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::RECEIVER_LOOPBACK.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Accept(
+                            Which::Accept(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::ACCEPT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::Provide(
+                            Which::Provide(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Context::PROVIDE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -3270,42 +3413,42 @@ pub mod disembargo {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::SenderLoopback(
+                            Which::SenderLoopback(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::SENDER_LOOPBACK.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::ReceiverLoopback(
+                            Which::ReceiverLoopback(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::RECEIVER_LOOPBACK.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Accept(
+                            Which::Accept(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::ACCEPT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::Provide(
+                            Which::Provide(unsafe {
                                 <u32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Context::PROVIDE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -3411,6 +3554,18 @@ impl _p::ty::Struct for Provide {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Provide {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = provide::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for provide::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Provide {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -3492,6 +3647,7 @@ pub mod provide {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Provide<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Provide<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Provide<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Accept<T = _p::Family>(T);
@@ -3590,6 +3746,18 @@ impl _p::ty::Struct for Accept {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Accept {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = accept::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for accept::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Accept {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -3653,6 +3821,7 @@ pub mod accept {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Accept<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Accept<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Accept<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Join<T = _p::Family>(T);
@@ -3751,6 +3920,18 @@ impl _p::ty::Struct for Join {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Join {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = join::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for join::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Join {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -3827,6 +4008,7 @@ pub mod join {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Join<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Join<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Join<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct MessageTarget<T = _p::Family>(T);
@@ -3925,6 +4107,19 @@ impl _p::ty::Struct for MessageTarget {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for MessageTarget {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = message_target::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for message_target::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl MessageTarget {
     const IMPORTED_CAP: _p::VariantDescriptor<u32> = _p::VariantDescriptor::<u32> {
         variant: _p::VariantInfo {
@@ -4017,6 +4212,7 @@ pub mod message_target {
     pub type Builder<'a, T = _p::rpc::Empty> = super::MessageTarget<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::MessageTarget<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         ImportedCap(_p::ViewOf<T, u32>),
         PromisedAnswer(_p::ViewOf<T, _p::Struct<super::PromisedAnswer>>),
@@ -4028,24 +4224,24 @@ pub mod message_target {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::ImportedCap(
+                        Which::ImportedCap(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::MessageTarget::IMPORTED_CAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::PromisedAnswer(
+                        Which::PromisedAnswer(unsafe {
                             <_p::Struct<
                                 super::PromisedAnswer,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -4062,24 +4258,24 @@ pub mod message_target {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::ImportedCap(
+                        Which::ImportedCap(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::MessageTarget::IMPORTED_CAP.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::PromisedAnswer(
+                        Which::PromisedAnswer(unsafe {
                             <_p::Struct<
                                 super::PromisedAnswer,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::MessageTarget::PROMISED_ANSWER.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -4184,6 +4380,18 @@ impl _p::ty::Struct for Payload {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for Payload {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = payload::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for payload::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl Payload {
     const CONTENT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
@@ -4255,6 +4463,7 @@ pub mod payload {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::Payload<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::Payload<_p::StructBuilder<'a, T>>;
+    pub type Pipeline<P> = super::Payload<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct CapDescriptor<T = _p::Family>(T);
@@ -4352,6 +4561,19 @@ impl _p::ty::Struct for CapDescriptor {
         data: 1u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for CapDescriptor {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = cap_descriptor::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for cap_descriptor::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl CapDescriptor {
     const ATTACHED_FD: _p::Descriptor<u8> = _p::Descriptor::<u8> {
@@ -4591,6 +4813,7 @@ pub mod cap_descriptor {
     pub type Builder<'a, T = _p::rpc::Empty> = super::CapDescriptor<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::CapDescriptor<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         None(_p::ViewOf<T, ()>),
         SenderHosted(_p::ViewOf<T, u32>),
@@ -4606,66 +4829,66 @@ pub mod cap_descriptor {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::None(
+                        Which::None(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::NONE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::SenderHosted(
+                        Which::SenderHosted(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::SENDER_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::SenderPromise(
+                        Which::SenderPromise(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::SENDER_PROMISE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::ReceiverHosted(
+                        Which::ReceiverHosted(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::RECEIVER_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::ReceiverAnswer(
+                        Which::ReceiverAnswer(unsafe {
                             <_p::Struct<
                                 super::PromisedAnswer,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::ThirdPartyHosted(
+                        Which::ThirdPartyHosted(unsafe {
                             <_p::Struct<
                                 super::ThirdPartyCapDescriptor,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -4682,66 +4905,66 @@ pub mod cap_descriptor {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::None(
+                        Which::None(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::NONE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::SenderHosted(
+                        Which::SenderHosted(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::SENDER_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 2u16 => {
                     Ok(
-                        Which::SenderPromise(
+                        Which::SenderPromise(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::SENDER_PROMISE.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 3u16 => {
                     Ok(
-                        Which::ReceiverHosted(
+                        Which::ReceiverHosted(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::RECEIVER_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 4u16 => {
                     Ok(
-                        Which::ReceiverAnswer(
+                        Which::ReceiverAnswer(unsafe {
                             <_p::Struct<
                                 super::PromisedAnswer,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::RECEIVER_ANSWER.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 5u16 => {
                     Ok(
-                        Which::ThirdPartyHosted(
+                        Which::ThirdPartyHosted(unsafe {
                             <_p::Struct<
                                 super::ThirdPartyCapDescriptor,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::CapDescriptor::THIRD_PARTY_HOSTED.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -4846,6 +5069,19 @@ impl _p::ty::Struct for PromisedAnswer {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for PromisedAnswer {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = promised_answer::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for promised_answer::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl PromisedAnswer {
     const QUESTION_ID: _p::Descriptor<u32> = _p::Descriptor::<u32> {
         slot: 0u32,
@@ -4918,6 +5154,7 @@ pub mod promised_answer {
     pub type Builder<'a, T = _p::rpc::Empty> = super::PromisedAnswer<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::PromisedAnswer<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Op<T = _p::Family>(T);
     impl _p::ty::SchemaType for Op {
@@ -5018,6 +5255,18 @@ pub mod promised_answer {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Op {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = op::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for op::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Op {
         const NOOP: _p::VariantDescriptor<()> = _p::VariantDescriptor::<()> {
             variant: _p::VariantInfo {
@@ -5078,6 +5327,7 @@ pub mod promised_answer {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Op<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Op<_p::StructBuilder<'a, T>>;
+        pub type Pipeline<P> = super::Op<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Noop(_p::ViewOf<T, ()>),
             GetPointerField(_p::ViewOf<T, u16>),
@@ -5092,22 +5342,22 @@ pub mod promised_answer {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Noop(
+                            Which::Noop(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Op::NOOP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::GetPointerField(
+                            Which::GetPointerField(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Op::GET_POINTER_FIELD.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5124,22 +5374,22 @@ pub mod promised_answer {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Noop(
+                            Which::Noop(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Op::NOOP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::GetPointerField(
+                            Which::GetPointerField(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Op::GET_POINTER_FIELD.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5255,6 +5505,19 @@ impl _p::ty::Struct for ThirdPartyCapDescriptor {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for ThirdPartyCapDescriptor {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = third_party_cap_descriptor::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for third_party_cap_descriptor::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl ThirdPartyCapDescriptor {
     const ID: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
@@ -5322,6 +5585,7 @@ pub mod third_party_cap_descriptor {
     pub type Builder<'a, T = _p::rpc::Empty> = super::ThirdPartyCapDescriptor<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::ThirdPartyCapDescriptor<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct Exception<T = _p::Family>(T);
@@ -5419,6 +5683,19 @@ impl _p::ty::Struct for Exception {
         data: 1u16,
         ptrs: 2u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for Exception {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = exception::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for exception::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl Exception {
     const REASON: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
@@ -5542,6 +5819,7 @@ pub mod exception {
     pub type Builder<'a, T = _p::rpc::Empty> = super::Exception<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::Exception<::recapn::rpc::Pipeline<P>>;
     #[repr(u16)]
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
     pub enum Type {

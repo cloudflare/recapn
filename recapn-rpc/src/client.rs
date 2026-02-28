@@ -1,7 +1,7 @@
 use crate::chan::{self, LocalMessage, Receiver, RpcCall, RpcChannel, Sender};
 use crate::pipeline::{Pipeline, PipelineOf};
 use crate::table::{CapTable, Table};
-use crate::{Error, Result};
+use crate::{Error, Result, rpc_capnp};
 use pin_project::pin_project;
 use recapn::any;
 use recapn::message::{Message, ReaderOptions};
@@ -36,6 +36,10 @@ impl Client {
     /// return the error passed in here.
     pub fn broken(err: Error) -> Self {
         Self(mpsc::broken(RpcChannel::Broken, err))
+    }
+
+    pub fn null() -> Self {
+        Self::broken(crate::connection::null_cap_error())
     }
 
     /// Returns a Client that queues up calls until `future` is ready, then forwards them
@@ -157,7 +161,7 @@ pub(crate) fn dropped_cap() -> Error {
     Error::disconnected("capability was dropped")
 }
 
-fn dropped_request() -> Error {
+pub(crate) fn dropped_request() -> Error {
     Error::disconnected("request was dropped before it could be responded to")
 }
 
@@ -355,12 +359,20 @@ pub struct Results<'a, T> {
 impl<T: ty::Struct> Results<'_, T> {
     /// Gets the root structure of the results.
     pub fn get(&self) -> ReaderOf<'_, T, CapTable<'_>> {
-        match self.root {
+        let payload = match self.root {
             chan::ResultsRoot::Results => self
                 .reader
-                .root()
-                .imbue(self.table.reader())
-                .read_as_struct::<T>(),
-        }
+                .root(),
+            chan::ResultsRoot::Return => self
+                .reader
+                .read_as_struct::<rpc_capnp::Message>()
+                .r#return()
+                .get_or_default()
+                .results()
+                .get_or_default()
+                .content()
+                .get()
+        };
+        payload.imbue(self.table.reader()).read_as_struct::<T>()
     }
 }

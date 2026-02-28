@@ -215,10 +215,27 @@ pub struct SegmentSet<S> {
 
 #[cfg(feature = "alloc")]
 impl SegmentSet<Box<[Word]>> {
-    pub fn new(table: SegmentSetTable, data: Box<[Word]>) -> Self {
+    pub fn from_boxed_slice(table: SegmentSetTable, data: Box<[Word]>) -> Self {
         assert!(table.last_start() <= data.len(), "incomplete data!");
 
         Self { slice: data, table }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> SegmentSet<&'a [Word]> {
+    pub fn from_slice(table: SegmentSetTable, data: &'a [Word]) -> Self {
+        assert!(table.last_start() <= data.len(), "incomplete data!");
+
+        Self { slice: data, table }
+    }
+
+    /// Copy the data in this segment set into a new `Box<[Word]>`
+    pub fn into_boxed_slice_set(self) -> SegmentSet<Box<[Word]>> {
+        SegmentSet {
+            slice: self.slice.into(),
+            table: self.table,
+        }
     }
 }
 
@@ -406,7 +423,7 @@ pub fn read_from_stream<R: io::Read>(
     let mut data = vec![Word::NULL; message_len].into_boxed_slice();
     r.read_exact(Word::slice_to_bytes_mut(&mut data))?;
 
-    Ok(SegmentSet::new(table, data))
+    Ok(SegmentSet::from_boxed_slice(table, data))
 }
 
 /// A `BufRead` paired with an unpacker.
@@ -568,7 +585,7 @@ pub fn read_with_packed_stream<R: io::BufRead>(
     let mut data = vec![Word::NULL; message_len].into_boxed_slice();
     stream.read_exact(&mut data)?;
 
-    Ok(SegmentSet::new(table, data))
+    Ok(SegmentSet::from_boxed_slice(table, data))
 }
 
 #[cfg(feature = "std")]

@@ -6,7 +6,7 @@ use crate::Error;
 
 use super::client::Client;
 
-type TableVec = Vec<Option<Client>>;
+pub(crate) type TableVec = Vec<Option<Client>>;
 
 /// A cap table represented internally as a `Vec` of `Client`s.
 ///

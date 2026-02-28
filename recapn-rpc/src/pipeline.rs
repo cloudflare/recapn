@@ -34,11 +34,11 @@ impl rpc::CapSystem for Pipeline {
 impl rpc::Pipelined for Pipeline {
     fn into_cap(self) -> Self::Cap {
         let ops = Arc::from(self.ops);
-        Client(self.builder.build(ops, || RpcChannel::Pipeline))
+        Client(self.builder.build::<Arc<_>, [_], _>(ops, || RpcChannel::Pipeline))
     }
     fn to_cap(&self) -> Self::Cap {
         let ops = Arc::from(self.ops.as_slice());
-        Client(self.builder.build(ops, || RpcChannel::Pipeline))
+        Client(self.builder.build::<Arc<_>, [_], _>(ops, || RpcChannel::Pipeline))
     }
 }
 
@@ -51,4 +51,4 @@ impl rpc::PipelineBuilder<AnyPtr> for Pipeline {
     }
 }
 
-pub type PipelineOf<R> = <R as rpc::Pipelinable>::Pipeline<Pipeline>;
+pub type PipelineOf<R> = recapn::rpc::PipelineOf<R, Pipeline>;

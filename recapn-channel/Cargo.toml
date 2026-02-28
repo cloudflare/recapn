@@ -5,14 +5,15 @@ authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-pin-project = "1.1"
-parking_lot = "0.12"
-hashbrown = "0.14"
-scopeguard = "1.2"
+pin-project.workspace = true
+parking_lot.workspace = true
+hashbrown.workspace = true
+scopeguard.workspace = true
 
 [dev-dependencies]
-tokio-test = "0.4"
-assert_matches2 = "0.1"
+tokio.workspace = true
+tokio-test.workspace = true
+assert_matches2.workspace = true
 
 [lints]
 workspace = true

@@ -98,6 +98,7 @@ pub enum GeneratedItem {
     Struct(GeneratedStruct),
     Enum(GeneratedEnum),
     Const(GeneratedConst),
+    Interface(GeneratedInterface),
 }
 
 impl ToTokens for GeneratedItem {
@@ -106,6 +107,7 @@ impl ToTokens for GeneratedItem {
             Self::Struct(s) => s.to_tokens(tokens),
             Self::Enum(e) => e.to_tokens(tokens),
             Self::Const(c) => c.to_tokens(tokens),
+            Self::Interface(i) => i.to_tokens(tokens),
         }
     }
 }
@@ -117,6 +119,7 @@ pub struct GeneratedStruct {
     pub type_params: Vec<syn::TypeParam>,
     pub size: Option<StructSize>,
     pub fields: Vec<GeneratedField>,
+    pub pipeline_fields: Vec<GeneratedPipelineOp>,
     pub which: Option<GeneratedWhich>,
     pub nested_items: Vec<GeneratedItem>,
 }
@@ -215,7 +218,7 @@ impl GeneratedStruct {
                 field: GeneratedField { descriptor_ident, .. },
                 case,
             }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&repr.0, &super::#struct_name::#descriptor_ident.field))))
+                quote!(#case => Ok(Which::#name(unsafe { <#field_type as _p::field::FieldType>::accessor(&repr.0, &super::#struct_name::#descriptor_ident.field) })))
             });
         let disciminant_mut_matches = fields.iter()
             .map(|GeneratedVariant {
@@ -224,7 +227,7 @@ impl GeneratedStruct {
                 field: GeneratedField { descriptor_ident, .. },
                 case,
             }| {
-                quote!(#case => Ok(Which::#name(<#field_type as _p::field::FieldType>::accessor(&mut repr.0, &super::#struct_name::#descriptor_ident.field))))
+                quote!(#case => Ok(Which::#name(unsafe { <#field_type as _p::field::FieldType>::accessor(&mut repr.0, &super::#struct_name::#descriptor_ident.field) })))
             });
 
         Some(quote! {
@@ -277,6 +280,21 @@ to_tokens!(
             let own_accessors = self.own_accessors();
             let (which_ref_accessor, which_mut_accessor) = self.which_accessors().unzip();
             let which_type = self.which_type();
+            let pipeline_impl = if !self.pipeline_fields.is_empty() {
+                let funcs = self.pipeline_fields.iter().map(GeneratedPipelineOp::accessor);
+                let impl_block = quote! {
+                    impl<P> #modname::Pipeline<P>
+                    where
+                        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+                        P: ::recapn::rpc::PipelineBuilder<::recapn::any::AnyPtr, Operation = ::recapn_rpc::pipeline::PipelineOp>,
+                    {
+                        #(#funcs)*
+                    }
+                };
+                Some(impl_block)
+            } else {
+                None
+            };
             let struct_view = quote! {
                 impl _p::StructView for #name {
                     type Reader<'a, T: _p::rpc::Table> = #modname::Reader<'a, T>;
@@ -403,6 +421,20 @@ to_tokens!(
                 #struct_view
                 #struct_group_marker
 
+                impl ::recapn::rpc::Pipelinable for #name {
+                    type Pipeline<P: ::recapn::rpc::Pipelined> = #modname::Pipeline<P>;
+                }
+                impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for #modname::Pipeline<P> {
+                    type Pipeline = P;
+
+                    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                        Self(p)
+                    }
+                    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                        self.0
+                    }
+                }
+
                 impl #name {
                     #(#descriptors)*
                 }
@@ -418,11 +450,14 @@ to_tokens!(
                     #which_mut_accessor
                 }
 
+                #pipeline_impl
+
                 pub mod #modname {
                     use super::{__file, __imports, _p};
 
                     pub type Reader<'a, T = _p::rpc::Empty> = super::#name<_p::StructReader<'a, T>>;
                     pub type Builder<'a, T = _p::rpc::Empty> = super::#name<_p::StructBuilder<'a, T>>;
+                    pub type Pipeline<P> = super::#name<::recapn::rpc::Pipeline<P>>;
 
                     #which_type
 
@@ -443,6 +478,44 @@ pub struct GeneratedField {
     pub own_accessor_ident: Option<syn::Ident>,
     pub descriptor_ident: syn::Ident,
     pub descriptor: Option<FieldDescriptor>,
+}
+
+pub enum PipelineType {
+    Group,
+    Field(u16),
+    Capability(u16),
+}
+
+pub struct GeneratedPipelineOp {
+    pub field_name: syn::Ident,
+    pub return_type: syn::Type,
+    pub pipelined: PipelineType,
+}
+
+impl GeneratedPipelineOp {
+    fn accessor(&self) -> TokenStream {
+        let Self { field_name, return_type, pipelined } = self;
+        let body = match pipelined {
+            PipelineType::Field(index) => quote! {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(#index))
+                )
+            },
+            PipelineType::Group => quote! {
+                ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+            },
+            PipelineType::Capability(index) => quote! {
+                ::recapn::ty::Capability::from_client(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(#index)).into_cap()
+                )
+            },
+        };
+        quote! {
+            pub fn #field_name(self) -> #return_type {
+                #body
+            }
+        }
+    }
 }
 
 pub struct FieldDescriptor {
@@ -534,7 +607,9 @@ impl GeneratedField {
             ..
         } = self;
         quote! {
-            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor);
+            unsafe {
+                <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor);
+            }
         }
     }
 }
@@ -569,7 +644,7 @@ impl GeneratedWhich {
     pub fn call_clear(&self) -> impl Iterator<Item = TokenStream> + '_ {
         let tag_slot = self.tag_slot as usize;
         let clear_tag = quote! {
-            s.set_field_unchecked(#tag_slot, 0);
+            unsafe { s.set_field_unchecked(#tag_slot, 0); }
         };
 
         let clear_first = self
@@ -682,7 +757,9 @@ impl GeneratedVariant {
             ..
         } = &self.field;
         quote! {
-            <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor.field);
+            unsafe {
+                <#field_type as _p::field::FieldType>::clear(s, &#type_name::#descriptor.field);
+            }
         }
     }
 }
@@ -755,5 +832,99 @@ to_tokens!(
             value,
         } = self;
         quote!(pub const #ident: #const_type = #value;)
+    }
+);
+
+pub struct GeneratedInterface {
+    pub name: String,
+    pub mod_ident: syn::Ident,
+    pub client_ident: syn::Ident,
+    pub client_methods: Vec<syn::ImplItemFn>,
+    pub server_ident: syn::Ident,
+    pub server_supertraits: Vec<syn::TypeParamBound>,
+    pub server_methods: Vec<syn::TraitItemFn>,
+    pub dispatch_ident: syn::Ident,
+    pub dispatch_interfaces: Vec<syn::Arm>,
+    pub nested_items: Vec<GeneratedItem>,
+}
+
+to_tokens!(
+    GeneratedInterface |self| {
+        let Self {
+            name,
+            mod_ident,
+            client_ident,
+            client_methods,
+            server_ident,
+            server_supertraits,
+            server_methods,
+            dispatch_ident,
+            dispatch_interfaces,
+            nested_items,
+        } = self;
+        quote! {
+            #[derive(Clone, Debug)]
+            pub struct #client_ident(::recapn_rpc::client::Client);
+
+            impl #client_ident {
+                #(#client_methods)*
+            }
+
+            impl ::recapn::ty::Capability for #client_ident {
+                type Client = ::recapn_rpc::client::Client;
+
+                fn from_client(c: Self::Client) -> Self {
+                    Self(c)
+                }
+                fn into_inner(self) -> Self::Client {
+                    self.0
+                }
+            }
+
+            impl<T: #server_ident> ::recapn_rpc::server::FromServer<T> for #client_ident {
+                type Dispatcher = #dispatch_ident<T>;
+
+                #[inline]
+                fn from_server(server: T) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+                    let (client, dispatcher) = ::recapn_rpc::server::new_server(#dispatch_ident(server));
+                    (Self(client), dispatcher)
+                }
+            }
+
+            pub trait #server_ident: #(#server_supertraits +)* {
+                #(#server_methods)*
+            }
+
+            pub struct #dispatch_ident<T>(pub T);
+
+            impl<T> #dispatch_ident<T> {
+                pub const NAME: &str = #name;
+            }
+
+            impl<T> ::recapn_rpc::server::Dispatch for #dispatch_ident<T>
+            where
+                T: #server_ident,
+            {
+                fn dispatch(
+                    &mut self,
+                    request: ::recapn_rpc::server::DispatchRequest,
+                ) -> ::recapn_rpc::server::DispatchResponse {
+                    match (request.interface(), request.method()) {
+                        #(#dispatch_interfaces)*
+                        (_, _) => request.unimplemented_interface(Self::NAME),
+                    }
+                }
+            }
+
+            pub mod #mod_ident {
+                use super::{__file, __imports, _p};
+
+                pub use super::#client_ident as Client;
+                pub use super::#server_ident as Server;
+                pub use super::#dispatch_ident as Dispatcher;
+
+                #(#nested_items)*
+            }
+        }
     }
 );

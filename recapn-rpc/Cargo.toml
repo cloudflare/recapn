@@ -2,15 +2,19 @@
 name = "recapn-rpc"
 version = "0.0.0"
 authors = ["Sydney Acksman <obsidianminor@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 recapn = { path = "../recapn" }
 recapn-channel = { path = "../recapn-channel" }
+pin-project.workspace = true
+parking_lot.workspace = true
+hashbrown.workspace = true
 fnv = "1.0"
-tokio = { version = "1.35", default-features = false, features = ["rt", "macros", "sync"] }
-pin-project = "1.1"
-hashbrown = "0.14"
+
+[dependencies.tokio]
+workspace = true
+features = ["rt", "macros", "sync"]
 
 [lints]
 workspace = true

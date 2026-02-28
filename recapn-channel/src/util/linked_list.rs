@@ -10,9 +10,8 @@
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::marker::{PhantomData, PhantomPinned};
-use core::mem;
-use core::ptr::NonNull;
-use core::ptr::{addr_of, addr_of_mut};
+use core::mem::ManuallyDrop;
+use core::ptr::{self, NonNull};
 
 /// An intrusive linked list.
 ///
@@ -52,7 +51,8 @@ pub(crate) unsafe trait Link {
     type Target;
 
     /// Convert the handle to a raw pointer without consuming the handle.
-    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target>;
+    #[allow(clippy::wrong_self_convention)]
+    fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle;
@@ -76,6 +76,15 @@ pub(crate) struct Pointers<T> {
 /// We do not want the compiler to put the `noalias` attribute on mutable
 /// references to this type, so the type has been made `!Unpin` with a
 /// `PhantomPinned` field.
+///
+/// Additionally, we never access the `prev` or `next` fields directly, as any
+/// such access would implicitly involve the creation of a reference to the
+/// field, which we want to avoid since the fields are not `!Unpin`, and would
+/// hence be given the `noalias` attribute if we were to do such an access. As
+/// an alternative to accessing the fields directly, the `Pointers` type
+/// provides getters and setters for the two fields, and those are implemented
+/// using `ptr`-specific methods which avoids the creation of intermediate
+/// references.
 ///
 /// See this link for more information:
 /// <https://github.com/rust-lang/rust/pull/82834>
@@ -107,17 +116,25 @@ impl<T> Pointers<T> {
     }
 
     pub(crate) fn get_prev(&self) -> Option<NonNull<T>> {
-        unsafe { addr_of!((*self.inner.get()).prev).read() }
+        // SAFETY: Field is accessed immutably through a reference.
+        unsafe { ptr::addr_of!((*self.inner.get()).prev).read() }
     }
     pub(crate) fn get_next(&self) -> Option<NonNull<T>> {
-        unsafe { addr_of!((*self.inner.get()).next).read() }
+        // SAFETY: Field is accessed immutably through a reference.
+        unsafe { ptr::addr_of!((*self.inner.get()).next).read() }
     }
 
     fn set_prev(&mut self, value: Option<NonNull<T>>) {
-        unsafe { addr_of_mut!((*self.inner.get()).prev).write(value) }
+        // SAFETY: Field is accessed mutably through a mutable reference.
+        unsafe {
+            ptr::addr_of_mut!((*self.inner.get()).prev).write(value);
+        }
     }
     fn set_next(&mut self, value: Option<NonNull<T>>) {
-        unsafe { addr_of_mut!((*self.inner.get()).next).write(value) }
+        // SAFETY: Field is accessed mutably through a mutable reference.
+        unsafe {
+            ptr::addr_of_mut!((*self.inner.get()).next).write(value);
+        }
     }
 }
 
@@ -136,8 +153,8 @@ impl<T> fmt::Debug for Pointers<T> {
 
 impl<L, T> LinkedList<L, T> {
     /// Creates an empty linked list.
-    pub(crate) const fn new() -> Self {
-        Self {
+    pub(crate) const fn new() -> LinkedList<L, T> {
+        LinkedList {
             head: None,
             tail: None,
             _marker: PhantomData,
@@ -148,27 +165,31 @@ impl<L, T> LinkedList<L, T> {
 impl<L: Link> LinkedList<L, L::Target> {
     /// Adds an element first in the list.
     pub(crate) fn push_front(&mut self, val: L::Handle) {
-        let ptr = L::into_raw(val);
+        // The value should not be dropped, it is being inserted into the list
+        let val = ManuallyDrop::new(val);
+        let ptr = L::as_raw(&val);
         assert_ne!(self.head, Some(ptr));
         unsafe {
-            let ptrs = L::pointers(ptr).as_mut();
-            ptrs.set_next(self.head);
-            ptrs.set_prev(None);
+            L::pointers(ptr).as_mut().set_next(self.head);
+            L::pointers(ptr).as_mut().set_prev(None);
 
-            let ptr = Some(ptr);
-
-            match self.head {
-                None => self.tail = ptr,
-                Some(head) => L::pointers(head).as_mut().set_prev(ptr),
+            if let Some(head) = self.head {
+                L::pointers(head).as_mut().set_prev(Some(ptr));
             }
 
-            self.head = ptr;
+            self.head = Some(ptr);
+
+            if self.tail.is_none() {
+                self.tail = Some(ptr);
+            }
         }
     }
 
     /// Adds an element to the back of the list.
     pub(crate) fn push_back(&mut self, val: L::Handle) {
-        let ptr = L::into_raw(val);
+        // The value should not be dropped, it is being inserted into the list
+        let val = ManuallyDrop::new(val);
+        let ptr = L::as_raw(&val);
         assert_ne!(self.tail, Some(ptr));
         unsafe {
             let ptrs = L::pointers(ptr).as_mut();
@@ -189,7 +210,7 @@ impl<L: Link> LinkedList<L, L::Target> {
     /// Moves all elements from the other list to this list.
     pub(crate) fn append_back(&mut self, other: &mut Self) {
         match self.tail {
-            None => mem::swap(self, other),
+            None => core::mem::swap(self, other),
             Some(tail) => {
                 if let Some(other_head) = other.head.take() {
                     unsafe {
@@ -205,7 +226,7 @@ impl<L: Link> LinkedList<L, L::Target> {
 
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
-    pub fn pop_back(&mut self) -> Option<L::Handle> {
+    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
         unsafe {
             let last = self.tail?;
             self.tail = L::pointers(last).as_ref().get_prev();
@@ -227,19 +248,19 @@ impl<L: Link> LinkedList<L, L::Target> {
     /// empty.
     pub(crate) fn pop_front(&mut self) -> Option<L::Handle> {
         unsafe {
-            let first = self.head?;
-            self.head = L::pointers(first).as_ref().get_next();
+            let head = self.head?;
+            self.head = L::pointers(head).as_ref().get_next();
 
-            if let Some(next) = L::pointers(first).as_ref().get_next() {
-                L::pointers(next).as_mut().set_prev(None);
+            if let Some(new_head) = L::pointers(head).as_ref().get_next() {
+                L::pointers(new_head).as_mut().set_prev(None);
             } else {
                 self.tail = None;
             }
 
-            L::pointers(first).as_mut().set_prev(None);
-            L::pointers(first).as_mut().set_next(None);
+            L::pointers(head).as_mut().set_prev(None);
+            L::pointers(head).as_mut().set_next(None);
 
-            Some(L::from_raw(first))
+            Some(L::from_raw(head))
         }
     }
 
@@ -328,13 +349,13 @@ pub(crate) struct GuardedLinkedList<L, T> {
     _marker: PhantomData<*const L>,
 }
 
-impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
+impl<L: Link> LinkedList<L, L::Target> {
     /// Turns a linked list into the guarded version by linking the guard node
     /// with the head and tail nodes. Like with other nodes, you should guarantee
     /// that the guard node is pinned in memory.
     pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
         // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
-        let guard = L::into_raw(guard_handle);
+        let guard = L::as_raw(&guard_handle);
 
         unsafe {
             if let Some(head) = self.head {
@@ -354,16 +375,15 @@ impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
             }
         }
 
-        GuardedLinkedList {
-            guard,
-            _marker: PhantomData,
-        }
+        GuardedLinkedList { guard, _marker: PhantomData }
     }
 }
 
 impl<L: Link> GuardedLinkedList<L, L::Target> {
     fn tail(&self) -> Option<NonNull<L::Target>> {
-        let tail_ptr = unsafe { L::pointers(self.guard).as_ref().get_prev().unwrap() };
+        let tail_ptr = unsafe {
+            L::pointers(self.guard).as_ref().get_prev().unwrap()
+        };
 
         // Compare the tail pointer with the address of the guard node itself.
         // If the guard points at itself, then there are no other nodes and
@@ -410,7 +430,7 @@ pub(crate) mod tests {
         type Handle = Pin<&'a Entry>;
         type Target = Entry;
 
-        fn into_raw(handle: Pin<&'_ Entry>) -> NonNull<Entry> {
+        fn as_raw(handle: &Pin<&'_ Entry>) -> NonNull<Entry> {
             NonNull::from(handle.get_ref())
         }
 
@@ -448,7 +468,7 @@ pub(crate) mod tests {
         list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
         entries: &[Pin<&'a Entry>],
     ) {
-        for entry in entries {
+        for entry in entries.iter() {
             list.push_front(*entry);
         }
     }
@@ -470,7 +490,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    const fn const_new() {
+    fn const_new() {
         const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::new();
     }
 

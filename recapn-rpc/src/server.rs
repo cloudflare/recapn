@@ -80,12 +80,10 @@ impl<T: Dispatch + ?Sized> Dispatcher<T> {
         let Some(req) = receiver.recv().await else {
             return Ok(false);
         };
-        let req = match req {
-            mpsc::Item::Request(req) => req,
-            mpsc::Item::Event(event) => {
-                // I want this to explode when I actually make an event value.
-                let () = event.into_inner();
-                return Ok(true);
+        let req = match req.item {
+            mpsc::Item::Request(request) => request,
+            mpsc::Item::Event(_) => {
+                panic!("unexpected channel event")
             }
         };
         let (request, responder) = req.respond();
@@ -267,6 +265,18 @@ impl<'a, P> ParametersReader<'a, P> {
     pub fn root(&self) -> any::PtrReader<'_, CapTable<'_>> {
         match self.root {
             chan::ParamsRoot::Params => self.reader.root().imbue(self.table.reader()),
+            chan::ParamsRoot::RpcCall => {
+                self.reader
+                    .root()
+                    .read_as_struct::<crate::rpc_capnp::Message>()
+                    .call()
+                    .get_or_default()
+                    .params()
+                    .get()
+                    .content()
+                    .get()
+                    .imbue(self.table.reader())
+            }
         }
     }
 }
@@ -487,6 +497,12 @@ impl StreamResponder {
             Err(err) => DispatchResult::Broken(err),
         };
         CallResult(r)
+    }
+
+    #[inline]
+    pub fn error(self, err: Error) -> CallResult {
+        self.inner.respond(chan::RpcResults::Owned(Err(err.clone())));
+        CallResult(DispatchResult::Broken(err))
     }
 }
 

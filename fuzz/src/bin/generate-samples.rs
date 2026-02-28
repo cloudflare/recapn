@@ -25,7 +25,7 @@ fn main() {
             $({
                 let sample_path = group_path.join($sample);
                 println!("Generating sample {}", sample_path.display());
-                let message: Message<_> = $block;
+                let message: Message<'_, _> = $block;
                 let file = File::create(sample_path).expect("failed to create sample file");
                 if let Some(segments) = message.segments() {
                     recapn::io::write_message(file, &segments).expect("failed to write segments");

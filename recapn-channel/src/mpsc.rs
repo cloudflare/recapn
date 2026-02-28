@@ -14,6 +14,12 @@
 //! many allocations for sending requests and returning responses over one-shots, but
 //! this set of types combines the channel queue with the oneshot mechanism and makes it
 //! so one request makes one allocation.
+//! 
+//! To facilitate operations like embargoes, the mpsc also supports sending generic "events"
+//! alongside standard requests. Events are custom data and have the same drop behavior as
+//! requests, but instead of using response receivers as their indicator to stay alive,
+//! events use EventRef instances. EventRefs can't access the event data, only keep the event
+//! alive to be delivered.
 
 use std::cell::UnsafeCell;
 use std::fmt::{self, Debug};
@@ -23,8 +29,8 @@ use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::pin::Pin;
 use std::process::abort;
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::{AtomicPtr, AtomicUsize};
+use std::ptr::{NonNull, addr_of, addr_of_mut};
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed};
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
@@ -32,8 +38,9 @@ use std::task::{Context, Poll, Waker};
 use parking_lot::{Mutex, MutexGuard};
 use pin_project::{pin_project, pinned_drop};
 
-use crate::request::{self, Request, SharedRequest};
+use crate::request::{self, Request, RequestData};
 use crate::util::array_vec::ArrayVec;
+use crate::util::atomic_option_arc::AtomicOptionArc;
 use crate::util::atomic_state::{AtomicState, ShotState};
 use crate::util::closed_task::ClosedTask;
 use crate::util::linked_list::{Link, LinkedList, Pointers};
@@ -41,94 +48,182 @@ use crate::util::wait_list::{RecvWaiter, WaitList};
 use crate::{Chan, IntoResults};
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum LinkKind {
+pub(crate) enum MessageKind {
     Request,
     Event,
 }
 
+/// The base message struct for an item in an mpsc channel.
+/// 
+/// This maintains 4 variables that all messages contain:
+/// 
+///  * The linked list pointers for the elements of the channel
+///  * The parent channel the message is contained in
+///  * The amount of interest in the message
+///  * The data associated with the message
 #[repr(C)]
-pub(crate) struct SharedLink<T: ?Sized> {
+pub(crate) struct SharedMessage<C: Chan, T: ?Sized> {
     /// Intrusive linked-list pointers for request channels
     ///
     /// In order to maintain "one allocation per request", we intrusively link
     /// requests together to build a request chain.
-    pointers: Pointers<SharedLink<()>>,
+    pointers: Pointers<SharedMessage<C, ()>>,
 
-    kind: LinkKind,
+    /// The parent channel of this link.
+    parent: AtomicOptionArc<SharedChannel<C>>,
+
+    /// The amount of "interest" in this message. When this value reaches zero, the message will be
+    /// automatically released from its active channel and dropped. If it has no active channel,
+    /// it will be dropped when it's put into one.
+    ///
+    /// Anything with interest includes things like response receivers, pipelines, and any
+    /// pipelined clients that are waiting for the response to be received.
+    interest_count: AtomicUsize,
+
+    kind: MessageKind,
 
     pub data: T,
 }
 
-impl<C: Chan> SharedLink<SharedRequest<C>> {
-    pub fn new(data: SharedRequest<C>) -> Arc<Self> {
+impl<C: Chan> request::SharedRequest<C> {
+    pub fn new(
+        request: C::Parameters,
+        usage: request::RequestUsage,
+        receivers: usize,
+    ) -> Arc<Self> {
         Arc::new(Self {
             pointers: Pointers::new(),
-            kind: LinkKind::Request,
-            data,
+            kind: MessageKind::Request,
+            parent: AtomicOptionArc::none(),
+            interest_count: AtomicUsize::new(receivers),
+            data: RequestData::new(request, usage),
         })
     }
 }
 
-enum LinkItem<C: Chan> {
-    Request(Arc<SharedLink<SharedRequest<C>>>),
-    Event(Box<SharedLink<C::Event>>),
+impl<C: Chan> SharedEvent<C> {
+    pub fn new(data: C::Event, interest: usize) -> Arc<Self> {
+        Arc::new(Self {
+            pointers: Pointers::new(),
+            kind: MessageKind::Event,
+            parent: AtomicOptionArc::none(),
+            interest_count: AtomicUsize::new(interest),
+            data: EventData::new(data),
+        })
+    }
 }
 
-impl<C: Chan> LinkItem<C> {
-    #[inline]
-    pub fn into_item(self) -> Item<C> {
-        match self {
-            LinkItem::Request(r) => Item::Request(Request::new(r)),
-            LinkItem::Event(e) => Item::Event(Event { inner: e }),
+impl<C: Chan, T: ?Sized> SharedMessage<C, T> {
+    /// Set the parent channel for this message.
+    ///
+    /// This should only be called while holding a lock on the specified channel.
+    pub unsafe fn set_parent(&self, sender: Sender<C>) -> Option<Sender<C>> {
+        self.parent.replace(Some(sender.into_shared())).map(Sender::from_shared)
+    }
+
+    /// Take back the parent sender for this message.
+    ///
+    /// This should only be called while holding a lock on the channel holding this message.
+    pub unsafe fn take_parent(&self) -> Option<Sender<C>> {
+        self.parent.take().map(Sender::from_shared)
+    }
+
+    pub fn add_interest(&self) {
+        let old = self.interest_count.fetch_add(1, Relaxed);
+
+        if old == usize::MAX {
+            std::process::abort();
+        }
+
+        // Make sure I don't accidentally attempt to re-add interest.
+        debug_assert_ne!(old, 0);
+    }
+
+    /// Removes interest in the message, returning a bool indicating if the message has any
+    /// interest remaining.
+    pub fn remove_interest(&self) -> bool {
+        let old = self.interest_count.fetch_sub(1, Relaxed);
+        old - 1 == 0
+    }
+
+    pub fn has_interest(&self) -> bool {
+        self.interest_count.load(Relaxed) != 0
+    }
+
+    pub fn remove_self_from_channel(&self) {
+        loop {
+            let Some(parent) = self.parent.add_ref() else {
+                // No parent!
+                return
+            };
+
+            let mut lock = match parent.resolve_and_lock() {
+                // We've locked the channel, now check to see if our parent was updated.
+                Ok((_, lock)) if self.parent.same_as(Some(&parent)) => lock,
+                // The parent was updated, let's retry.
+                Ok(_) => continue,
+                // The parent has resolved into a terminal resolution, which means the receiver
+                // must be dropping all the messages from the channel anyway. So we can just
+                // return now.
+                Err(_) => return,
+            };
+
+            let ptr = NonNull::from_ref(self).cast::<SharedMessage<C, ()>>();
+            let Some(link) = (unsafe { lock.messages.remove(ptr) }) else {
+                panic!("message wasn't contained in locked parent")
+            };
+
+            drop(link.into_item());
+
+            return
         }
     }
 }
 
 struct LinkPtr<C: Chan> {
-    p: PhantomData<fn() -> C>,
-    ptr: *const SharedLink<()>,
+    ptr: *const SharedMessage<C, ()>,
 }
 
 impl<C: Chan> LinkPtr<C> {
-    pub fn from_item(item: LinkItem<C>) -> Self {
-        Self {
-            p: PhantomData,
-            ptr: match item {
-                LinkItem::Request(r) => Arc::into_raw(r).cast(),
-                LinkItem::Event(e) => Box::into_raw(e).cast(),
-            },
-        }
+    /// Create a link pointer from a request that has already had the parent channel set.
+    pub fn from_parented_request(req: Request<C>) -> Self {
+        Self { ptr: Arc::into_raw(req.into_shared()).cast() }
     }
 
-    pub fn into_link_item(self) -> LinkItem<C> {
-        let kind = unsafe { (*self.ptr).kind };
-        match kind {
-            LinkKind::Request => {
-                let cast_ptr = self.ptr.cast::<SharedLink<SharedRequest<C>>>();
-                LinkItem::Request(unsafe { Arc::from_raw(cast_ptr) })
-            }
-            LinkKind::Event => {
-                let cast_ptr = self.ptr.cast::<SharedLink<C::Event>>().cast_mut();
-                LinkItem::Event(unsafe { Box::from_raw(cast_ptr) })
-            }
-        }
+    /// Create a link pointer from an event that has already had the parent channel set.
+    pub fn from_parented_event(event: Event<C>) -> Self {
+        Self { ptr: Arc::into_raw(event.into_shared()).cast() }
     }
 
-    pub fn into_item(self) -> Item<C> {
-        self.into_link_item().into_item()
+    pub fn into_item(self) -> ItemWithSender<C> {
+        let sender;
+        let item = unsafe {
+            match *addr_of!((*self.ptr).kind) {
+                MessageKind::Request => {
+                    let shared = Arc::from_raw(self.ptr.cast::<request::SharedRequest<C>>());
+                    sender = shared.take_parent().expect("missing parent channel from linked message");
+                    Item::Request(Request::from_shared(shared))
+                }
+                MessageKind::Event => {
+                    let shared = Arc::from_raw(self.ptr.cast::<SharedEvent<C>>());
+                    sender = shared.take_parent().expect("missing parent channel from linked message");
+                    Item::Event(Event::from_shared(shared))
+                }
+            }
+        };
+        ItemWithSender { item, sender }
     }
 }
 
 unsafe impl<C: Chan> Link for LinkPtr<C> {
     type Handle = Self;
-    type Target = SharedLink<()>;
+    type Target = SharedMessage<C, ()>;
 
-    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
+    fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target> {
         NonNull::new(handle.ptr.cast_mut()).unwrap()
     }
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
         Self {
-            p: PhantomData,
             ptr: ptr.as_ptr().cast_const(),
         }
     }
@@ -145,14 +240,10 @@ pub(crate) struct GuardedChannel<C: Chan> {
     /// to this channel to make sure the reference cycle is broken.
     parent_request: Option<request::Receiver<C>>,
 
-    requests: LinkedList<LinkPtr<C>, SharedLink<()>>,
+    messages: LinkedList<LinkPtr<C>, SharedMessage<C, ()>>,
 
     /// The waker set by the receiver to wake up the receiver task.
     waker: Option<Waker>,
-
-    /// If this is a channel that's part of a ReceiverSet, this holds a strong reference
-    /// back to the parent.
-    parent_set: Option<Arc<SharedChannelSet<C>>>,
 }
 
 enum ChannelResolution<C: Chan> {
@@ -166,10 +257,8 @@ pub(crate) struct SharedChannel<C: Chan> {
     /// by the parent set and can't be accessed without locking it first.
     set_link_pointers: Pointers<SharedChannel<C>>,
 
-    /// An pointer back to the channel set that owns the channel. This can be checked to assert
-    /// that the channel hasn't been moved to another set in the time between locks without having
-    /// to lock the channel again.
-    parent_set_ptr: AtomicPtr<SharedChannelSet<C>>,
+    /// An pointer back to the channel set that owns the channel.
+    parent_set: AtomicOptionArc<SharedChannelSet<C>>,
 
     /// The mutex guarded state of the channel. This includes things like the request linked list,
     /// waker, and any possible owners of the channel, like a parent request or parent channel set.
@@ -207,6 +296,9 @@ pub(crate) struct SharedChannel<C: Chan> {
     chan: C,
 }
 
+unsafe impl<C: Chan> Send for SharedChannel<C> {}
+unsafe impl<C: Chan> Sync for SharedChannel<C> {}
+
 impl<C: Chan + Debug> Debug for SharedChannel<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SharedChannel")
@@ -221,12 +313,11 @@ impl<C: Chan> SharedChannel<C> {
     fn new(chan: C, senders: usize, parent: Option<request::Receiver<C>>) -> Self {
         Self {
             set_link_pointers: Pointers::new(),
-            parent_set_ptr: AtomicPtr::new(core::ptr::null_mut()),
+            parent_set: AtomicOptionArc::none(),
             guarded_state: Mutex::new(GuardedChannel {
                 parent_request: parent,
-                requests: LinkedList::new(),
+                messages: LinkedList::new(),
                 waker: None,
-                parent_set: None,
             }),
             atomic_state: AtomicState::new(),
             waiters: WaitList::new(),
@@ -240,18 +331,35 @@ impl<C: Chan> SharedChannel<C> {
     fn resolved(chan: C, senders: usize, resolution: ChannelResolution<C>) -> Self {
         Self {
             set_link_pointers: Pointers::new(),
-            parent_set_ptr: AtomicPtr::new(core::ptr::null_mut()),
+            parent_set: AtomicOptionArc::none(),
             guarded_state: Mutex::new(GuardedChannel {
                 parent_request: None,
-                requests: LinkedList::new(),
+                messages: LinkedList::new(),
                 waker: None,
-                parent_set: None,
             }),
             atomic_state: AtomicState::new_set(),
             waiters: WaitList::new(),
             sender_count: AtomicUsize::new(senders),
             closed_task: ClosedTask::new(),
             resolution: UnsafeCell::new(MaybeUninit::new(resolution)),
+            chan,
+        }
+    }
+
+    fn dropped(chan: C) -> Self {
+        Self {
+            set_link_pointers: Pointers::new(),
+            parent_set: AtomicOptionArc::none(),
+            guarded_state: Mutex::new(GuardedChannel {
+                parent_request: None,
+                messages: LinkedList::new(),
+                waker: None,
+            }),
+            atomic_state: AtomicState::new_send_closed(),
+            waiters: WaitList::new(),
+            sender_count: AtomicUsize::new(1),
+            closed_task: ClosedTask::new(),
+            resolution: UnsafeCell::new(MaybeUninit::uninit()),
             chan,
         }
     }
@@ -268,7 +376,7 @@ impl<C: Chan> SharedChannel<C> {
         self: &Arc<Self>,
         req: Request<C>,
     ) -> Result<(), (Request<C>, Option<&C::Error>)> {
-        let (this, mut channel) = match self.resolve_and_lock() {
+        let (real, mut channel) = match self.resolve_and_lock() {
             Ok(v) => v,
             Err(r) => {
                 return match r {
@@ -278,32 +386,31 @@ impl<C: Chan> SharedChannel<C> {
             }
         };
 
-        let req_shared = req.into_inner();
-        let link_ptr = LinkPtr::from_item(LinkItem::Request(req_shared.clone()));
+        let req_shared = req.as_shared().clone();
+        // SAFETY: We're holding the lock on this channel
+        unsafe {
+            req_shared.set_parent(self.clone().into_new_sender());
+        }
+        let link_ptr = LinkPtr::from_parented_request(req);
 
         // Insert the request into the list.
-        channel.requests.push_back(link_ptr);
+        channel.messages.push_back(link_ptr);
 
-        unsafe {
-            req_shared.data.set_parent(this.clone());
-        }
-
-        if req_shared.data.is_finished() {
+        if req_shared.is_finished() {
             // Just drop the request nobody wants the result
-            let _ = channel.requests.pop_back().unwrap().into_item();
-            unsafe {
-                req_shared.data.take_parent();
-            }
+            let _ = channel.messages.pop_back().unwrap().into_item();
             return Ok(());
         }
 
-        if let Some(w) = &channel.waker {
-            w.wake_by_ref();
+        let waker = channel.waker.take();
+        drop(channel);
+
+        if let Some(w) = waker {
+            w.wake();
         }
 
-        if let Some(parent_set) = channel.parent_set.clone() {
-            drop(channel);
-            parent_set.ready_channel(self);
+        if let Some(parent_set) = real.parent_set.add_ref() {
+            parent_set.ready_channel(real);
         }
 
         Ok(())
@@ -311,8 +418,8 @@ impl<C: Chan> SharedChannel<C> {
 
     fn send_event(
         self: &Arc<Self>,
-        event: Event<C::Event>,
-    ) -> Result<(), (Event<C::Event>, Option<&C::Error>)> {
+        event: Event<C>,
+    ) -> Result<(), (Event<C>, Option<&C::Error>)> {
         let (_, mut channel) = match self.resolve_and_lock() {
             Ok(v) => v,
             Err(r) => {
@@ -323,16 +430,28 @@ impl<C: Chan> SharedChannel<C> {
             }
         };
 
-        channel
-            .requests
-            .push_back(LinkPtr::from_item(LinkItem::Event(event.inner)));
-
-        if let Some(w) = &channel.waker {
-            w.wake_by_ref();
+        let shared_event = event.as_shared().clone();
+        unsafe {
+            event.as_shared().set_parent(self.clone().into_new_sender());
         }
 
-        if let Some(parent_set) = channel.parent_set.clone() {
-            drop(channel);
+        channel
+            .messages
+            .push_back(LinkPtr::from_parented_event(event));
+
+        if !shared_event.has_interest() {
+            let _ = channel.messages.pop_back().unwrap().into_item();
+            return Ok(())
+        }
+
+        let waker = channel.waker.take();
+        drop(channel);
+
+        if let Some(w) = waker {
+            w.wake();
+        }
+
+        if let Some(parent_set) = self.parent_set.add_ref() {
             parent_set.ready_channel(self);
         }
 
@@ -341,7 +460,6 @@ impl<C: Chan> SharedChannel<C> {
 
     unsafe fn add_sender(&self) {
         let old = self.sender_count.fetch_add(1, Relaxed);
-
         if old == usize::MAX {
             abort();
         }
@@ -360,10 +478,6 @@ impl<C: Chan> SharedChannel<C> {
         }).is_ok()
     }
 
-    fn sender_poll_closed(&self, cx: &mut Context<'_>) -> Poll<()> {
-        self.closed_task.poll(&self.atomic_state, cx)
-    }
-
     /// Remove a tracked receiver from the receiver count.
     ///
     /// If this is the last receiver (and the receiver count is zero), this closes the channel on
@@ -371,10 +485,28 @@ impl<C: Chan> SharedChannel<C> {
     ///
     /// Note: A channel cannot be re-opened by adding a receiver when the channel is closed.
     unsafe fn remove_sender(&self) {
-        let last_receiver = self.sender_count.fetch_sub(1, Relaxed) == 0;
+        let last_receiver = (self.sender_count.fetch_sub(1, Relaxed) - 1) == 0;
         if last_receiver {
-            self.closed_task.close(&self.atomic_state)
+            self.closed_task.close(&self.atomic_state);
+
+            // Wake up the receiver so it can notice the channel is closed.
+            let waker = self.guarded_state.lock().waker.take();
+            if let Some(waker) = waker {
+                waker.wake();
+            }
         }
+    }
+
+    fn into_new_sender(self: Arc<Self>) -> Sender<C> {
+        Sender::new(self)
+    }
+
+    fn into_existing_sender(self: Arc<Self>) -> Sender<C> {
+        Sender::from_shared(self)
+    }
+
+    fn sender_poll_closed(&self, cx: &mut Context<'_>) -> Poll<()> {
+        self.closed_task.poll(&self.atomic_state, cx)
     }
 
     /// Close the receiver without resolving.
@@ -412,21 +544,6 @@ impl<C: Chan> SharedChannel<C> {
                     ChannelResolution::Error(err) => Resolution::Error(err),
                 })
             }
-        }
-    }
-
-    /// Like most_resolved, but returns None if the channel has permanently resolved.
-    pub fn most_unresolved(mut self: &Self) -> Option<&Self> {
-        loop {
-            let resolution = self.try_resolved();
-            break match resolution {
-                None => Some(self),
-                Some(Resolution::Dropped | Resolution::Error(_)) => None,
-                Some(Resolution::Forwarded(channel)) => {
-                    self = &*channel.shared;
-                    continue;
-                }
-            };
         }
     }
 
@@ -474,8 +591,11 @@ impl<C: Chan> SharedChannel<C> {
     }
 
     fn forward_to(self: &Arc<Self>, mut other: &Arc<Self>) -> Result<(), ()> {
+        // Keep track of the original so that we can determine resolution chains.
+        let original = other;
         let mut resolution;
         (other, resolution) = other.most_resolved();
+        let waker;
         loop {
             if let Some(r) = resolution {
                 let err = match r {
@@ -523,30 +643,30 @@ impl<C: Chan> SharedChannel<C> {
             self_lock.waker = None;
 
             unsafe {
-                self.resolve(ChannelResolution::Forward(Sender::new(other.clone())));
+                // Use the original channel so we can maintain resolution chains.
+                self.resolve(ChannelResolution::Forward(original.clone().into_new_sender()));
             }
 
             // There's no requests to forward, so just return early. This way we won't wake up the
             // other receiver for no reason.
-            if self_lock.requests.is_empty() {
+            if self_lock.messages.is_empty() {
                 return Ok(());
             }
 
-            other_lock.requests.append_back(&mut self_lock.requests);
-
-            if let Some(waker) = &other_lock.waker {
-                waker.wake_by_ref();
-            }
-
-            if let Some(parent_set) = other_lock.parent_set.clone() {
-                drop(lock_b);
-                drop(lock_a);
-                parent_set.ready_channel(other);
-            }
-
-
-            return Ok(());
+            other_lock.messages.append_back(&mut self_lock.messages);
+            waker = other_lock.waker.take();
+            break;
         }
+
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+
+        if let Some(parent_set) = other.parent_set.add_ref() {
+            parent_set.ready_channel(other);
+        }
+
+        Ok(())
     }
 
     fn resolve_and_close(&self, err: Option<C::Error>) {
@@ -562,14 +682,8 @@ impl<C: Chan> SharedChannel<C> {
 
         scopeguard::defer_on_unwind! {
             let mut self_lock = self.guarded_state.lock();
-            while let Some(r) = self_lock.requests.pop_front() {
-                if let LinkItem::Request(r) = r.into_link_item() {
-                    unsafe {
-                        r.data.take_parent();
-                        r.data.drop_request();
-                        // TODO: Maybe signal that the request is over without waking everyone up?
-                    }
-                }
+            while let Some(r) = self_lock.messages.pop_front() {
+                drop(r.into_item());
             }
         };
 
@@ -577,8 +691,8 @@ impl<C: Chan> SharedChannel<C> {
 
         let respond_with_err = |i: Item<C>| {
             if let Some(err) = &err {
-                if let Item::Request(r) = i {
-                    let (_, responder) = r.respond();
+                if let Item::Request(request) = i {
+                    let (_, responder) = request.respond();
                     responder.respond(err.clone().into_results());
                 }
             }
@@ -586,19 +700,11 @@ impl<C: Chan> SharedChannel<C> {
 
         'outer: loop {
             while request_array.can_push() {
-                let Some(ptr) = self_lock.requests.pop_front() else {
+                let Some(ptr) = self_lock.messages.pop_front() else {
                     break 'outer;
                 };
 
-                let item = ptr.into_link_item();
-
-                if let LinkItem::Request(req) = &item {
-                    unsafe {
-                        req.data.take_parent();
-                    }
-                }
-
-                request_array.push(item.into_item());
+                request_array.push(ptr.into_item().item);
             }
 
             drop(self_lock);
@@ -647,7 +753,7 @@ unsafe impl<C: Chan> Link for ChannelInSet<C> {
     type Handle = Self;
     type Target = SharedChannel<C>;
 
-    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
+    fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target> {
         handle.ptr
     }
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
@@ -667,33 +773,37 @@ struct GuardedChannelSet<C: Chan> {
 }
 
 impl<C: Chan> GuardedChannelSet<C> {
+    fn wake_up(&self) {
+        if let Some(waker) = &self.waker {
+            waker.wake_by_ref();
+        }
+    }
+
     fn pop_receiver(&mut self) -> Option<Receiver<C>> {
         let channel = self.ready.pop_front().or_else(|| self.idle.pop_front())?;
         let channel = unsafe { Arc::from_raw(channel.ptr.as_ptr().cast_const()) };
-        let mut guarded_channel = channel.guarded_state.lock();
-        guarded_channel.parent_set = None;
-        channel.parent_set_ptr.store(std::ptr::null_mut(), Relaxed);
+        let guarded_channel = channel.guarded_state.lock();
+        channel.parent_set.replace(None);
         channel.atomic_state.clear_ready(Relaxed);
         drop(guarded_channel);
         Some(Receiver { shared: ManuallyDrop::new(channel) })
     }
 
     fn has_idle(&self) -> bool {
-        self.idle.is_empty()
+        !self.idle.is_empty()
     }
 
     /// Pop the ready list until it yields an item or a closed channel.
-    fn pop_ready(&mut self) -> Option<(NonNull<SharedChannel<C>>, Option<Item<C>>)> {
+    fn pop_ready(&mut self) -> Option<(NonNull<SharedChannel<C>>, Option<ItemWithSender<C>>)> {
         loop {
             let channel = self.ready.pop_front()?;
             let channel_ptr = channel.ptr;
             let channel_ref = unsafe { channel_ptr.as_ref() };
             let mut guarded_channel = channel_ref.guarded_state.lock();
-            let Some(next_request) = guarded_channel.requests.pop_front() else {
+            let Some(next_request) = guarded_channel.messages.pop_front() else {
                 if channel_ref.is_closed() {
                     // The channel is closed, so we can tear it down and remove it.
-                    guarded_channel.parent_set = None;
-                    channel_ref.parent_set_ptr.store(std::ptr::null_mut(), Relaxed);
+                    channel_ref.parent_set.replace(None);
                     channel_ref.atomic_state.clear_ready(Relaxed);
                     return Some((channel_ptr, None))
                 } else {
@@ -704,17 +814,14 @@ impl<C: Chan> GuardedChannelSet<C> {
                     continue;
                 }
             };
-            if guarded_channel.requests.is_empty() || channel_ref.is_closed() {
+            if !guarded_channel.messages.is_empty() || channel_ref.is_closed() {
                 // If we're ready still, put it back into the ready list.
                 self.ready.push_back(channel);
+                self.wake_up();
             } else {
                 channel_ref.atomic_state.clear_ready(Relaxed);
             }
-            let link = next_request.into_link_item();
-            if let LinkItem::Request(req) = &link {
-                unsafe { req.data.take_parent() };
-            }
-            return Some((channel_ptr, Some(link.into_item())));
+            return Some((channel_ptr, Some(next_request.into_item())));
         }
     }
 }
@@ -730,7 +837,6 @@ impl<C: Chan> SharedChannelSet<C> {
         let channel_ref = unsafe { channel_ptr.as_ref() };
 
         let self_strong = Arc::clone(self);
-        let self_strong_ptr = Arc::as_ptr(self);
 
         let mut set_guard = self.guarded.lock();
         let mut channel_guard = channel_ref.guarded_state.lock();
@@ -738,18 +844,14 @@ impl<C: Chan> SharedChannelSet<C> {
         // Clean up our channel state by removing any old wakers, setting the parent set to our
         // weak pointer, and writing our atomic parent set pointer.
         channel_guard.waker = None;
-        channel_guard.parent_set = Some(self_strong);
-        channel_ref.parent_set_ptr.store(self_strong_ptr.cast_mut(), Relaxed);
+        channel_ref.parent_set.replace(Some(self_strong));
 
         // If the channel is already in a state to be actioned, put it
         // immediately in the ready state.
-        if !channel_guard.requests.is_empty() || channel_ref.is_closed() {
+        if !channel_guard.messages.is_empty() || channel_ref.is_closed() {
             set_guard.ready.push_back(ChannelInSet { ptr: channel_ptr });
             channel_ref.atomic_state.set_ready(Relaxed);
-
-            if let Some(waker) = &set_guard.waker {
-                waker.wake_by_ref();
-            }
+            set_guard.wake_up();
         } else {
             set_guard.idle.push_back(ChannelInSet { ptr: channel_ptr });
         }
@@ -760,14 +862,12 @@ impl<C: Chan> SharedChannelSet<C> {
 
         let mut set_guard = self.guarded.lock();
 
-        let channel_parent_set_ptr = channel.parent_set_ptr.load(Relaxed);
-        if !std::ptr::addr_eq(channel_parent_set_ptr, self.as_ref()) {
+        if !channel.parent_set.same_as(Some(self)) {
             return false
         }
 
-        let mut channel_guard = channel.guarded_state.lock();
-        channel_guard.parent_set = None;
-        channel.parent_set_ptr.store(std::ptr::null_mut(), Relaxed);
+        let _channel_guard = channel.guarded_state.lock();
+        channel.parent_set.replace(None);
         let old_flags = channel.atomic_state.clear_ready(Relaxed);
 
         unsafe {
@@ -799,28 +899,10 @@ impl<C: Chan> SharedChannelSet<C> {
         receivers
     }
 
-    fn poll_recv<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<SetRecvResult<'a, C>> {
+    fn poll_recv<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<Option<SetRecvResult<'a, C>>> {
         let mut guarded = self.guarded.lock();
-        let next = guarded.pop_ready();
-        match next {
-            Some((channel, None)) => {
-                let strong_channel = unsafe { Arc::from_raw(channel.as_ptr().cast_const()) };
-                Poll::Ready(SetRecvResult::Closed {
-                    receiver: Receiver {
-                        shared: ManuallyDrop::new(strong_channel)
-                    }
-                })
-            }
-            Some((channel, Some(item))) => {
-                Poll::Ready(SetRecvResult::Item {
-                    receiver: ReceiverKeyRef {
-                        channel: channel.as_ptr().cast_const(),
-                        set: self,
-                    },
-                    item,
-                })
-            }
-            None if guarded.has_idle() => {
+        let Some((channel, item)) = guarded.pop_ready() else {
+            return if guarded.has_idle() {
                 let cx_waker = cx.waker();
                 if let Some(w) = &mut guarded.waker {
                     w.clone_from(cx_waker);
@@ -828,33 +910,51 @@ impl<C: Chan> SharedChannelSet<C> {
                     guarded.waker = Some(cx_waker.clone());
                 };
                 Poll::Pending
+            } else {
+                Poll::Ready(None)
+            };
+        };
+        let result = match item {
+            Some(ItemWithSender { item, sender }) => SetRecvResult::Item {
+                receiver: ReceiverKeyRef {
+                    channel: channel.as_ptr().cast_const(),
+                    set: self,
+                },
+                item,
+                sender,
+            },
+            None => SetRecvResult::Closed {
+                receiver: Receiver {
+                    shared: ManuallyDrop::new(unsafe {
+                        Arc::from_raw(channel.as_ptr().cast_const())
+                    })
+                }
             }
-            None => Poll::Ready(SetRecvResult::None)
-        }
+        };
+
+        Poll::Ready(Some(result))
     }
 
-    fn try_recv(self: &Arc<Self>) -> SetRecvResult<'_, C> {
-        let next = self.guarded.lock().pop_ready();
-        match next {
-            Some((channel, None)) => {
-                let strong_channel = unsafe { Arc::from_raw(channel.as_ptr().cast_const()) };
-                SetRecvResult::Closed {
-                    receiver: Receiver {
-                        shared: ManuallyDrop::new(strong_channel)
-                    }
+    fn try_recv(self: &Arc<Self>) -> Option<SetRecvResult<'_, C>> {
+        let (channel, item) = self.guarded.lock().pop_ready()?;
+        let result = match item {
+            Some(ItemWithSender { item, sender }) => SetRecvResult::Item {
+                receiver: ReceiverKeyRef {
+                    channel: channel.as_ptr().cast_const(),
+                    set: self,
+                },
+                item,
+                sender,
+            },
+            None => SetRecvResult::Closed {
+                receiver: Receiver {
+                    shared: ManuallyDrop::new(unsafe {
+                        Arc::from_raw(channel.as_ptr().cast_const())
+                    })
                 }
             }
-            Some((channel, Some(item))) => {
-                SetRecvResult::Item {
-                    receiver: ReceiverKeyRef {
-                        channel: channel.as_ptr().cast_const(),
-                        set: self,
-                    },
-                    item,
-                }
-            }
-            None => SetRecvResult::None
-        }
+        };
+        Some(result)
     }
 
     fn ready_channel(mut self: Arc<Self>, channel: &SharedChannel<C>) {
@@ -863,11 +963,10 @@ impl<C: Chan> SharedChannelSet<C> {
         let mut set_guard = loop {
             let set_guard = self.guarded.lock();
 
-            let channel_parent_set_ptr = channel.parent_set_ptr.load(Relaxed);
-            if !std::ptr::addr_eq(channel_parent_set_ptr, self.as_ref()) {
+            if !channel.parent_set.same_as(Some(&self)) {
                 drop(set_guard);
-                let channel_guard = channel.guarded_state.lock();
-                let new_set = channel_guard.parent_set.clone();
+                let _channel_guard = channel.guarded_state.lock();
+                let new_set = channel.parent_set.add_ref();
                 let Some(new_self) = new_set else {
                     return;
                 };
@@ -887,38 +986,157 @@ impl<C: Chan> SharedChannelSet<C> {
             set_guard.ready.push_back(ChannelInSet { ptr: channel_ptr });
         }
 
-        if let Some(waker) = &set_guard.waker {
-            waker.wake_by_ref();
-        }
+        set_guard.wake_up();
 
     }
 }
+
+struct EventData<E> {
+    data: UnsafeCell<ManuallyDrop<E>>,
+}
+
+impl<E> EventData<E> {
+    fn new(data: E) -> Self {
+        Self { data: UnsafeCell::new(ManuallyDrop::new(data)) }
+    }
+
+    unsafe fn get(&self) -> &E {
+        &*self.data.get()
+    }
+    unsafe fn get_mut(&self) -> &mut E {
+        &mut *self.data.get()
+    }
+    unsafe fn take_data(&self) -> E {
+        ManuallyDrop::take(&mut *self.data.get())
+    }
+
+    unsafe fn drop_data(&self) {
+        ManuallyDrop::drop(&mut *self.data.get())
+    }
+}
+
+type SharedEvent<C> = SharedMessage<C, EventData<<C as Chan>::Event>>;
 
 /// An message that can be sent on a mpsc channel. This follows the same ordering as requests, but
-/// without the drop behavior of requests, allowing simple messages to be sent along the
-/// request path.
-pub struct Event<E> {
-    inner: Box<SharedLink<E>>,
+/// without the extra data of requests, like responses and pipelines, allowing simple messages to
+/// be sent along the request path.
+pub struct Event<C: Chan> {
+    inner: ManuallyDrop<Arc<SharedEvent<C>>>,
 }
 
-impl<E> Event<E> {
+impl<C: Chan> Event<C> {
+    fn from_shared(shared: Arc<SharedEvent<C>>) -> Self {
+        Self { inner: ManuallyDrop::new(shared) }
+    }
+    fn into_shared(mut self) -> Arc<SharedEvent<C>> {
+        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
+        std::mem::forget(self);
+        inner
+    }
+    fn as_shared(&self) -> &Arc<SharedEvent<C>> {
+        &self.inner
+    }
+
+    /// Create an event with interest. When this interest is dropped, the event is automatically
+    /// released from its current channel.
     #[inline]
-    pub fn new(data: E) -> Self {
-        Self {
-            inner: Box::new(SharedLink {
-                pointers: Pointers::new(),
-                kind: LinkKind::Event,
-                data,
-            }),
+    pub fn new(data: C::Event) -> (Self, EventInterest<C>) {
+        let shared = SharedEvent::new(data, 1);
+        let interest = EventInterest { inner: shared.clone() };
+        let event = Self::from_shared(shared);
+        (event, interest)
+    }
+
+    /// Create an event with inherent interest. This will never be released automatically
+    /// from whatever channel it's placed in.
+    #[inline]
+    pub fn with_inherent_interest(data: C::Event) -> Self {
+        Self::from_shared(SharedEvent::new(data, 1))
+    }
+
+    /// Returns whether the event has any interest associated with it. If this is false,
+    /// the event will be immediately dropped when sent on a channel.
+    pub fn has_interest(&self) -> bool {
+        self.inner.interest_count.load(Relaxed) != 0
+    }
+
+    /// Consume the event and return the underlying value.
+    #[inline]
+    pub fn into_inner(self) -> C::Event {
+        let message = self.into_shared();
+        unsafe { message.data.take_data() }
+    }
+
+    /// Get a shared reference to the underlying event value.
+    #[inline]
+    pub fn get(&self) -> &C::Event {
+        unsafe { self.inner.data.get() }
+    }
+
+    /// Get a mutable reference to the underlying event value.
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut C::Event {
+        unsafe { self.inner.data.get_mut() }
+    }
+}
+
+impl<C: Chan> Debug for Event<C>
+where
+    C::Event: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Event")
+            .field("inner", &self.get())
+            .finish()
+    }
+}
+
+impl<C: Chan> Drop for Event<C> {
+    fn drop(&mut self) {
+        unsafe {
+            self.inner.data.drop_data();
+            ManuallyDrop::drop(&mut self.inner);
         }
     }
+}
 
-    #[inline]
-    pub fn into_inner(self) -> E {
-        self.inner.data
+unsafe impl<C: Chan> Send for Event<C>
+where
+    C::Event: Send
+{}
+
+unsafe impl<C: Chan> Sync for Event<C>
+where
+    C::Event: Sync
+{}
+
+/// A reference to an event in a channel. This can only be used to keep the event alive. When all
+/// interest is dropped the event is released automatically.
+pub struct EventInterest<C: Chan> {
+    inner: Arc<SharedEvent<C>>,
+}
+
+impl<C: Chan> Clone for EventInterest<C> {
+    fn clone(&self) -> Self {
+        let inner = self.inner.clone();
+        inner.add_interest();
+        Self { inner }
     }
 }
 
+impl<C: Chan> Drop for EventInterest<C> {
+    fn drop(&mut self) {
+        if self.inner.remove_interest() {
+            self.inner.remove_self_from_channel();
+        }
+    }
+}
+
+/// The resolution of a channel.
+/// 
+/// A channel can be resolved into another channel, where all requests sent to this one are
+/// forwarded to the next one, or closed, where all requests return the given terminal error.
+/// This will also indicate if the Receiver was dropped without doing any resolution.
 pub enum Resolution<'a, C: Chan> {
     /// The channel was forwarded to another channel
     Forwarded(&'a Sender<C>),
@@ -929,6 +1147,7 @@ pub enum Resolution<'a, C: Chan> {
 }
 
 impl<'a, C: Chan> Resolution<'a, C> {
+    /// Returns the forwarded channel, if the channel was forwarded to another.
     pub fn forwarded(self) -> Option<&'a Sender<C>> {
         let Self::Forwarded(f) = self else {
             return None;
@@ -936,21 +1155,45 @@ impl<'a, C: Chan> Resolution<'a, C> {
         Some(f)
     }
 
+    /// Returns whether the channel was forwarded to another.
     pub fn is_forwarded(&self) -> bool {
         matches!(self, Self::Forwarded(_))
     }
 
+    /// Returns whether the channel was dropped.
     pub fn is_dropped(&self) -> bool {
         matches!(self, Self::Dropped)
     }
 
+    /// Returns the close error, if the channel was closed with an error.
     pub fn error(self) -> Option<&'a C::Error> {
         let Self::Error(e) = self else { return None };
         Some(e)
     }
 
+    /// Returns whether the channel was closed with an error.
     pub fn is_error(&self) -> bool {
         matches!(self, Self::Error(_))
+    }
+}
+
+impl<'a, C: Chan> Debug for Resolution<'a, C>
+where
+    Sender<C>: Debug,
+    C::Error: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Forwarded(sender) =>
+                f.debug_tuple("Forwarded")
+                    .field(sender)
+                    .finish(),
+            Self::Dropped => f.write_str("Dropped"),
+            Self::Error(err) =>
+                f.debug_tuple("Error")
+                    .field(err)
+                    .finish()
+        }
     }
 }
 
@@ -966,6 +1209,7 @@ impl<C: Chan> Clone for Resolution<'_, C> {
 }
 impl<C: Chan> Copy for Resolution<'_, C> {}
 
+/// The most resolved
 pub enum MostResolved<'a, E> {
     /// The receiving end was dropped
     Dropped,
@@ -986,12 +1230,12 @@ impl<C: Chan> Copy for MostResolved<'_, C> {}
 
 #[derive(Debug)]
 pub struct Sender<C: Chan> {
-    shared: Arc<SharedChannel<C>>,
+    shared: ManuallyDrop<Arc<SharedChannel<C>>>,
 }
 
 impl<C: Chan> Clone for Sender<C> {
     fn clone(&self) -> Self {
-        Self::new(self.shared.clone())
+        Self::new(Arc::clone(&self.shared))
     }
 }
 
@@ -1009,7 +1253,17 @@ impl<C: Chan> Sender<C> {
         unsafe {
             shared.add_sender();
         }
-        Self { shared }
+        Self::from_shared(shared)
+    }
+
+    fn into_shared(mut self) -> Arc<SharedChannel<C>> {
+        let inner = unsafe { ManuallyDrop::take(&mut self.shared) };
+        std::mem::forget(self);
+        inner
+    }
+
+    fn from_shared(shared: Arc<SharedChannel<C>>) -> Self {
+        Self { shared: ManuallyDrop::new(shared) }
     }
 
     pub fn send(&self, req: Request<C>) -> Result<(), (Request<C>, Option<&C::Error>)> {
@@ -1018,8 +1272,8 @@ impl<C: Chan> Sender<C> {
 
     pub fn send_event(
         &self,
-        event: Event<C::Event>,
-    ) -> Result<(), (Event<C::Event>, Option<&C::Error>)> {
+        event: Event<C>,
+    ) -> Result<(), (Event<C>, Option<&C::Error>)> {
         self.shared.send_event(event)
     }
 
@@ -1137,6 +1391,9 @@ impl<C: Chan> PinnedDrop for Resolved<'_, C> {
     }
 }
 
+unsafe impl<C: Chan> Send for Resolved<'_, C> where Request<C>: Send {}
+unsafe impl<C: Chan> Sync for Resolved<'_, C> where Request<C>: Send {}
+
 impl<C: Chan + ?Sized> PartialEq for Sender<C> {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.shared, &other.shared)
@@ -1153,9 +1410,15 @@ impl<C: Chan + ?Sized> Hash for Sender<C> {
 unsafe impl<C: Chan> Send for Sender<C> where Request<C>: Send {}
 unsafe impl<C: Chan> Sync for Sender<C> where Request<C>: Send {}
 
+/// An item that can be sent along an mpsc channel.
 pub enum Item<C: Chan> {
     Request(Request<C>),
-    Event(Event<C::Event>),
+    Event(Event<C>),
+}
+
+pub struct ItemWithSender<C: Chan> {
+    pub item: Item<C>,
+    pub sender: Sender<C>,
 }
 
 #[derive(Debug)]
@@ -1172,6 +1435,15 @@ impl<C: Chan> Receiver<C> {
         let inner = unsafe { ManuallyDrop::take(&mut self.shared) };
         std::mem::forget(self);
         inner
+    }
+
+    #[inline]
+    pub fn sender(&self) -> Option<Sender<C>> {
+        if !self.shared.try_add_sender() {
+            return None
+        }
+
+        Some(Sender::from_shared(Arc::clone(&self.shared)))
     }
 
     #[inline]
@@ -1207,11 +1479,12 @@ impl<C: Chan> Receiver<C> {
         self.shared.is_closed()
     }
 
-    pub async fn recv(&mut self) -> Option<Item<C>> {
+    /// Receive the next item in the channel.
+    pub async fn recv(&mut self) -> Option<ItemWithSender<C>> {
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 
-    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<Item<C>>> {
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<ItemWithSender<C>>> {
         if self.is_closed() {
             return Poll::Ready(None);
         }
@@ -1219,12 +1492,9 @@ impl<C: Chan> Receiver<C> {
         let waker = cx.waker().clone();
 
         let mut locked = self.shared.guarded_state.lock();
-        let next = locked.requests.pop_front().map(LinkPtr::into_link_item);
+        let next = locked.messages.pop_front();
 
         if let Some(n) = next {
-            if let LinkItem::Request(req) = &n {
-                unsafe { req.data.take_parent() };
-            }
             return Poll::Ready(Some(n.into_item()));
         }
 
@@ -1242,9 +1512,9 @@ impl<C: Chan> Receiver<C> {
     }
 
     /// Tries to receive the next value for this receiver.
-    pub fn try_recv(&mut self) -> Option<Item<C>> {
+    pub fn try_recv(&mut self) -> Option<ItemWithSender<C>> {
         let mut locked = self.shared.guarded_state.lock();
-        let link = locked.requests.pop_front()?;
+        let link = locked.messages.pop_front()?;
         Some(link.into_item())
     }
 
@@ -1264,20 +1534,26 @@ impl<C: Chan> Drop for Receiver<C> {
     }
 }
 
+/// Create a new mpsc channel with the given channel data.
 pub fn channel<C: Chan>(chan: C) -> (Sender<C>, Receiver<C>) {
     let channel = Arc::new(SharedChannel::new(chan, 1, None));
-    let sender = Sender {
-        shared: channel.clone(),
-    };
+    let sender = channel.clone().into_existing_sender();
     let receiver = Receiver { shared: ManuallyDrop::new(channel) };
     (sender, receiver)
 }
 
 /// Creates a sender to a broken channel with the given error
 pub fn broken<C: Chan>(chan: C, err: C::Error) -> Sender<C> {
-    Sender {
-        shared: Arc::new(SharedChannel::resolved(chan, 1, ChannelResolution::Error(err)))
-    }
+    Arc::new(SharedChannel::resolved(
+        chan,
+        1,
+        ChannelResolution::Error(err),
+    )).into_existing_sender()
+}
+
+/// Creates a sender to a broken channel with a dropped receiver
+pub fn dropped<C: Chan>(chan: C) -> Sender<C> {
+    Arc::new(SharedChannel::dropped(chan)).into_existing_sender()
 }
 
 /// A version of Receiver that drops the channel if all the senders are destroyed and the
@@ -1300,14 +1576,23 @@ impl<C: Chan> WeakReceiver<C> {
         if !shared.try_add_sender() {
             return None
         }
-        Some(Sender { shared })
+        Some(shared.into_existing_sender())
     }
 
     /// Upgrade the channel into a receiver
-    pub fn upgrade(self) -> Option<Receiver<C>> {
+    pub fn upgrade(self) -> Option<(Receiver<C>, request::Receiver<C>)> {
         let shared = self.shared.upgrade()?;
+        let response = shared.guarded_state.lock().parent_request.take().unwrap();
+        Some((Receiver { shared: ManuallyDrop::new(shared) }, response))
+    }
+}
+
+impl<C: Chan> Drop for WeakReceiver<C> {
+    fn drop(&mut self) {
+        let Some(shared) = self.shared.upgrade() else { return };
         let _ = shared.guarded_state.lock().parent_request.take();
-        Some(Receiver { shared: ManuallyDrop::new(shared) })
+        shared.drop_receiver();
+        drop(shared);
     }
 }
 
@@ -1321,7 +1606,7 @@ impl<C: Chan> WeakSender<C> {
         if !shared.try_add_sender() {
             return None
         }
-        Some(Sender { shared })
+        Some(shared.into_existing_sender())
     }
 }
 
@@ -1333,13 +1618,19 @@ pub(crate) fn weak_channel<C: Chan>(
     let weak_channel = WeakReceiver {
         shared: Arc::downgrade(&channel),
     };
-    let sender = Sender { shared: channel };
+    let sender = channel.into_existing_sender();
     (sender, weak_channel)
 }
 
 /// A key to remove a receiver from a ReceiverSet.
 pub struct ReceiverKey<C: Chan> {
     shared: Weak<SharedChannel<C>>,
+}
+
+impl<C: Chan> ReceiverKey<C> {
+    pub fn into_weak_sender(self) -> WeakSender<C> {
+        WeakSender { shared: self.shared }
+    }
 }
 
 pub struct ReceiverKeyRef<'a, C: Chan> {
@@ -1376,14 +1667,14 @@ impl<'a, C: Chan> ReceiverKeyRef<'a, C> {
 }
 
 pub enum SetRecvResult<'a, C: Chan> {
-    /// No item was received.
-    None,
     /// An item was received from a channel.
     Item {
         /// The receiver key this item was received for.
         receiver: ReceiverKeyRef<'a, C>,
         /// The item received.
         item: Item<C>,
+        /// The sender this item was sent to.
+        sender: Sender<C>,
     },
     /// A receiver was closed, indicating that it will never receive any messages. The receiver
     /// for the channel is removed from the set and returned to the caller.
@@ -1430,6 +1721,25 @@ impl<C: Chan> ReceiverSet<C> {
         Some(Receiver { shared: ManuallyDrop::new(channel) })
     }
 
+    #[inline]
+    pub fn remove_by_sender(&mut self, key: &Sender<C>) -> Option<Receiver<C>> {
+        if !self.shared.remove_by_ref(&key.shared) {
+            return None
+        }
+
+        Some(Receiver { shared: key.shared.clone() })
+    }
+
+    #[inline]
+    pub fn remove_by_weak_sender(&mut self, key: &WeakSender<C>) -> Option<Receiver<C>> {
+        let channel = key.shared.upgrade()?;
+        if !self.shared.remove_by_ref(&channel) {
+            return None
+        }
+
+        Some(Receiver { shared: ManuallyDrop::new(channel) })
+    }
+
     /// Returns all receivers in the set, clearing the set.
     #[inline]
     pub fn remove_all(&mut self) -> Vec<Receiver<C>> {
@@ -1439,14 +1749,16 @@ impl<C: Chan> ReceiverSet<C> {
     /// Receive the next value for any channel in this set. If there are no channels in this set,
     /// this returns None.
     #[inline]
-    pub async fn recv(&mut self) -> SetRecvResult<'_, C> {
+    pub async fn recv(&mut self) -> Option<SetRecvResult<'_, C>> {
         pub struct SetRecv<'a, C: Chan> {
             ptr: Option<NonNull<ReceiverSet<C>>>,
             a: PhantomData<&'a mut ReceiverSet<C>>,
         }
 
+        unsafe impl<'a, C: Chan> Send for SetRecv<'a, C> where &'a mut ReceiverSet<C>: Send {}
+
         impl<'a, C: Chan> Future for SetRecv<'a, C> {
-            type Output = SetRecvResult<'a, C>;
+            type Output = Option<SetRecvResult<'a, C>>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let this = self.get_mut();
@@ -1466,13 +1778,13 @@ impl<C: Chan> ReceiverSet<C> {
     }
 
     #[inline]
-    pub fn poll_recv<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<SetRecvResult<'a, C>> {
+    pub fn poll_recv<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<Option<SetRecvResult<'a, C>>> {
         self.shared.poll_recv(cx)
     }
 
     /// Tries to receive the next value for this set.
     #[inline]
-    pub fn try_recv(&mut self) -> SetRecvResult<'_, C> {
+    pub fn try_recv(&mut self) -> Option<SetRecvResult<'_, C>> {
         self.shared.try_recv()
     }
 }

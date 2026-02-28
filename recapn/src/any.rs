@@ -35,8 +35,7 @@ use crate::ptr::{
     CopySize, ElementCount, ErrorHandler, IgnoreErrors, MessageSize, PtrElementSize, StructSize,
 };
 use crate::rpc::{
-    self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, PipelineBuilder, Pipelined,
-    Table,
+    self, BreakableCapSystem, CapTable, Capable, Empty, InsertableInto, Pipelinable, PipelineBuilder, Pipelined, Table, TypedPipeline
 };
 use crate::ty::{self, FromPtr, StructReader as _};
 use crate::{data, text, Family, IntoFamily, Result};
@@ -543,6 +542,21 @@ impl<'a, T: Table, T2: Table> PartialEq<PtrReader<'a, T2>> for PtrBuilder<'a, T>
     #[inline]
     fn eq(&self, other: &PtrReader<'a, T2>) -> bool {
         matches!(self.equality(other), Ok(PtrEquality::Equal))
+    }
+}
+
+impl Pipelinable for AnyPtr {
+    type Pipeline<P: Pipelined> = PtrPipeline<P>;
+}
+
+impl<P: Pipelined> TypedPipeline for PtrPipeline<P> {
+    type Pipeline = P;
+
+    fn from_pipeline(p: rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> rpc::Pipeline<Self::Pipeline> {
+        self.0
     }
 }
 

@@ -6,10 +6,20 @@ members = [
     "recapn-rpc",
     "tests",
     "fuzz",
-    "examples/addressbook"
+    "examples/addressbook",
+    "examples/calculator"
 ]
 
 resolver = "2"
+
+[workspace.dependencies]
+assert_matches2 = "0.1"
+tokio = { version = "1.50", default-features = false }
+tokio-test = "0.4"
+pin-project = "1.1"
+parking_lot = "0.12"
+hashbrown = "0.14"
+scopeguard = "1.2"
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

@@ -16,6 +16,9 @@ pub mod ptr {
     pub use crate::ptr::{BlobBuilder as Builder, BlobReader as Reader};
 }
 
+/// The maximum length of a string that can be contained in a Text value.
+pub const MAX_LENGTH: u32 = ByteCount::MAX_VALUE - 1;
+
 /// Concatenates literals into a static text reader.
 ///
 /// Internally this uses `core::concat!` and adds an extra nul byte. The resulting bytes

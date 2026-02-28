@@ -47,8 +47,8 @@ unsafe impl Link for Waiter {
     type Handle = NonNull<Self>;
     type Target = Self;
 
-    fn into_raw(handle: Self::Handle) -> NonNull<Self::Target> {
-        handle
+    fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target> {
+        *handle
     }
 
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {

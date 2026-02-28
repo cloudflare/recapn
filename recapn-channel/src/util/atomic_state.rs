@@ -36,6 +36,11 @@ impl AtomicState {
     }
 
     #[inline]
+    pub const fn new_send_closed() -> Self {
+        Self(AtomicU8::new(STATE_SEND_CLOSED))
+    }
+
+    #[inline]
     pub fn get(&mut self) -> StateFlags {
         StateFlags(*self.0.get_mut())
     }
@@ -129,7 +134,7 @@ impl AtomicState {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct StateFlags(u8);
 
 impl StateFlags {

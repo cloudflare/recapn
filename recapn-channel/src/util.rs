@@ -1,4 +1,5 @@
 pub mod array_vec;
+pub mod atomic_option_arc;
 pub mod atomic_state;
 pub mod closed_task;
 pub mod linked_list;

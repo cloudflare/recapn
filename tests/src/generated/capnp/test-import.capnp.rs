@@ -98,6 +98,19 @@ impl _p::ty::Struct for TestImport {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestImport {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_import::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_import::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestImport {
     const FIELD: _p::Descriptor<_p::Struct<__imports::capnp_test_capnp::TestAllTypes>> = _p::Descriptor::<
         _p::Struct<__imports::capnp_test_capnp::TestAllTypes>,
@@ -149,10 +162,27 @@ impl<'p, T: _p::rpc::Table + 'p> test_import::Builder<'p, T> {
         }
     }
 }
+impl<P> test_import::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn field(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<__imports::capnp_test_capnp::TestAllTypes, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_import {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestImport<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestImport<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestImport<::recapn::rpc::Pipeline<P>>;
 }

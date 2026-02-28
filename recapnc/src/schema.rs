@@ -153,7 +153,7 @@ impl SchemaLoader {
         Ok(schema)
     }
 
-    pub fn resolve_brand<'a>(&'a self, brand: &ReaderOf<'a, Brand>) -> Result<Branding<'_>> {
+    pub fn resolve_brand<'a>(&'a self, brand: &ReaderOf<'a, Brand>) -> Result<Branding<'a>> {
         let scopes_list = brand.scopes().get();
         let scopes = {
             let mut scopes = Vec::with_capacity(scopes_list.len() as usize);

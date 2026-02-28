@@ -637,6 +637,44 @@ impl<'b, 'p, T: Table, G: FieldGroup> VoidVariant<Group<G>, StructBuilder<'b, 'p
     }
 }
 
+impl<'b, T: Table, G: FieldGroup> VoidVariant<Group<G>, OwnedStructBuilder<'b, T>> {
+    /// Returns a bool indicating whether or not this field is set in the union
+    #[inline]
+    pub fn is_set(&self) -> bool {
+        let &VariantInfo { slot, case } = self.variant;
+        unsafe { self.repr.data_field_unchecked::<u16>(slot as usize) == case }
+    }
+
+    #[inline]
+    fn set_variant(&mut self) {
+        let &VariantInfo { slot, case } = self.variant;
+        unsafe { self.repr.set_field_unchecked(slot as usize, case) }
+    }
+
+    #[inline]
+    pub fn get(self) -> Option<G::Builder<'b, T>> {
+        if self.is_set() {
+            unsafe { Some(ty::StructBuilder::from_ptr(self.repr)) }
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked(self) -> G::Builder<'b, T> {
+        ty::StructBuilder::from_ptr(self.repr)
+    }
+
+    #[inline]
+    pub fn set(mut self) -> G::Builder<'b, T> {
+        self.set_variant();
+        unsafe {
+            G::clear(&mut self.repr);
+            ty::StructBuilder::from_ptr(self.repr)
+        }
+    }
+}
+
 #[must_use = "accessors don't do anything unless you call one of their functions"]
 pub struct DataField<D: Value, Repr> {
     descriptor: &'static FieldInfo<D>,

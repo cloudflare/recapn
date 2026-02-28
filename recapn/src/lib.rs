@@ -59,9 +59,9 @@ pub mod prelude {
         pub use recapn::any::{self, AnyList, AnyPtr, AnyStruct};
         pub use recapn::data::{self, Data};
         pub use recapn::field::{
-            self, Accessor, AccessorMut, AccessorOwned, Descriptor, Enum, FieldGroup, Group,
-            Struct, UnionViewer, Variant, VariantDescriptor, VariantInfo, VariantMut, VariantOwned,
-            ViewOf, Viewable,
+            self, Accessor, AccessorMut, AccessorOwned, Capability, Descriptor, Enum, FieldGroup,
+            Group, Struct, UnionViewer, Variant, VariantDescriptor, VariantInfo, VariantMut,
+            VariantOwned, ViewOf, Viewable,
         };
         pub use recapn::list::{self, List};
         pub use recapn::ptr::{

@@ -15,13 +15,13 @@ use recapn_channel::request::{self, ResponseReceiverFactory};
 use recapn_channel::{Chan, IntoResults, PipelineResolver};
 
 use crate::client::Client;
-use crate::connection;
+use crate::connection::{self, ConnectionId};
 use crate::pipeline::PipelineOp;
 use crate::table::{CapTable, Table};
-use crate::Error;
+use crate::{Error, rpc_capnp};
 
 #[derive(Debug)]
-pub(crate) enum RpcChannel {
+pub enum RpcChannel {
     /// A client that sends requests to a local request handler.
     Local,
     /// A client that always returns the same error when requests are made.
@@ -32,21 +32,32 @@ pub(crate) enum RpcChannel {
     LocalShortening,
     /// A client from spawning a task to fulfill it later.
     Spawned,
-    /// A client to handle bootstrap requests.
-    Bootstrap(connection::QuestionId),
-    /// A local request pipeline
+    /// A local request pipeline.
     Pipeline,
-    /// A client to handle pipelined requests to a remote party.
-    RemotePipeline,
-    /// A client that was imported from another vat. When the client is dropped,
-    /// the import is released.
-    Import(connection::ImportClient),
+    Bootstrap {
+        connection: ConnectionId,
+        id: connection::QuestionId,
+    },
+    PromisedAnswer {
+        connection: ConnectionId,
+        id: connection::QuestionId,
+        pipeline: Arc<[PipelineOp]>,
+    },
+    /// A client that was imported from another vat.
+    Import {
+        connection: ConnectionId,
+        id: connection::ImportId,
+    },
 }
 
 pub type Sender = mpsc::Sender<RpcChannel>;
+pub type WeakSender = mpsc::WeakSender<RpcChannel>;
 pub type Receiver = mpsc::Receiver<RpcChannel>;
+pub type ReceiverSet = mpsc::ReceiverSet<RpcChannel>;
+pub type ReceiverKey = mpsc::ReceiverKey<RpcChannel>;
+pub type SetRecvResult<'a> = mpsc::SetRecvResult<'a, RpcChannel>;
 pub type Item = mpsc::Item<RpcChannel>;
-pub type Event = mpsc::Event<<RpcChannel as Chan>::Event>;
+pub type Event = mpsc::Event<RpcChannel>;
 
 pub type Request = request::Request<RpcChannel>;
 pub type ResponseReceiver = request::ResponseReceiver<RpcChannel>;
@@ -56,7 +67,7 @@ pub type Response = request::Response<RpcChannel>;
 pub type PipelineBuilder = request::PipelineBuilder<RpcChannel>;
 
 impl Chan for RpcChannel {
-    type Event = ();
+    type Event = RpcEvent;
     type Parameters = RpcCall;
 
     type PipelineKey = Arc<[PipelineOp]>;
@@ -65,6 +76,15 @@ impl Chan for RpcChannel {
 
     type Pipeline = SetPipeline;
     type Results = RpcResults;
+}
+
+#[derive(Debug)]
+pub enum RpcEvent {
+    Embargo {
+        connection: ConnectionId,
+        id: connection::EmbargoId,
+        target: connection::CapTarget,
+    },
 }
 
 pub type LocalMessage = Box<Message<'static, dyn Alloc + Send>>;
@@ -102,6 +122,8 @@ impl MessagePayload {
 pub enum ResultsRoot {
     /// The message root is the result parameters.
     Results,
+    /// The message root is an rpc Message with a Return value
+    Return,
 }
 
 pub struct RpcResponse {
@@ -115,31 +137,51 @@ impl RpcResponse {
     pub fn with_results<T>(&self, f: impl FnOnce(any::PtrReader<'_, CapTable<'_>>) -> T) -> T {
         let reader = self.message.reader(ReaderOptions::default());
         let results = match self.root {
-            ResultsRoot::Results => reader.root().imbue(self.table.reader()),
+            ResultsRoot::Results => reader.root(),
+            ResultsRoot::Return => reader.read_as_struct::<rpc_capnp::Message>()
+                .r#return()
+                .get_or_default()
+                .results()
+                .get_or_default()
+                .content()
+                .get()
         };
-        f(results)
+        f(results.imbue(self.table.reader()))
     }
 
-    fn try_resolve_pipeline_ops(&self, ops: &[PipelineOp]) -> recapn::Result<Client> {
-        self.with_results(|mut ptr| {
-            for op in ops {
-                match op {
-                    PipelineOp::PtrField(index) => {
-                        ptr = ptr
-                            .try_read_as::<any::AnyStruct>()?
-                            .ptr_field_or_default(*index);
-                    }
-                }
-            }
-            Ok(ptr.read_as_client::<Client>())
+    pub fn try_resolve_pipeline_ops(&self, ops: &[PipelineOp]) -> recapn::Result<Client> {
+        self.with_results(|ptr| {
+            Ok(apply_ops(ptr, ops)?.read_as_client::<Client>())
         })
     }
+
+    pub fn try_resolve_cap_index(&self, ops: &[PipelineOp]) -> recapn::Result<Option<u32>> {
+        self.with_results(|ptr| {
+            apply_ops(ptr, ops)?.as_ref().try_to_capability_index()
+        })
+    }
+}
+
+fn apply_ops<'a, 't>(
+    mut ptr: any::PtrReader<'a, CapTable<'t>>,
+    ops: &[PipelineOp],
+) -> recapn::Result<any::PtrReader<'a, CapTable<'t>>> {
+    for op in ops {
+        match op {
+            PipelineOp::PtrField(index) => {
+                ptr = ptr
+                    .try_read_as::<any::AnyStruct>()?
+                    .ptr_field_or_default(*index);
+            }
+        }
+    }
+    Ok(ptr)
 }
 
 impl PipelineResolver<RpcChannel> for RpcResponse {
     fn resolve(
         &self,
-        _: ResponseReceiverFactory<'_, RpcChannel>,
+        _: ResponseReceiver,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -149,7 +191,7 @@ impl PipelineResolver<RpcChannel> for RpcResponse {
                     recv.close(Error::failed("attempted to resolve client into itself"))
                 }
             }
-            Err(err) => channel.close(Error::failed(err.to_string())),
+            Err(err) => channel.close(Error::from(err)),
         }
     }
     fn pipeline(
@@ -159,7 +201,7 @@ impl PipelineResolver<RpcChannel> for RpcResponse {
     ) -> mpsc::Sender<RpcChannel> {
         match self.try_resolve_pipeline_ops(&key) {
             Ok(c) => c.0,
-            Err(err) => mpsc::broken(RpcChannel::Broken, Error::failed(err.to_string())),
+            Err(err) => mpsc::broken(RpcChannel::Broken, Error::from(err)),
         }
     }
 }
@@ -167,7 +209,7 @@ impl PipelineResolver<RpcChannel> for RpcResponse {
 impl PipelineResolver<RpcChannel> for Result<RpcResponse, Error> {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<'_, RpcChannel>,
+        recv: ResponseReceiver,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -191,7 +233,7 @@ impl PipelineResolver<RpcChannel> for Result<RpcResponse, Error> {
 impl PipelineResolver<RpcChannel> for RpcResults {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<'_, RpcChannel>,
+        recv: ResponseReceiver,
         key: Arc<[PipelineOp]>,
         channel: mpsc::Receiver<RpcChannel>,
     ) {
@@ -212,6 +254,23 @@ impl PipelineResolver<RpcChannel> for RpcResults {
     }
 }
 
+impl RpcResults {
+    pub fn resolve_ops_to_index(&self, ops: &[PipelineOp]) -> Result<Option<u32>, Error> {
+        self.unwrap_results()
+            .as_ref()
+            .map_err(|e| e.clone())
+            .and_then(|r| r.try_resolve_cap_index(ops).map_err(Into::into))
+    }
+
+    pub fn resolve_ops_to_sender(&self, ops: &[PipelineOp]) -> Sender {
+        self.unwrap_results()
+            .as_ref()
+            .map_err(|e| e.clone())
+            .and_then(|r| r.try_resolve_pipeline_ops(&ops).map_err(Into::into))
+            .map_or_else(|e| mpsc::broken(RpcChannel::Broken, e), |c| c.0)
+    }
+}
+
 pub enum RpcResults {
     /// A response owned by this request.
     Owned(Result<RpcResponse, Error>),
@@ -219,7 +278,7 @@ pub enum RpcResults {
     ///
     /// This is useful if a call is sent to ourselves and another question needs to pull the
     /// response from it.
-    OtherResponse(request::Response<RpcChannel>),
+    OtherResponse(Response),
 }
 
 impl RpcResults {
@@ -248,7 +307,7 @@ pub enum SetPipeline {
 impl PipelineResolver<RpcChannel> for SetPipeline {
     fn resolve(
         &self,
-        recv: ResponseReceiverFactory<'_, RpcChannel>,
+        recv: ResponseReceiver,
         key: Arc<[PipelineOp]>,
         channel: Receiver,
     ) {
@@ -299,6 +358,8 @@ pub enum ResponseTarget {
 pub enum ParamsRoot {
     /// The message root is the request parameters.
     Params,
+    /// The message root is an RPC Call wrapped in a Message.
+    RpcCall,
 }
 
 pub struct Params {

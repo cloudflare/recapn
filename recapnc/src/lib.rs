@@ -443,13 +443,32 @@ pub enum Error {
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
+/// Whether to include references to RPC in generated code
+#[derive(Default)]
+pub enum IncludeRpc {
+    /// Always include RPC
+    Yes,
+    /// Never include RPC
+    No,
+    /// Infer whether to include RPC by the types defined and imported by the requested files.
+    #[default]
+    Automatic,
+}
+
+#[derive(Default)]
+#[non_exhaustive]
+pub struct GeneratorOptions {
+    pub include_rpc: IncludeRpc,
+}
+
 /// Read from an existing `CodeGeneratorRequest` and write files based on the given output path.
 pub fn generate_from_request(
     request: &ReaderOf<'_, CodeGeneratorRequest>,
+    options: GeneratorOptions,
     out: impl AsRef<Path>,
 ) -> Result<()> {
     let out = out.as_ref();
-    let context = GeneratorContext::new(request)?;
+    let context = GeneratorContext::new(request, options.include_rpc)?;
 
     let mut root_mod = GeneratedRoot { files: Vec::new() };
 
@@ -492,12 +511,12 @@ pub fn generate_from_request(
 }
 
 /// Read a `CodeGeneratorRequest` capnp message from a stream and write files based on the given output path.
-pub fn generate_from_request_stream(r: impl Read, out: impl AsRef<Path>) -> Result<()> {
+pub fn generate_from_request_stream(r: impl Read, options: GeneratorOptions, out: impl AsRef<Path>) -> Result<()> {
     let message = io::read_from_stream(r, StreamOptions::default())?;
     let reader = Reader::new(&message, ReaderOptions::default());
     let request = reader.root().read_as_struct::<CodeGeneratorRequest>();
 
-    generate_from_request(&request, out)
+    generate_from_request(&request, options, out)
 }
 
 pub struct CapnpCommand {
@@ -601,7 +620,7 @@ impl CapnpCommand {
             .take()
             .expect("missing stdout in child capnp process");
 
-        generate_from_request_stream(out, path.as_ref())
+        generate_from_request_stream(out, GeneratorOptions::default(), path.as_ref())
             .expect("failed to generate code for capnp files");
 
         cmd.wait().expect("capnp command failed");

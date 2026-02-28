@@ -138,6 +138,19 @@ impl _p::ty::Struct for TestAllTypes {
         ptrs: 20u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestAllTypes {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_all_types::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_all_types::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestAllTypes {
     const VOID_FIELD: _p::Descriptor<()> = ();
     const BOOL_FIELD: _p::Descriptor<bool> = _p::Descriptor::<bool> {
@@ -1036,6 +1049,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_all_types::Builder<'p, T> {
         }
     }
 }
+impl<P> test_all_types::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn struct_field(self) -> ::recapn::rpc::PipelineOf<TestAllTypes, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+        )
+    }
+}
 pub mod test_all_types {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestAllTypes<
@@ -1044,6 +1071,7 @@ pub mod test_all_types {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestAllTypes<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestAllTypes<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestDefaults<T = _p::Family>(T);
@@ -1141,6 +1169,19 @@ impl _p::ty::Struct for TestDefaults {
         data: 6u16,
         ptrs: 20u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestDefaults {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_defaults::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_defaults::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestDefaults {
     const VOID_FIELD: _p::Descriptor<()> = ();
@@ -2463,6 +2504,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_defaults::Builder<'p, T> {
         }
     }
 }
+impl<P> test_defaults::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn struct_field(self) -> ::recapn::rpc::PipelineOf<TestAllTypes, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+        )
+    }
+}
 pub mod test_defaults {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestDefaults<
@@ -2471,6 +2526,7 @@ pub mod test_defaults {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestDefaults<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestDefaults<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestAnyPointer<T = _p::Family>(T);
@@ -2569,6 +2625,19 @@ impl _p::ty::Struct for TestAnyPointer {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestAnyPointer {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_any_pointer::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_any_pointer::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestAnyPointer {
     const ANY_POINTER_FIELD: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
@@ -2606,6 +2675,22 @@ impl<'p, T: _p::rpc::Table + 'p> test_any_pointer::Builder<'p, T> {
         }
     }
 }
+impl<P> test_any_pointer::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn any_pointer_field(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_any_pointer {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestAnyPointer<
@@ -2614,6 +2699,7 @@ pub mod test_any_pointer {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestAnyPointer<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestAnyPointer<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestAnyOthers<T = _p::Family>(T);
@@ -2712,6 +2798,19 @@ impl _p::ty::Struct for TestAnyOthers {
         ptrs: 3u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestAnyOthers {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_any_others::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_any_others::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestAnyOthers {
     const ANY_STRUCT_FIELD: _p::Descriptor<_p::AnyStruct> = _p::Descriptor::<
         _p::AnyStruct,
@@ -2723,7 +2822,9 @@ impl TestAnyOthers {
         slot: 1u32,
         default: ::core::option::Option::None,
     };
-    const CAPABILITY_FIELD: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+    const CAPABILITY_FIELD: _p::Descriptor<
+        _p::Capability<::recapn_rpc::client::Client>,
+    > = _p::Descriptor::<_p::Capability<::recapn_rpc::client::Client>> {
         slot: 2u32,
         default: ::core::option::Option::None,
     };
@@ -2748,9 +2849,13 @@ impl<'p, T: _p::rpc::Table + 'p> test_any_others::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn capability_field(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+    pub fn capability_field(
+        &self,
+    ) -> _p::Accessor<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
+            <_p::Capability<
+                ::recapn_rpc::client::Client,
+            > as _p::field::FieldType>::accessor(
                 &self.0,
                 &TestAnyOthers::CAPABILITY_FIELD,
             )
@@ -2777,9 +2882,13 @@ impl<'p, T: _p::rpc::Table + 'p> test_any_others::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn capability_field(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+    pub fn capability_field(
+        &mut self,
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
+            <_p::Capability<
+                ::recapn_rpc::client::Client,
+            > as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestAnyOthers::CAPABILITY_FIELD,
             )
@@ -2804,13 +2913,38 @@ impl<'p, T: _p::rpc::Table + 'p> test_any_others::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_capability_field(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+    pub fn into_capability_field(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::Capability<::recapn_rpc::client::Client>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
+            <_p::Capability<
+                ::recapn_rpc::client::Client,
+            > as _p::field::FieldType>::accessor(
                 self.0,
                 &TestAnyOthers::CAPABILITY_FIELD,
             )
         }
+    }
+}
+impl<P> test_any_others::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn any_struct_field(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn capability_field(self) -> ::recapn_rpc::client::Client {
+        ::recapn::ty::Capability::from_client(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)).into_cap(),
+        )
     }
 }
 pub mod test_any_others {
@@ -2821,6 +2955,7 @@ pub mod test_any_others {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestAnyOthers<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestAnyOthers<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestOutOfOrder<T = _p::Family>(T);
@@ -2918,6 +3053,19 @@ impl _p::ty::Struct for TestOutOfOrder {
         data: 0u16,
         ptrs: 9u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestOutOfOrder {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_out_of_order::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_out_of_order::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestOutOfOrder {
     const QUX: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
@@ -3164,6 +3312,7 @@ pub mod test_out_of_order {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestOutOfOrder<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestOutOfOrder<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestUnion<T = _p::Family>(T);
@@ -3261,6 +3410,19 @@ impl _p::ty::Struct for TestUnion {
         data: 8u16,
         ptrs: 2u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestUnion {
     const UNION0: _p::Descriptor<_p::Group<test_union::Union0>> = ();
@@ -3486,12 +3648,34 @@ impl<'p, T: _p::rpc::Table + 'p> test_union::Builder<'p, T> {
         }
     }
 }
+impl<P> test_union::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn union0(self) -> ::recapn::rpc::PipelineOf<test_union::Union0, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+    pub fn union1(self) -> ::recapn::rpc::PipelineOf<test_union::Union1, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+    pub fn union2(self) -> ::recapn::rpc::PipelineOf<test_union::Union2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+    pub fn union3(self) -> ::recapn::rpc::PipelineOf<test_union::Union3, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_union {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestUnion<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUnion<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Union0<T = _p::Family>(T);
     impl _p::ty::SchemaType for Union0 {
@@ -3588,8 +3772,25 @@ pub mod test_union {
     }
     impl _p::FieldGroup for Union0 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(0usize, 0);
-            <() as _p::field::FieldType>::clear(s, &Union0::U0F0S0.field);
+            unsafe {
+                s.set_field_unchecked(0usize, 0);
+            }
+            unsafe {
+                <() as _p::field::FieldType>::clear(s, &Union0::U0F0S0.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Union0 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = union0::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for union0::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Union0 {
@@ -3906,6 +4107,7 @@ pub mod test_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Union0<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Union0<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             U0f0s0(_p::ViewOf<T, ()>),
             U0f0s1(_p::ViewOf<T, bool>),
@@ -3932,142 +4134,142 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U0f0s0(
+                            Which::U0f0s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U0f0s1(
+                            Which::U0f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U0f0s8(
+                            Which::U0f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U0f0s16(
+                            Which::U0f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U0f0s32(
+                            Which::U0f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     5u16 => {
                         Ok(
-                            Which::U0f0s64(
+                            Which::U0f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     6u16 => {
                         Ok(
-                            Which::U0f0sp(
+                            Which::U0f0sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F0SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     7u16 => {
                         Ok(
-                            Which::U0f1s0(
+                            Which::U0f1s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     8u16 => {
                         Ok(
-                            Which::U0f1s1(
+                            Which::U0f1s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     9u16 => {
                         Ok(
-                            Which::U0f1s8(
+                            Which::U0f1s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     10u16 => {
                         Ok(
-                            Which::U0f1s16(
+                            Which::U0f1s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     11u16 => {
                         Ok(
-                            Which::U0f1s32(
+                            Which::U0f1s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     12u16 => {
                         Ok(
-                            Which::U0f1s64(
+                            Which::U0f1s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     13u16 => {
                         Ok(
-                            Which::U0f1sp(
+                            Which::U0f1sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union0::U0F1SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -4084,142 +4286,142 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U0f0s0(
+                            Which::U0f0s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U0f0s1(
+                            Which::U0f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U0f0s8(
+                            Which::U0f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U0f0s16(
+                            Which::U0f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U0f0s32(
+                            Which::U0f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     5u16 => {
                         Ok(
-                            Which::U0f0s64(
+                            Which::U0f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     6u16 => {
                         Ok(
-                            Which::U0f0sp(
+                            Which::U0f0sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F0SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     7u16 => {
                         Ok(
-                            Which::U0f1s0(
+                            Which::U0f1s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     8u16 => {
                         Ok(
-                            Which::U0f1s1(
+                            Which::U0f1s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     9u16 => {
                         Ok(
-                            Which::U0f1s8(
+                            Which::U0f1s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     10u16 => {
                         Ok(
-                            Which::U0f1s16(
+                            Which::U0f1s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     11u16 => {
                         Ok(
-                            Which::U0f1s32(
+                            Which::U0f1s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     12u16 => {
                         Ok(
-                            Which::U0f1s64(
+                            Which::U0f1s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     13u16 => {
                         Ok(
-                            Which::U0f1sp(
+                            Which::U0f1sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union0::U0F1SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -4323,8 +4525,25 @@ pub mod test_union {
     }
     impl _p::FieldGroup for Union1 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(1usize, 0);
-            <() as _p::field::FieldType>::clear(s, &Union1::U1F0S0.field);
+            unsafe {
+                s.set_field_unchecked(1usize, 0);
+            }
+            unsafe {
+                <() as _p::field::FieldType>::clear(s, &Union1::U1F0S0.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Union1 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = union1::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for union1::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Union1 {
@@ -4771,6 +4990,7 @@ pub mod test_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Union1<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Union1<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             U1f0s0(_p::ViewOf<T, ()>),
             U1f0s1(_p::ViewOf<T, bool>),
@@ -4803,202 +5023,202 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U1f0s0(
+                            Which::U1f0s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U1f0s1(
+                            Which::U1f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U1f1s1(
+                            Which::U1f1s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U1f0s8(
+                            Which::U1f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U1f1s8(
+                            Which::U1f1s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     5u16 => {
                         Ok(
-                            Which::U1f0s16(
+                            Which::U1f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     6u16 => {
                         Ok(
-                            Which::U1f1s16(
+                            Which::U1f1s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     7u16 => {
                         Ok(
-                            Which::U1f0s32(
+                            Which::U1f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     8u16 => {
                         Ok(
-                            Which::U1f1s32(
+                            Which::U1f1s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     9u16 => {
                         Ok(
-                            Which::U1f0s64(
+                            Which::U1f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     10u16 => {
                         Ok(
-                            Which::U1f1s64(
+                            Which::U1f1s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     11u16 => {
                         Ok(
-                            Which::U1f0sp(
+                            Which::U1f0sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F0SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     12u16 => {
                         Ok(
-                            Which::U1f1sp(
+                            Which::U1f1sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F1SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     13u16 => {
                         Ok(
-                            Which::U1f2s0(
+                            Which::U1f2s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     14u16 => {
                         Ok(
-                            Which::U1f2s1(
+                            Which::U1f2s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     15u16 => {
                         Ok(
-                            Which::U1f2s8(
+                            Which::U1f2s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     16u16 => {
                         Ok(
-                            Which::U1f2s16(
+                            Which::U1f2s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     17u16 => {
                         Ok(
-                            Which::U1f2s32(
+                            Which::U1f2s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     18u16 => {
                         Ok(
-                            Which::U1f2s64(
+                            Which::U1f2s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     19u16 => {
                         Ok(
-                            Which::U1f2sp(
+                            Which::U1f2sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union1::U1F2SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5015,202 +5235,202 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U1f0s0(
+                            Which::U1f0s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U1f0s1(
+                            Which::U1f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U1f1s1(
+                            Which::U1f1s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U1f0s8(
+                            Which::U1f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U1f1s8(
+                            Which::U1f1s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     5u16 => {
                         Ok(
-                            Which::U1f0s16(
+                            Which::U1f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     6u16 => {
                         Ok(
-                            Which::U1f1s16(
+                            Which::U1f1s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     7u16 => {
                         Ok(
-                            Which::U1f0s32(
+                            Which::U1f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     8u16 => {
                         Ok(
-                            Which::U1f1s32(
+                            Which::U1f1s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     9u16 => {
                         Ok(
-                            Which::U1f0s64(
+                            Which::U1f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     10u16 => {
                         Ok(
-                            Which::U1f1s64(
+                            Which::U1f1s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     11u16 => {
                         Ok(
-                            Which::U1f0sp(
+                            Which::U1f0sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F0SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     12u16 => {
                         Ok(
-                            Which::U1f1sp(
+                            Which::U1f1sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F1SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     13u16 => {
                         Ok(
-                            Which::U1f2s0(
+                            Which::U1f2s0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     14u16 => {
                         Ok(
-                            Which::U1f2s1(
+                            Which::U1f2s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     15u16 => {
                         Ok(
-                            Which::U1f2s8(
+                            Which::U1f2s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     16u16 => {
                         Ok(
-                            Which::U1f2s16(
+                            Which::U1f2s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     17u16 => {
                         Ok(
-                            Which::U1f2s32(
+                            Which::U1f2s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     18u16 => {
                         Ok(
-                            Which::U1f2s64(
+                            Which::U1f2s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     19u16 => {
                         Ok(
-                            Which::U1f2sp(
+                            Which::U1f2sp(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union1::U1F2SP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5314,8 +5534,25 @@ pub mod test_union {
     }
     impl _p::FieldGroup for Union2 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(2usize, 0);
-            <bool as _p::field::FieldType>::clear(s, &Union2::U2F0S1.field);
+            unsafe {
+                s.set_field_unchecked(2usize, 0);
+            }
+            unsafe {
+                <bool as _p::field::FieldType>::clear(s, &Union2::U2F0S1.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Union2 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = union2::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for union2::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Union2 {
@@ -5438,6 +5675,7 @@ pub mod test_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Union2<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Union2<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             U2f0s1(_p::ViewOf<T, bool>),
             U2f0s8(_p::ViewOf<T, i8>),
@@ -5455,52 +5693,52 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U2f0s1(
+                            Which::U2f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union2::U2F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U2f0s8(
+                            Which::U2f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union2::U2F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U2f0s16(
+                            Which::U2f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union2::U2F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U2f0s32(
+                            Which::U2f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union2::U2F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U2f0s64(
+                            Which::U2f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union2::U2F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5517,52 +5755,52 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U2f0s1(
+                            Which::U2f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union2::U2F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U2f0s8(
+                            Which::U2f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union2::U2F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U2f0s16(
+                            Which::U2f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union2::U2F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U2f0s32(
+                            Which::U2f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union2::U2F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U2f0s64(
+                            Which::U2f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union2::U2F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5666,8 +5904,25 @@ pub mod test_union {
     }
     impl _p::FieldGroup for Union3 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(3usize, 0);
-            <bool as _p::field::FieldType>::clear(s, &Union3::U3F0S1.field);
+            unsafe {
+                s.set_field_unchecked(3usize, 0);
+            }
+            unsafe {
+                <bool as _p::field::FieldType>::clear(s, &Union3::U3F0S1.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Union3 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = union3::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for union3::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Union3 {
@@ -5790,6 +6045,7 @@ pub mod test_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Union3<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Union3<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             U3f0s1(_p::ViewOf<T, bool>),
             U3f0s8(_p::ViewOf<T, i8>),
@@ -5807,52 +6063,52 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U3f0s1(
+                            Which::U3f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union3::U3F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U3f0s8(
+                            Which::U3f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union3::U3F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U3f0s16(
+                            Which::U3f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union3::U3F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U3f0s32(
+                            Which::U3f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union3::U3F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U3f0s64(
+                            Which::U3f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Union3::U3F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -5869,52 +6125,52 @@ pub mod test_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::U3f0s1(
+                            Which::U3f0s1(unsafe {
                                 <bool as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union3::U3F0S1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::U3f0s8(
+                            Which::U3f0s8(unsafe {
                                 <i8 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union3::U3F0S8.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::U3f0s16(
+                            Which::U3f0s16(unsafe {
                                 <i16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union3::U3F0S16.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     3u16 => {
                         Ok(
-                            Which::U3f0s32(
+                            Which::U3f0s32(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union3::U3F0S32.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     4u16 => {
                         Ok(
-                            Which::U3f0s64(
+                            Which::U3f0s64(unsafe {
                                 <i64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Union3::U3F0S64.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -6020,6 +6276,19 @@ impl _p::ty::Struct for TestUnnamedUnion {
         data: 2u16,
         ptrs: 2u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestUnnamedUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_unnamed_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_unnamed_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestUnnamedUnion {
     const BEFORE: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
@@ -6170,6 +6439,7 @@ pub mod test_unnamed_union {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUnnamedUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUnnamedUnion<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Foo(_p::ViewOf<T, u16>),
         Bar(_p::ViewOf<T, u32>),
@@ -6181,22 +6451,22 @@ pub mod test_unnamed_union {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Foo(
+                        Which::Foo(unsafe {
                             <u16 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestUnnamedUnion::FOO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestUnnamedUnion::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -6213,22 +6483,22 @@ pub mod test_unnamed_union {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Foo(
+                        Which::Foo(unsafe {
                             <u16 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestUnnamedUnion::FOO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <u32 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestUnnamedUnion::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -6334,6 +6604,19 @@ impl _p::ty::Struct for TestUnionInUnion {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestUnionInUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_union_in_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_union_in_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestUnionInUnion {
     const OUTER: _p::Descriptor<_p::Group<test_union_in_union::Outer>> = ();
 }
@@ -6371,6 +6654,18 @@ impl<'p, T: _p::rpc::Table + 'p> test_union_in_union::Builder<'p, T> {
         }
     }
 }
+impl<P> test_union_in_union::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn outer(self) -> ::recapn::rpc::PipelineOf<test_union_in_union::Outer, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_union_in_union {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestUnionInUnion<
@@ -6379,6 +6674,7 @@ pub mod test_union_in_union {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUnionInUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUnionInUnion<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Outer<T = _p::Family>(T);
     impl _p::ty::SchemaType for Outer {
@@ -6475,10 +6771,27 @@ pub mod test_union_in_union {
     }
     impl _p::FieldGroup for Outer {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(4usize, 0);
-            <_p::Group<
-                outer::Inner,
-            > as _p::field::FieldType>::clear(s, &Outer::INNER.field);
+            unsafe {
+                s.set_field_unchecked(4usize, 0);
+            }
+            unsafe {
+                <_p::Group<
+                    outer::Inner,
+                > as _p::field::FieldType>::clear(s, &Outer::INNER.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Outer {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = outer::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for outer::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Outer {
@@ -6552,6 +6865,7 @@ pub mod test_union_in_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Outer<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Outer<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Inner(_p::ViewOf<T, _p::Group<Inner>>),
             Baz(_p::ViewOf<T, i32>),
@@ -6566,24 +6880,24 @@ pub mod test_union_in_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Inner(
+                            Which::Inner(unsafe {
                                 <_p::Group<
                                     Inner,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Outer::INNER.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Outer::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -6600,24 +6914,24 @@ pub mod test_union_in_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Inner(
+                            Which::Inner(unsafe {
                                 <_p::Group<
                                     Inner,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Outer::INNER.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <i32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Outer::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -6722,8 +7036,25 @@ pub mod test_union_in_union {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                s.set_field_unchecked(2usize, 0);
-                <i32 as _p::field::FieldType>::clear(s, &Inner::FOO.field);
+                unsafe {
+                    s.set_field_unchecked(2usize, 0);
+                }
+                unsafe {
+                    <i32 as _p::field::FieldType>::clear(s, &Inner::FOO.field);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Inner {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = inner::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for inner::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Inner {
@@ -6788,6 +7119,7 @@ pub mod test_union_in_union {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Inner<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Inner<::recapn::rpc::Pipeline<P>>;
             pub enum Which<T: _p::Viewable = _p::Family> {
                 Foo(_p::ViewOf<T, i32>),
                 Bar(_p::ViewOf<T, i32>),
@@ -6802,22 +7134,22 @@ pub mod test_union_in_union {
                     match tag {
                         0u16 => {
                             Ok(
-                                Which::Foo(
+                                Which::Foo(unsafe {
                                     <i32 as _p::field::FieldType>::accessor(
                                         &repr.0,
                                         &super::Inner::FOO.field,
-                                    ),
-                                ),
+                                    )
+                                }),
                             )
                         }
                         1u16 => {
                             Ok(
-                                Which::Bar(
+                                Which::Bar(unsafe {
                                     <i32 as _p::field::FieldType>::accessor(
                                         &repr.0,
                                         &super::Inner::BAR.field,
-                                    ),
-                                ),
+                                    )
+                                }),
                             )
                         }
                         unknown => Err(_p::NotInSchema(unknown)),
@@ -6834,22 +7166,22 @@ pub mod test_union_in_union {
                     match tag {
                         0u16 => {
                             Ok(
-                                Which::Foo(
+                                Which::Foo(unsafe {
                                     <i32 as _p::field::FieldType>::accessor(
                                         &mut repr.0,
                                         &super::Inner::FOO.field,
-                                    ),
-                                ),
+                                    )
+                                }),
                             )
                         }
                         1u16 => {
                             Ok(
-                                Which::Bar(
+                                Which::Bar(unsafe {
                                     <i32 as _p::field::FieldType>::accessor(
                                         &mut repr.0,
                                         &super::Inner::BAR.field,
-                                    ),
-                                ),
+                                    )
+                                }),
                             )
                         }
                         unknown => Err(_p::NotInSchema(unknown)),
@@ -6956,6 +7288,19 @@ impl _p::ty::Struct for TestGroups {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestGroups {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_groups::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_groups::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestGroups {
     const GROUPS: _p::Descriptor<_p::Group<test_groups::Groups>> = ();
 }
@@ -6991,12 +7336,25 @@ impl<'p, T: _p::rpc::Table + 'p> test_groups::Builder<'p, T> {
         }
     }
 }
+impl<P> test_groups::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn groups(self) -> ::recapn::rpc::PipelineOf<test_groups::Groups, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_groups {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestGroups<_p::StructReader<'a, T>>;
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestGroups<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestGroups<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Groups<T = _p::Family>(T);
     impl _p::ty::SchemaType for Groups {
@@ -7093,10 +7451,27 @@ pub mod test_groups {
     }
     impl _p::FieldGroup for Groups {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(2usize, 0);
-            <_p::Group<
-                groups::Foo,
-            > as _p::field::FieldType>::clear(s, &Groups::FOO.field);
+            unsafe {
+                s.set_field_unchecked(2usize, 0);
+            }
+            unsafe {
+                <_p::Group<
+                    groups::Foo,
+                > as _p::field::FieldType>::clear(s, &Groups::FOO.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Groups {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = groups::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for groups::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Groups {
@@ -7218,6 +7593,7 @@ pub mod test_groups {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Groups<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Groups<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Foo(_p::ViewOf<T, _p::Group<Foo>>),
             Baz(_p::ViewOf<T, _p::Group<Baz>>),
@@ -7233,38 +7609,38 @@ pub mod test_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Foo(
+                            Which::Foo(unsafe {
                                 <_p::Group<
                                     Foo,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Groups::FOO.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <_p::Group<
                                     Baz,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Groups::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Bar(
+                            Which::Bar(unsafe {
                                 <_p::Group<
                                     Bar,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Groups::BAR.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -7281,38 +7657,38 @@ pub mod test_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Foo(
+                            Which::Foo(unsafe {
                                 <_p::Group<
                                     Foo,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Groups::FOO.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <_p::Group<
                                     Baz,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Groups::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Bar(
+                            Which::Bar(unsafe {
                                 <_p::Group<
                                     Bar,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Groups::BAR.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -7417,9 +7793,28 @@ pub mod test_groups {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <i32 as _p::field::FieldType>::clear(s, &Foo::CORGE);
-                <i64 as _p::field::FieldType>::clear(s, &Foo::GRAULT);
-                <_p::Text as _p::field::FieldType>::clear(s, &Foo::GARPLY);
+                unsafe {
+                    <i32 as _p::field::FieldType>::clear(s, &Foo::CORGE);
+                }
+                unsafe {
+                    <i64 as _p::field::FieldType>::clear(s, &Foo::GRAULT);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Foo::GARPLY);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Foo {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = foo::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for foo::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Foo {
@@ -7489,6 +7884,7 @@ pub mod test_groups {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Foo<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Foo<::recapn::rpc::Pipeline<P>>;
         }
         #[derive(Clone)]
         pub struct Baz<T = _p::Family>(T);
@@ -7588,9 +7984,28 @@ pub mod test_groups {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <i32 as _p::field::FieldType>::clear(s, &Baz::CORGE);
-                <_p::Text as _p::field::FieldType>::clear(s, &Baz::GRAULT);
-                <_p::Text as _p::field::FieldType>::clear(s, &Baz::GARPLY);
+                unsafe {
+                    <i32 as _p::field::FieldType>::clear(s, &Baz::CORGE);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Baz::GRAULT);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Baz::GARPLY);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Baz {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = baz::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for baz::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Baz {
@@ -7671,6 +8086,7 @@ pub mod test_groups {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Baz<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Baz<::recapn::rpc::Pipeline<P>>;
         }
         #[derive(Clone)]
         pub struct Bar<T = _p::Family>(T);
@@ -7770,9 +8186,28 @@ pub mod test_groups {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <i32 as _p::field::FieldType>::clear(s, &Bar::CORGE);
-                <_p::Text as _p::field::FieldType>::clear(s, &Bar::GRAULT);
-                <i64 as _p::field::FieldType>::clear(s, &Bar::GARPLY);
+                unsafe {
+                    <i32 as _p::field::FieldType>::clear(s, &Bar::CORGE);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Bar::GRAULT);
+                }
+                unsafe {
+                    <i64 as _p::field::FieldType>::clear(s, &Bar::GARPLY);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Bar {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = bar::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for bar::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Bar {
@@ -7842,6 +8277,7 @@ pub mod test_groups {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Bar<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Bar<::recapn::rpc::Pipeline<P>>;
         }
     }
 }
@@ -7945,6 +8381,19 @@ impl _p::ty::Struct for TestInterleavedGroups {
         ptrs: 6u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestInterleavedGroups {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_interleaved_groups::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_interleaved_groups::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestInterleavedGroups {
     const GROUP1: _p::Descriptor<_p::Group<test_interleaved_groups::Group1>> = ();
     const GROUP2: _p::Descriptor<_p::Group<test_interleaved_groups::Group2>> = ();
@@ -8019,6 +8468,25 @@ impl<'p, T: _p::rpc::Table + 'p> test_interleaved_groups::Builder<'p, T> {
         }
     }
 }
+impl<P> test_interleaved_groups::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn group1(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_interleaved_groups::Group1, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+    pub fn group2(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_interleaved_groups::Group2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_interleaved_groups {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestInterleavedGroups<
@@ -8027,6 +8495,7 @@ pub mod test_interleaved_groups {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestInterleavedGroups<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestInterleavedGroups<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Group1<T = _p::Family>(T);
     impl _p::ty::SchemaType for Group1 {
@@ -8123,11 +8592,34 @@ pub mod test_interleaved_groups {
     }
     impl _p::FieldGroup for Group1 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            <u32 as _p::field::FieldType>::clear(s, &Group1::FOO);
-            <u64 as _p::field::FieldType>::clear(s, &Group1::BAR);
-            <_p::Text as _p::field::FieldType>::clear(s, &Group1::WALDO);
-            s.set_field_unchecked(14usize, 0);
-            <u16 as _p::field::FieldType>::clear(s, &Group1::QUX.field);
+            unsafe {
+                <u32 as _p::field::FieldType>::clear(s, &Group1::FOO);
+            }
+            unsafe {
+                <u64 as _p::field::FieldType>::clear(s, &Group1::BAR);
+            }
+            unsafe {
+                <_p::Text as _p::field::FieldType>::clear(s, &Group1::WALDO);
+            }
+            unsafe {
+                s.set_field_unchecked(14usize, 0);
+            }
+            unsafe {
+                <u16 as _p::field::FieldType>::clear(s, &Group1::QUX.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Group1 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = group1::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for group1::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Group1 {
@@ -8273,6 +8765,7 @@ pub mod test_interleaved_groups {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Group1<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Group1<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Qux(_p::ViewOf<T, u16>),
             Corge(_p::ViewOf<T, _p::Group<Corge>>),
@@ -8288,34 +8781,34 @@ pub mod test_interleaved_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group1::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::Group<
                                     Corge,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group1::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Fred(
+                            Which::Fred(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group1::FRED.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -8332,34 +8825,34 @@ pub mod test_interleaved_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group1::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::Group<
                                     Corge,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group1::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Fred(
+                            Which::Fred(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group1::FRED.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -8464,10 +8957,31 @@ pub mod test_interleaved_groups {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <u64 as _p::field::FieldType>::clear(s, &Corge::GRAULT);
-                <u16 as _p::field::FieldType>::clear(s, &Corge::GARPLY);
-                <_p::Text as _p::field::FieldType>::clear(s, &Corge::PLUGH);
-                <_p::Text as _p::field::FieldType>::clear(s, &Corge::XYZZY);
+                unsafe {
+                    <u64 as _p::field::FieldType>::clear(s, &Corge::GRAULT);
+                }
+                unsafe {
+                    <u16 as _p::field::FieldType>::clear(s, &Corge::GARPLY);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Corge::PLUGH);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Corge::XYZZY);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Corge {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = corge::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for corge::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Corge {
@@ -8566,6 +9080,7 @@ pub mod test_interleaved_groups {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Corge<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Corge<::recapn::rpc::Pipeline<P>>;
         }
     }
     #[derive(Clone)]
@@ -8664,11 +9179,34 @@ pub mod test_interleaved_groups {
     }
     impl _p::FieldGroup for Group2 {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            <u32 as _p::field::FieldType>::clear(s, &Group2::FOO);
-            <u64 as _p::field::FieldType>::clear(s, &Group2::BAR);
-            <_p::Text as _p::field::FieldType>::clear(s, &Group2::WALDO);
-            s.set_field_unchecked(15usize, 0);
-            <u16 as _p::field::FieldType>::clear(s, &Group2::QUX.field);
+            unsafe {
+                <u32 as _p::field::FieldType>::clear(s, &Group2::FOO);
+            }
+            unsafe {
+                <u64 as _p::field::FieldType>::clear(s, &Group2::BAR);
+            }
+            unsafe {
+                <_p::Text as _p::field::FieldType>::clear(s, &Group2::WALDO);
+            }
+            unsafe {
+                s.set_field_unchecked(15usize, 0);
+            }
+            unsafe {
+                <u16 as _p::field::FieldType>::clear(s, &Group2::QUX.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Group2 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = group2::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for group2::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Group2 {
@@ -8814,6 +9352,7 @@ pub mod test_interleaved_groups {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Group2<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Group2<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Qux(_p::ViewOf<T, u16>),
             Corge(_p::ViewOf<T, _p::Group<Corge>>),
@@ -8829,34 +9368,34 @@ pub mod test_interleaved_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group2::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::Group<
                                     Corge,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group2::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Fred(
+                            Which::Fred(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Group2::FRED.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -8873,34 +9412,34 @@ pub mod test_interleaved_groups {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <u16 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group2::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::Group<
                                     Corge,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group2::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Fred(
+                            Which::Fred(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Group2::FRED.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -9005,10 +9544,31 @@ pub mod test_interleaved_groups {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <u64 as _p::field::FieldType>::clear(s, &Corge::GRAULT);
-                <u16 as _p::field::FieldType>::clear(s, &Corge::GARPLY);
-                <_p::Text as _p::field::FieldType>::clear(s, &Corge::PLUGH);
-                <_p::Text as _p::field::FieldType>::clear(s, &Corge::XYZZY);
+                unsafe {
+                    <u64 as _p::field::FieldType>::clear(s, &Corge::GRAULT);
+                }
+                unsafe {
+                    <u16 as _p::field::FieldType>::clear(s, &Corge::GARPLY);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Corge::PLUGH);
+                }
+                unsafe {
+                    <_p::Text as _p::field::FieldType>::clear(s, &Corge::XYZZY);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for Corge {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = corge::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for corge::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl Corge {
@@ -9107,6 +9667,7 @@ pub mod test_interleaved_groups {
             pub type Builder<'a, T = _p::rpc::Empty> = super::Corge<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::Corge<::recapn::rpc::Pipeline<P>>;
         }
     }
 }
@@ -9207,6 +9768,19 @@ impl _p::ty::Struct for TestUnionDefaults {
         data: 0u16,
         ptrs: 4u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestUnionDefaults {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_union_defaults::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_union_defaults::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestUnionDefaults {
     const S16S8S64S8_SET: _p::Descriptor<_p::Struct<TestUnion>> = _p::Descriptor::<
@@ -9437,6 +10011,35 @@ impl<'p, T: _p::rpc::Table + 'p> test_union_defaults::Builder<'p, T> {
         }
     }
 }
+impl<P> test_union_defaults::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn s16s8s64s8_set(self) -> ::recapn::rpc::PipelineOf<TestUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn s0sps1s32_set(self) -> ::recapn::rpc::PipelineOf<TestUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+    pub fn unnamed1(self) -> ::recapn::rpc::PipelineOf<TestUnnamedUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+        )
+    }
+    pub fn unnamed2(self) -> ::recapn::rpc::PipelineOf<TestUnnamedUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(3u16)),
+        )
+    }
+}
 pub mod test_union_defaults {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestUnionDefaults<
@@ -9445,6 +10048,7 @@ pub mod test_union_defaults {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUnionDefaults<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUnionDefaults<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestNestedTypes<T = _p::Family>(T);
@@ -9542,6 +10146,19 @@ impl _p::ty::Struct for TestNestedTypes {
         data: 1u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestNestedTypes {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_nested_types::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_nested_types::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestNestedTypes {
     const NESTED_STRUCT: _p::Descriptor<_p::Struct<test_nested_types::NestedStruct>> = _p::Descriptor::<
@@ -9665,6 +10282,22 @@ impl<'p, T: _p::rpc::Table + 'p> test_nested_types::Builder<'p, T> {
         }
     }
 }
+impl<P> test_nested_types::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn nested_struct(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_nested_types::NestedStruct, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_nested_types {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestNestedTypes<
@@ -9673,6 +10306,7 @@ pub mod test_nested_types {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestNestedTypes<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestNestedTypes<::recapn::rpc::Pipeline<P>>;
     #[repr(u16)]
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
     pub enum NestedEnum {
@@ -9801,6 +10435,19 @@ pub mod test_nested_types {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for NestedStruct {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = nested_struct::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for nested_struct::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl NestedStruct {
         const OUTER_NESTED_ENUM: _p::Descriptor<_p::Enum<NestedEnum>> = _p::Descriptor::<
             _p::Enum<NestedEnum>,
@@ -9879,6 +10526,7 @@ pub mod test_nested_types {
         pub type Builder<'a, T = _p::rpc::Empty> = super::NestedStruct<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::NestedStruct<::recapn::rpc::Pipeline<P>>;
         #[repr(u16)]
         #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
         pub enum NestedEnum {
@@ -10008,6 +10656,19 @@ impl _p::ty::Struct for TestUsing {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestUsing {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_using::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_using::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestUsing {
     const INNER_NESTED_ENUM: _p::Descriptor<
         _p::Enum<test_nested_types::nested_struct::NestedEnum>,
@@ -10088,6 +10749,7 @@ pub mod test_using {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUsing<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUsing<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestLists<T = _p::Family>(T);
@@ -10185,6 +10847,19 @@ impl _p::ty::Struct for TestLists {
         data: 0u16,
         ptrs: 10u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestLists {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_lists::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_lists::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestLists {
     const LIST0: _p::Descriptor<_p::List<_p::Struct<test_lists::Struct0>>> = _p::Descriptor::<
@@ -10562,6 +11237,7 @@ pub mod test_lists {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestLists<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestLists<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Struct0<T = _p::Family>(T);
     impl _p::ty::SchemaType for Struct0 {
@@ -10662,6 +11338,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct0 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct0::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct0::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct0 {
         const F: _p::Descriptor<()> = ();
     }
@@ -10685,6 +11374,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct0<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct0<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct1<T = _p::Family>(T);
@@ -10786,6 +11476,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct1 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct1::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct1::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct1 {
         const F: _p::Descriptor<bool> = _p::Descriptor::<bool> {
             slot: 0u32,
@@ -10812,6 +11515,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct1<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct1<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct8<T = _p::Family>(T);
@@ -10913,6 +11617,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct8 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct8::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct8::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct8 {
         const F: _p::Descriptor<u8> = _p::Descriptor::<u8> {
             slot: 0u32,
@@ -10939,6 +11656,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct8<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct8<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct16<T = _p::Family>(T);
@@ -11040,6 +11758,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct16 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct16::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct16::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct16 {
         const F: _p::Descriptor<u16> = _p::Descriptor::<u16> {
             slot: 0u32,
@@ -11066,6 +11797,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct16<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct16<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct32<T = _p::Family>(T);
@@ -11167,6 +11899,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct32 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct32::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct32::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct32 {
         const F: _p::Descriptor<u32> = _p::Descriptor::<u32> {
             slot: 0u32,
@@ -11193,6 +11938,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct32<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct32<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct64<T = _p::Family>(T);
@@ -11294,6 +12040,19 @@ pub mod test_lists {
             ptrs: 0u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct64 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct64::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct64::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct64 {
         const F: _p::Descriptor<u64> = _p::Descriptor::<u64> {
             slot: 0u32,
@@ -11320,6 +12079,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct64<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct64<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct StructP<T = _p::Family>(T);
@@ -11421,6 +12181,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for StructP {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct_p::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct_p::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl StructP {
         const F: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
             slot: 0u32,
@@ -11453,6 +12226,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::StructP<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::StructP<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct0c<T = _p::Family>(T);
@@ -11554,6 +12328,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct0c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct0c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct0c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct0c {
         const F: _p::Descriptor<()> = ();
         const PAD: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
@@ -11599,6 +12386,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct0c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct0c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct1c<T = _p::Family>(T);
@@ -11700,6 +12488,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct1c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct1c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct1c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct1c {
         const F: _p::Descriptor<bool> = _p::Descriptor::<bool> {
             slot: 0u32,
@@ -11750,6 +12551,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct1c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct1c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct8c<T = _p::Family>(T);
@@ -11851,6 +12653,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct8c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct8c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct8c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct8c {
         const F: _p::Descriptor<u8> = _p::Descriptor::<u8> {
             slot: 0u32,
@@ -11899,6 +12714,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct8c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct8c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct16c<T = _p::Family>(T);
@@ -12000,6 +12816,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct16c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct16c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct16c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct16c {
         const F: _p::Descriptor<u16> = _p::Descriptor::<u16> {
             slot: 0u32,
@@ -12053,6 +12882,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct16c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct16c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct32c<T = _p::Family>(T);
@@ -12154,6 +12984,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct32c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct32c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct32c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct32c {
         const F: _p::Descriptor<u32> = _p::Descriptor::<u32> {
             slot: 0u32,
@@ -12207,6 +13050,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct32c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct32c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Struct64c<T = _p::Family>(T);
@@ -12308,6 +13152,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Struct64c {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct64c::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct64c::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Struct64c {
         const F: _p::Descriptor<u64> = _p::Descriptor::<u64> {
             slot: 0u32,
@@ -12361,6 +13218,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Struct64c<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Struct64c<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct StructPc<T = _p::Family>(T);
@@ -12462,6 +13320,19 @@ pub mod test_lists {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for StructPc {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = struct_pc::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for struct_pc::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl StructPc {
         const F: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
             slot: 0u32,
@@ -12510,6 +13381,7 @@ pub mod test_lists {
         pub type Builder<'a, T = _p::rpc::Empty> = super::StructPc<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::StructPc<::recapn::rpc::Pipeline<P>>;
     }
 }
 #[derive(Clone)]
@@ -12611,6 +13483,19 @@ impl _p::ty::Struct for TestFieldZeroIsBit {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestFieldZeroIsBit {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_field_zero_is_bit::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_field_zero_is_bit::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestFieldZeroIsBit {
     const BIT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
         slot: 0u32,
@@ -12688,6 +13573,7 @@ pub mod test_field_zero_is_bit {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestFieldZeroIsBit<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestFieldZeroIsBit<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestListDefaults<T = _p::Family>(T);
@@ -12786,6 +13672,19 @@ impl _p::ty::Struct for TestListDefaults {
         data: 0u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestListDefaults {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_list_defaults::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_list_defaults::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestListDefaults {
     const LISTS: _p::Descriptor<_p::Struct<TestLists>> = _p::Descriptor::<
@@ -12967,6 +13866,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_list_defaults::Builder<'p, T> {
         }
     }
 }
+impl<P> test_list_defaults::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn lists(self) -> ::recapn::rpc::PipelineOf<TestLists, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_list_defaults {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestListDefaults<
@@ -12975,6 +13888,7 @@ pub mod test_list_defaults {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestListDefaults<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestListDefaults<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestLateUnion<T = _p::Family>(T);
@@ -13072,6 +13986,19 @@ impl _p::ty::Struct for TestLateUnion {
         data: 3u16,
         ptrs: 3u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestLateUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_late_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_late_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestLateUnion {
     const FOO: _p::Descriptor<i32> = _p::Descriptor::<i32> {
@@ -13197,6 +14124,23 @@ impl<'p, T: _p::rpc::Table + 'p> test_late_union::Builder<'p, T> {
         }
     }
 }
+impl<P> test_late_union::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn the_union(self) -> ::recapn::rpc::PipelineOf<test_late_union::TheUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+    pub fn another_union(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_late_union::AnotherUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_late_union {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestLateUnion<
@@ -13205,6 +14149,7 @@ pub mod test_late_union {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestLateUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestLateUnion<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct TheUnion<T = _p::Family>(T);
     impl _p::ty::SchemaType for TheUnion {
@@ -13301,8 +14246,25 @@ pub mod test_late_union {
     }
     impl _p::FieldGroup for TheUnion {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(3usize, 0);
-            <_p::Text as _p::field::FieldType>::clear(s, &TheUnion::QUX.field);
+            unsafe {
+                s.set_field_unchecked(3usize, 0);
+            }
+            unsafe {
+                <_p::Text as _p::field::FieldType>::clear(s, &TheUnion::QUX.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for TheUnion {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = the_union::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for the_union::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl TheUnion {
@@ -13411,6 +14373,7 @@ pub mod test_late_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::TheUnion<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::TheUnion<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Qux(_p::ViewOf<T, _p::Text>),
             Corge(_p::ViewOf<T, _p::List<i32>>),
@@ -13426,34 +14389,34 @@ pub mod test_late_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::TheUnion::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::List<
                                     i32,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::TheUnion::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Grault(
+                            Which::Grault(unsafe {
                                 <f32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::TheUnion::GRAULT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -13470,34 +14433,34 @@ pub mod test_late_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::TheUnion::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::List<
                                     i32,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::TheUnion::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Grault(
+                            Which::Grault(unsafe {
                                 <f32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::TheUnion::GRAULT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -13601,8 +14564,25 @@ pub mod test_late_union {
     }
     impl _p::FieldGroup for AnotherUnion {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(6usize, 0);
-            <_p::Text as _p::field::FieldType>::clear(s, &AnotherUnion::QUX.field);
+            unsafe {
+                s.set_field_unchecked(6usize, 0);
+            }
+            unsafe {
+                <_p::Text as _p::field::FieldType>::clear(s, &AnotherUnion::QUX.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for AnotherUnion {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = another_union::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for another_union::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl AnotherUnion {
@@ -13721,6 +14701,7 @@ pub mod test_late_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::AnotherUnion<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::AnotherUnion<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Qux(_p::ViewOf<T, _p::Text>),
             Corge(_p::ViewOf<T, _p::List<i32>>),
@@ -13736,34 +14717,34 @@ pub mod test_late_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::AnotherUnion::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::List<
                                     i32,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::AnotherUnion::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Grault(
+                            Which::Grault(unsafe {
                                 <f32 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::AnotherUnion::GRAULT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -13780,34 +14761,34 @@ pub mod test_late_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Qux(
+                            Which::Qux(unsafe {
                                 <_p::Text as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::AnotherUnion::QUX.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Corge(
+                            Which::Corge(unsafe {
                                 <_p::List<
                                     i32,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::AnotherUnion::CORGE.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     2u16 => {
                         Ok(
-                            Which::Grault(
+                            Which::Grault(unsafe {
                                 <f32 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::AnotherUnion::GRAULT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -13913,6 +14894,19 @@ impl _p::ty::Struct for TestOldVersion {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestOldVersion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_old_version::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_old_version::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestOldVersion {
     const OLD1: _p::Descriptor<i64> = _p::Descriptor::<i64> {
         slot: 0u32,
@@ -13990,6 +14984,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_old_version::Builder<'p, T> {
         }
     }
 }
+impl<P> test_old_version::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn old3(self) -> ::recapn::rpc::PipelineOf<TestOldVersion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+}
 pub mod test_old_version {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestOldVersion<
@@ -13998,6 +15006,7 @@ pub mod test_old_version {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestOldVersion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestOldVersion<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestNewVersion<T = _p::Family>(T);
@@ -14095,6 +15104,19 @@ impl _p::ty::Struct for TestNewVersion {
         data: 2u16,
         ptrs: 3u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestNewVersion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_new_version::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_new_version::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestNewVersion {
     const OLD1: _p::Descriptor<i64> = _p::Descriptor::<i64> {
@@ -14214,6 +15236,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_new_version::Builder<'p, T> {
         }
     }
 }
+impl<P> test_new_version::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn old3(self) -> ::recapn::rpc::PipelineOf<TestNewVersion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+}
 pub mod test_new_version {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestNewVersion<
@@ -14222,6 +15258,7 @@ pub mod test_new_version {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestNewVersion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestNewVersion<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestOldUnionVersion<T = _p::Family>(T);
@@ -14322,6 +15359,19 @@ impl _p::ty::Struct for TestOldUnionVersion {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestOldUnionVersion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_old_union_version::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_old_union_version::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestOldUnionVersion {
     const A: _p::VariantDescriptor<()> = _p::VariantDescriptor::<()> {
         variant: _p::VariantInfo {
@@ -14389,6 +15439,7 @@ pub mod test_old_union_version {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestOldUnionVersion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestOldUnionVersion<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         A(_p::ViewOf<T, ()>),
         B(_p::ViewOf<T, u64>),
@@ -14400,22 +15451,22 @@ pub mod test_old_union_version {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::A(
+                        Which::A(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestOldUnionVersion::A.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::B(
+                        Which::B(unsafe {
                             <u64 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestOldUnionVersion::B.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -14432,22 +15483,22 @@ pub mod test_old_union_version {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::A(
+                        Which::A(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestOldUnionVersion::A.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::B(
+                        Which::B(unsafe {
                             <u64 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestOldUnionVersion::B.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -14554,6 +15605,19 @@ impl _p::ty::Struct for TestNewUnionVersion {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestNewUnionVersion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_new_union_version::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_new_union_version::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestNewUnionVersion {
     const A: _p::VariantDescriptor<_p::Group<test_new_union_version::A>> = _p::VariantDescriptor::<
         _p::Group<test_new_union_version::A>,
@@ -14639,6 +15703,7 @@ pub mod test_new_union_version {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestNewUnionVersion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestNewUnionVersion<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         A(_p::ViewOf<T, _p::Group<A>>),
         B(_p::ViewOf<T, u64>),
@@ -14650,24 +15715,24 @@ pub mod test_new_union_version {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::A(
+                        Which::A(unsafe {
                             <_p::Group<
                                 A,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestNewUnionVersion::A.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::B(
+                        Which::B(unsafe {
                             <u64 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestNewUnionVersion::B.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -14684,24 +15749,24 @@ pub mod test_new_union_version {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::A(
+                        Which::A(unsafe {
                             <_p::Group<
                                 A,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestNewUnionVersion::A.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::B(
+                        Which::B(unsafe {
                             <u64 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestNewUnionVersion::B.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -14804,8 +15869,24 @@ pub mod test_new_union_version {
     }
     impl _p::FieldGroup for A {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(4usize, 0);
-            <() as _p::field::FieldType>::clear(s, &A::A0.field);
+            unsafe {
+                s.set_field_unchecked(4usize, 0);
+            }
+            unsafe {
+                <() as _p::field::FieldType>::clear(s, &A::A0.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for A {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = a::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for a::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl A {
@@ -14859,6 +15940,7 @@ pub mod test_new_union_version {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::A<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::A<_p::StructBuilder<'a, T>>;
+        pub type Pipeline<P> = super::A<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             A0(_p::ViewOf<T, ()>),
             A1(_p::ViewOf<T, u64>),
@@ -14873,22 +15955,22 @@ pub mod test_new_union_version {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::A0(
+                            Which::A0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::A::A0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::A1(
+                            Which::A1(unsafe {
                                 <u64 as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::A::A1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -14905,22 +15987,22 @@ pub mod test_new_union_version {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::A0(
+                            Which::A0(unsafe {
                                 <() as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::A::A0.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::A1(
+                            Which::A1(unsafe {
                                 <u64 as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::A::A1.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -15026,6 +16108,19 @@ impl _p::ty::Struct for TestStructUnion {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestStructUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_struct_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_struct_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestStructUnion {
     const UN: _p::Descriptor<_p::Group<test_struct_union::Un>> = ();
 }
@@ -15059,6 +16154,18 @@ impl<'p, T: _p::rpc::Table + 'p> test_struct_union::Builder<'p, T> {
         }
     }
 }
+impl<P> test_struct_union::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn un(self) -> ::recapn::rpc::PipelineOf<test_struct_union::Un, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_struct_union {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestStructUnion<
@@ -15067,6 +16174,7 @@ pub mod test_struct_union {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestStructUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestStructUnion<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct SomeStruct<T = _p::Family>(T);
     impl _p::ty::SchemaType for SomeStruct {
@@ -15167,6 +16275,19 @@ pub mod test_struct_union {
             ptrs: 2u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for SomeStruct {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = some_struct::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for some_struct::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl SomeStruct {
         const SOME_TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
             slot: 0u32,
@@ -15243,6 +16364,7 @@ pub mod test_struct_union {
         pub type Builder<'a, T = _p::rpc::Empty> = super::SomeStruct<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::SomeStruct<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Un<T = _p::Family>(T);
@@ -15340,10 +16462,26 @@ pub mod test_struct_union {
     }
     impl _p::FieldGroup for Un {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(0usize, 0);
-            <_p::Struct<
-                SomeStruct,
-            > as _p::field::FieldType>::clear(s, &Un::STRUCT.field);
+            unsafe {
+                s.set_field_unchecked(0usize, 0);
+            }
+            unsafe {
+                <_p::Struct<
+                    SomeStruct,
+                > as _p::field::FieldType>::clear(s, &Un::STRUCT.field);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Un {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = un::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for un::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Un {
@@ -15442,6 +16580,7 @@ pub mod test_struct_union {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Un<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Un<_p::StructBuilder<'a, T>>;
+        pub type Pipeline<P> = super::Un<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             Struct(_p::ViewOf<T, _p::Struct<super::SomeStruct>>),
             Object(_p::ViewOf<T, _p::Struct<__file::TestAnyPointer>>),
@@ -15456,26 +16595,26 @@ pub mod test_struct_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Struct(
+                            Which::Struct(unsafe {
                                 <_p::Struct<
                                     super::SomeStruct,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Un::STRUCT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Object(
+                            Which::Object(unsafe {
                                 <_p::Struct<
                                     __file::TestAnyPointer,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::Un::OBJECT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -15492,26 +16631,26 @@ pub mod test_struct_union {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::Struct(
+                            Which::Struct(unsafe {
                                 <_p::Struct<
                                     super::SomeStruct,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Un::STRUCT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Object(
+                            Which::Object(unsafe {
                                 <_p::Struct<
                                     __file::TestAnyPointer,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::Un::OBJECT.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -15624,6 +16763,19 @@ impl _p::ty::Struct for TestPrintInlineStructs {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestPrintInlineStructs {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_print_inline_structs::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_print_inline_structs::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestPrintInlineStructs {
     const SOME_TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
@@ -15728,6 +16880,7 @@ pub mod test_print_inline_structs {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestPrintInlineStructs<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestPrintInlineStructs<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct InlineStruct<T = _p::Family>(T);
     impl _p::ty::SchemaType for InlineStruct {
@@ -15828,6 +16981,19 @@ pub mod test_print_inline_structs {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for InlineStruct {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = inline_struct::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for inline_struct::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl InlineStruct {
         const INT32_FIELD: _p::Descriptor<i32> = _p::Descriptor::<i32> {
             slot: 0u32,
@@ -15895,6 +17061,7 @@ pub mod test_print_inline_structs {
         pub type Builder<'a, T = _p::rpc::Empty> = super::InlineStruct<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::InlineStruct<::recapn::rpc::Pipeline<P>>;
     }
 }
 #[derive(Clone)]
@@ -15998,6 +17165,19 @@ impl _p::ty::Struct for TestWholeFloatDefault {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestWholeFloatDefault {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_whole_float_default::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_whole_float_default::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestWholeFloatDefault {
     const FIELD: _p::Descriptor<f32> = _p::Descriptor::<f32> {
         slot: 0u32,
@@ -16056,6 +17236,7 @@ pub mod test_whole_float_default {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestWholeFloatDefault<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestWholeFloatDefault<::recapn::rpc::Pipeline<P>>;
     pub const CONSTANT: f32 = 456f32;
     pub const BIG_CONSTANT: f32 = 4000000000000000000000000000000f32;
 }
@@ -16155,6 +17336,19 @@ impl _p::ty::Struct for TestGenerics {
         data: 1u16,
         ptrs: 3u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestGenerics {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_generics::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_generics::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestGenerics {
     const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
@@ -16309,6 +17503,25 @@ impl<'p, T: _p::rpc::Table + 'p> test_generics::Builder<'p, T> {
         unsafe { <test_generics::Which<_> as _p::UnionViewer<_>>::get(self) }
     }
 }
+impl<P> test_generics::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn rev(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+}
 pub mod test_generics {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestGenerics<
@@ -16317,6 +17530,7 @@ pub mod test_generics {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestGenerics<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestGenerics<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Uv(_p::ViewOf<T, ()>),
         Ug(_p::ViewOf<T, _p::Group<Ug>>),
@@ -16328,24 +17542,24 @@ pub mod test_generics {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Uv(
+                        Which::Uv(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestGenerics::UV.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Ug(
+                        Which::Ug(unsafe {
                             <_p::Group<
                                 Ug,
                             > as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestGenerics::UG.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -16362,24 +17576,24 @@ pub mod test_generics {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Uv(
+                        Which::Uv(unsafe {
                             <() as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestGenerics::UV.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Ug(
+                        Which::Ug(unsafe {
                             <_p::Group<
                                 Ug,
                             > as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestGenerics::UG.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -16486,6 +17700,19 @@ pub mod test_generics {
             ptrs: 2u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Inner {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = inner::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for inner::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Inner {
         const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
             slot: 0u32,
@@ -16536,12 +17763,32 @@ pub mod test_generics {
             }
         }
     }
+    impl<P> inner::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+        pub fn bar(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
     pub mod inner {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Inner<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Inner<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Inner<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Inner2<T = _p::Family>(T);
@@ -16642,6 +17889,19 @@ pub mod test_generics {
             data: 0u16,
             ptrs: 4u16,
         };
+    }
+    impl ::recapn::rpc::Pipelinable for Inner2 {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = inner2::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for inner2::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
     }
     impl Inner2 {
         const BAR: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
@@ -16755,12 +18015,42 @@ pub mod test_generics {
             }
         }
     }
+    impl<P> inner2::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn bar(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+        pub fn baz(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+        pub fn inner_bound(self) -> ::recapn::rpc::PipelineOf<Inner, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+            )
+        }
+        pub fn inner_unbound(self) -> ::recapn::rpc::PipelineOf<Inner, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(3u16)),
+            )
+        }
+    }
     pub mod inner2 {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Inner2<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Inner2<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Inner2<::recapn::rpc::Pipeline<P>>;
         #[derive(Clone)]
         pub struct DeepNest<T = _p::Family>(T);
         impl _p::ty::SchemaType for DeepNest {
@@ -16860,6 +18150,19 @@ pub mod test_generics {
                 data: 0u16,
                 ptrs: 4u16,
             };
+        }
+        impl ::recapn::rpc::Pipelinable for DeepNest {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = deep_nest::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for deep_nest::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
+            }
         }
         impl DeepNest {
             const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
@@ -16991,6 +18294,35 @@ pub mod test_generics {
                 }
             }
         }
+        impl<P> deep_nest::Pipeline<P>
+        where
+            P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+            P: ::recapn::rpc::PipelineBuilder<
+                ::recapn::any::AnyPtr,
+                Operation = ::recapn_rpc::pipeline::PipelineOp,
+            >,
+        {
+            pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+                )
+            }
+            pub fn bar(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+                )
+            }
+            pub fn baz(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+                )
+            }
+            pub fn qux(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(3u16)),
+                )
+            }
+        }
         pub mod deep_nest {
             use super::{__file, __imports, _p};
             pub type Reader<'a, T = _p::rpc::Empty> = super::DeepNest<
@@ -16999,6 +18331,667 @@ pub mod test_generics {
             pub type Builder<'a, T = _p::rpc::Empty> = super::DeepNest<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::DeepNest<::recapn::rpc::Pipeline<P>>;
+            #[derive(Clone, Debug)]
+            pub struct DeepNestInterface(::recapn_rpc::client::Client);
+            impl DeepNestInterface {
+                pub fn call(
+                    &self,
+                ) -> ::recapn_rpc::client::Request<
+                    deep_nest_interface::CallParams,
+                    deep_nest_interface::CallResults,
+                > {
+                    self.0.call(9816138025992274567u64, 0u16)
+                }
+            }
+            impl ::recapn::ty::Capability for DeepNestInterface {
+                type Client = ::recapn_rpc::client::Client;
+                fn from_client(c: Self::Client) -> Self {
+                    Self(c)
+                }
+                fn into_inner(self) -> Self::Client {
+                    self.0
+                }
+            }
+            impl<T: DeepNestInterfaceServer> ::recapn_rpc::server::FromServer<T>
+            for DeepNestInterface {
+                type Dispatcher = DeepNestInterfaceDispatcher<T>;
+                #[inline]
+                fn from_server(
+                    server: T,
+                ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+                    let (client, dispatcher) = ::recapn_rpc::server::new_server(
+                        DeepNestInterfaceDispatcher(server),
+                    );
+                    (Self(client), dispatcher)
+                }
+            }
+            pub trait DeepNestInterfaceServer {
+                fn call(
+                    &mut self,
+                    ctx: ::recapn_rpc::server::CallContext<
+                        deep_nest_interface::CallParams,
+                        deep_nest_interface::CallResults,
+                    >,
+                ) -> ::recapn_rpc::server::CallResult {
+                    ctx.response
+                        .error(
+                            ::recapn_rpc::Error::unimplemented(
+                                "'capnp/test.capnp:TestGenerics.Inner2.DeepNest.DeepNestInterface.call' is not implemented for this type",
+                            ),
+                        )
+                }
+            }
+            pub struct DeepNestInterfaceDispatcher<T>(pub T);
+            impl<T> DeepNestInterfaceDispatcher<T> {
+                pub const NAME: &str = "capnp/test.capnp:TestGenerics.Inner2.DeepNest.DeepNestInterface";
+            }
+            impl<T> ::recapn_rpc::server::Dispatch for DeepNestInterfaceDispatcher<T>
+            where
+                T: DeepNestInterfaceServer,
+            {
+                fn dispatch(
+                    &mut self,
+                    request: ::recapn_rpc::server::DispatchRequest,
+                ) -> ::recapn_rpc::server::DispatchResponse {
+                    match (request.interface(), request.method()) {
+                        (9816138025992274567u64, 0u16) => {
+                            self.0.call(request.into_call_context()).into()
+                        }
+                        (9816138025992274567u64, _) => {
+                            request.unimplemented_method(Self::NAME)
+                        }
+                        (_, _) => request.unimplemented_interface(Self::NAME),
+                    }
+                }
+            }
+            pub mod deep_nest_interface {
+                use super::{__file, __imports, _p};
+                pub use super::DeepNestInterface as Client;
+                pub use super::DeepNestInterfaceServer as Server;
+                pub use super::DeepNestInterfaceDispatcher as Dispatcher;
+                #[derive(Clone)]
+                pub struct CallParams<T = _p::Family>(T);
+                impl _p::ty::SchemaType for CallParams {
+                    const ID: u64 = 13280812693176152137u64;
+                }
+                impl<T> _p::IntoFamily for CallParams<T> {
+                    type Family = CallParams;
+                }
+                impl<T: _p::Capable> _p::Capable for CallParams<T> {
+                    type Table = T::Table;
+                    type Imbued = T::Imbued;
+                    type ImbuedWith<T2: _p::rpc::Table> = CallParams<T::ImbuedWith<T2>>;
+                    #[inline]
+                    fn imbued(&self) -> &Self::Imbued {
+                        self.0.imbued()
+                    }
+                    #[inline]
+                    fn imbue_release<T2: _p::rpc::Table>(
+                        self,
+                        new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+                    ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+                        let (imbued, old) = self.0.imbue_release(new_table);
+                        (CallParams(imbued), old)
+                    }
+                    #[inline]
+                    fn imbue_release_into<U>(
+                        &self,
+                        other: U,
+                    ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+                    where
+                        U: _p::Capable,
+                        U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+                    {
+                        self.0.imbue_release_into(other)
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+                for call_params::Reader<'a, T> {
+                    type Ptr = _p::StructReader<'a, T>;
+                }
+                impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+                for call_params::Reader<'a, T> {
+                    #[inline]
+                    fn from(ptr: _p::StructReader<'a, T>) -> Self {
+                        CallParams(ptr)
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::From<call_params::Reader<'a, T>>
+                for _p::StructReader<'a, T> {
+                    #[inline]
+                    fn from(reader: call_params::Reader<'a, T>) -> Self {
+                        reader.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+                for call_params::Reader<'a, T> {
+                    #[inline]
+                    fn as_ref(&self) -> &_p::StructReader<'a, T> {
+                        &self.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+                for call_params::Reader<'a, T> {}
+                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+                for call_params::Builder<'a, T> {
+                    type Ptr = _p::StructBuilder<'a, T>;
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::From<call_params::Builder<'a, T>>
+                for _p::StructBuilder<'a, T> {
+                    #[inline]
+                    fn from(reader: call_params::Builder<'a, T>) -> Self {
+                        reader.0
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::AsRef<_p::StructBuilder<'a, T>>
+                for call_params::Builder<'a, T> {
+                    #[inline]
+                    fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+                        &self.0
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::AsMut<_p::StructBuilder<'a, T>>
+                for call_params::Builder<'a, T> {
+                    #[inline]
+                    fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+                        &mut self.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+                for call_params::Builder<'a, T> {
+                    unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                        Self(ptr)
+                    }
+                }
+                impl _p::StructView for CallParams {
+                    type Reader<'a, T: _p::rpc::Table> = call_params::Reader<'a, T>;
+                    type Builder<'a, T: _p::rpc::Table> = call_params::Builder<'a, T>;
+                }
+                impl _p::ty::Struct for CallParams {
+                    const SIZE: _p::StructSize = _p::StructSize {
+                        data: 0u16,
+                        ptrs: 0u16,
+                    };
+                }
+                impl ::recapn::rpc::Pipelinable for CallParams {
+                    type Pipeline<P: ::recapn::rpc::Pipelined> = call_params::Pipeline<
+                        P,
+                    >;
+                }
+                impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+                for call_params::Pipeline<P> {
+                    type Pipeline = P;
+                    fn from_pipeline(
+                        p: ::recapn::rpc::Pipeline<Self::Pipeline>,
+                    ) -> Self {
+                        Self(p)
+                    }
+                    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                        self.0
+                    }
+                }
+                impl CallParams {}
+                impl<'p, T: _p::rpc::Table + 'p> call_params::Reader<'p, T> {}
+                impl<'p, T: _p::rpc::Table + 'p> call_params::Builder<'p, T> {}
+                pub mod call_params {
+                    use super::{__file, __imports, _p};
+                    pub type Reader<'a, T = _p::rpc::Empty> = super::CallParams<
+                        _p::StructReader<'a, T>,
+                    >;
+                    pub type Builder<'a, T = _p::rpc::Empty> = super::CallParams<
+                        _p::StructBuilder<'a, T>,
+                    >;
+                    pub type Pipeline<P> = super::CallParams<::recapn::rpc::Pipeline<P>>;
+                }
+                #[derive(Clone)]
+                pub struct CallResults<T = _p::Family>(T);
+                impl _p::ty::SchemaType for CallResults {
+                    const ID: u64 = 16177194828052909935u64;
+                }
+                impl<T> _p::IntoFamily for CallResults<T> {
+                    type Family = CallResults;
+                }
+                impl<T: _p::Capable> _p::Capable for CallResults<T> {
+                    type Table = T::Table;
+                    type Imbued = T::Imbued;
+                    type ImbuedWith<T2: _p::rpc::Table> = CallResults<T::ImbuedWith<T2>>;
+                    #[inline]
+                    fn imbued(&self) -> &Self::Imbued {
+                        self.0.imbued()
+                    }
+                    #[inline]
+                    fn imbue_release<T2: _p::rpc::Table>(
+                        self,
+                        new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+                    ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+                        let (imbued, old) = self.0.imbue_release(new_table);
+                        (CallResults(imbued), old)
+                    }
+                    #[inline]
+                    fn imbue_release_into<U>(
+                        &self,
+                        other: U,
+                    ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+                    where
+                        U: _p::Capable,
+                        U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+                    {
+                        self.0.imbue_release_into(other)
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+                for call_results::Reader<'a, T> {
+                    type Ptr = _p::StructReader<'a, T>;
+                }
+                impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+                for call_results::Reader<'a, T> {
+                    #[inline]
+                    fn from(ptr: _p::StructReader<'a, T>) -> Self {
+                        CallResults(ptr)
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::From<call_results::Reader<'a, T>>
+                for _p::StructReader<'a, T> {
+                    #[inline]
+                    fn from(reader: call_results::Reader<'a, T>) -> Self {
+                        reader.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+                for call_results::Reader<'a, T> {
+                    #[inline]
+                    fn as_ref(&self) -> &_p::StructReader<'a, T> {
+                        &self.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+                for call_results::Reader<'a, T> {}
+                impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+                for call_results::Builder<'a, T> {
+                    type Ptr = _p::StructBuilder<'a, T>;
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::From<call_results::Builder<'a, T>>
+                for _p::StructBuilder<'a, T> {
+                    #[inline]
+                    fn from(reader: call_results::Builder<'a, T>) -> Self {
+                        reader.0
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::AsRef<_p::StructBuilder<'a, T>>
+                for call_results::Builder<'a, T> {
+                    #[inline]
+                    fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+                        &self.0
+                    }
+                }
+                impl<
+                    'a,
+                    T: _p::rpc::Table,
+                > core::convert::AsMut<_p::StructBuilder<'a, T>>
+                for call_results::Builder<'a, T> {
+                    #[inline]
+                    fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+                        &mut self.0
+                    }
+                }
+                impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+                for call_results::Builder<'a, T> {
+                    unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                        Self(ptr)
+                    }
+                }
+                impl _p::StructView for CallResults {
+                    type Reader<'a, T: _p::rpc::Table> = call_results::Reader<'a, T>;
+                    type Builder<'a, T: _p::rpc::Table> = call_results::Builder<'a, T>;
+                }
+                impl _p::ty::Struct for CallResults {
+                    const SIZE: _p::StructSize = _p::StructSize {
+                        data: 0u16,
+                        ptrs: 0u16,
+                    };
+                }
+                impl ::recapn::rpc::Pipelinable for CallResults {
+                    type Pipeline<P: ::recapn::rpc::Pipelined> = call_results::Pipeline<
+                        P,
+                    >;
+                }
+                impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+                for call_results::Pipeline<P> {
+                    type Pipeline = P;
+                    fn from_pipeline(
+                        p: ::recapn::rpc::Pipeline<Self::Pipeline>,
+                    ) -> Self {
+                        Self(p)
+                    }
+                    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                        self.0
+                    }
+                }
+                impl CallResults {}
+                impl<'p, T: _p::rpc::Table + 'p> call_results::Reader<'p, T> {}
+                impl<'p, T: _p::rpc::Table + 'p> call_results::Builder<'p, T> {}
+                pub mod call_results {
+                    use super::{__file, __imports, _p};
+                    pub type Reader<'a, T = _p::rpc::Empty> = super::CallResults<
+                        _p::StructReader<'a, T>,
+                    >;
+                    pub type Builder<'a, T = _p::rpc::Empty> = super::CallResults<
+                        _p::StructBuilder<'a, T>,
+                    >;
+                    pub type Pipeline<P> = super::CallResults<
+                        ::recapn::rpc::Pipeline<P>,
+                    >;
+                }
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub struct Interface(::recapn_rpc::client::Client);
+    impl Interface {
+        pub fn call(
+            &self,
+        ) -> ::recapn_rpc::client::Request<Inner2, interface::CallResults> {
+            self.0.call(14548678385738242652u64, 0u16)
+        }
+    }
+    impl ::recapn::ty::Capability for Interface {
+        type Client = ::recapn_rpc::client::Client;
+        fn from_client(c: Self::Client) -> Self {
+            Self(c)
+        }
+        fn into_inner(self) -> Self::Client {
+            self.0
+        }
+    }
+    impl<T: InterfaceServer> ::recapn_rpc::server::FromServer<T> for Interface {
+        type Dispatcher = InterfaceDispatcher<T>;
+        #[inline]
+        fn from_server(
+            server: T,
+        ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+            let (client, dispatcher) = ::recapn_rpc::server::new_server(
+                InterfaceDispatcher(server),
+            );
+            (Self(client), dispatcher)
+        }
+    }
+    pub trait InterfaceServer {
+        fn call(
+            &mut self,
+            ctx: ::recapn_rpc::server::CallContext<Inner2, interface::CallResults>,
+        ) -> ::recapn_rpc::server::CallResult {
+            ctx.response
+                .error(
+                    ::recapn_rpc::Error::unimplemented(
+                        "'capnp/test.capnp:TestGenerics.Interface.call' is not implemented for this type",
+                    ),
+                )
+        }
+    }
+    pub struct InterfaceDispatcher<T>(pub T);
+    impl<T> InterfaceDispatcher<T> {
+        pub const NAME: &str = "capnp/test.capnp:TestGenerics.Interface";
+    }
+    impl<T> ::recapn_rpc::server::Dispatch for InterfaceDispatcher<T>
+    where
+        T: InterfaceServer,
+    {
+        fn dispatch(
+            &mut self,
+            request: ::recapn_rpc::server::DispatchRequest,
+        ) -> ::recapn_rpc::server::DispatchResponse {
+            match (request.interface(), request.method()) {
+                (14548678385738242652u64, 0u16) => {
+                    self.0.call(request.into_call_context()).into()
+                }
+                (14548678385738242652u64, _) => request.unimplemented_method(Self::NAME),
+                (_, _) => request.unimplemented_interface(Self::NAME),
+            }
+        }
+    }
+    pub mod interface {
+        use super::{__file, __imports, _p};
+        pub use super::Interface as Client;
+        pub use super::InterfaceServer as Server;
+        pub use super::InterfaceDispatcher as Dispatcher;
+        #[derive(Clone)]
+        pub struct CallResults<T = _p::Family>(T);
+        impl _p::ty::SchemaType for CallResults {
+            const ID: u64 = 11940276422636306861u64;
+        }
+        impl<T> _p::IntoFamily for CallResults<T> {
+            type Family = CallResults;
+        }
+        impl<T: _p::Capable> _p::Capable for CallResults<T> {
+            type Table = T::Table;
+            type Imbued = T::Imbued;
+            type ImbuedWith<T2: _p::rpc::Table> = CallResults<T::ImbuedWith<T2>>;
+            #[inline]
+            fn imbued(&self) -> &Self::Imbued {
+                self.0.imbued()
+            }
+            #[inline]
+            fn imbue_release<T2: _p::rpc::Table>(
+                self,
+                new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+            ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+                let (imbued, old) = self.0.imbue_release(new_table);
+                (CallResults(imbued), old)
+            }
+            #[inline]
+            fn imbue_release_into<U>(
+                &self,
+                other: U,
+            ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+            where
+                U: _p::Capable,
+                U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+            {
+                self.0.imbue_release_into(other)
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_results::Reader<'a, T> {
+            type Ptr = _p::StructReader<'a, T>;
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+        for call_results::Reader<'a, T> {
+            #[inline]
+            fn from(ptr: _p::StructReader<'a, T>) -> Self {
+                CallResults(ptr)
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<call_results::Reader<'a, T>>
+        for _p::StructReader<'a, T> {
+            #[inline]
+            fn from(reader: call_results::Reader<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+        for call_results::Reader<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructReader<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+        for call_results::Reader<'a, T> {}
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_results::Builder<'a, T> {
+            type Ptr = _p::StructBuilder<'a, T>;
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<call_results::Builder<'a, T>>
+        for _p::StructBuilder<'a, T> {
+            #[inline]
+            fn from(reader: call_results::Builder<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+        for call_results::Builder<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+        for call_results::Builder<'a, T> {
+            #[inline]
+            fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+                &mut self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+        for call_results::Builder<'a, T> {
+            unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                Self(ptr)
+            }
+        }
+        impl _p::StructView for CallResults {
+            type Reader<'a, T: _p::rpc::Table> = call_results::Reader<'a, T>;
+            type Builder<'a, T: _p::rpc::Table> = call_results::Builder<'a, T>;
+        }
+        impl _p::ty::Struct for CallResults {
+            const SIZE: _p::StructSize = _p::StructSize {
+                data: 0u16,
+                ptrs: 2u16,
+            };
+        }
+        impl ::recapn::rpc::Pipelinable for CallResults {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = call_results::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for call_results::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
+            }
+        }
+        impl CallResults {
+            const QUX: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+                slot: 0u32,
+                default: ::core::option::Option::None,
+            };
+            const GEN: _p::Descriptor<_p::Struct<__file::TestGenerics>> = _p::Descriptor::<
+                _p::Struct<__file::TestGenerics>,
+            > {
+                slot: 1u32,
+                default: ::core::option::Option::None,
+            };
+        }
+        impl<'p, T: _p::rpc::Table + 'p> call_results::Reader<'p, T> {
+            #[inline]
+            pub fn qux(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+                unsafe {
+                    <_p::AnyPtr as _p::field::FieldType>::accessor(
+                        &self.0,
+                        &CallResults::QUX,
+                    )
+                }
+            }
+            #[inline]
+            pub fn gen(
+                &self,
+            ) -> _p::Accessor<'_, 'p, T, _p::Struct<__file::TestGenerics>> {
+                unsafe {
+                    <_p::Struct<
+                        __file::TestGenerics,
+                    > as _p::field::FieldType>::accessor(&self.0, &CallResults::GEN)
+                }
+            }
+        }
+        impl<'p, T: _p::rpc::Table + 'p> call_results::Builder<'p, T> {
+            #[inline]
+            pub fn qux(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+                unsafe {
+                    <_p::AnyPtr as _p::field::FieldType>::accessor(
+                        &mut self.0,
+                        &CallResults::QUX,
+                    )
+                }
+            }
+            #[inline]
+            pub fn gen(
+                &mut self,
+            ) -> _p::AccessorMut<'_, 'p, T, _p::Struct<__file::TestGenerics>> {
+                unsafe {
+                    <_p::Struct<
+                        __file::TestGenerics,
+                    > as _p::field::FieldType>::accessor(&mut self.0, &CallResults::GEN)
+                }
+            }
+            #[inline]
+            pub fn into_qux(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+                unsafe {
+                    <_p::AnyPtr as _p::field::FieldType>::accessor(
+                        self.0,
+                        &CallResults::QUX,
+                    )
+                }
+            }
+            #[inline]
+            pub fn into_gen(
+                self,
+            ) -> _p::AccessorOwned<'p, T, _p::Struct<__file::TestGenerics>> {
+                unsafe {
+                    <_p::Struct<
+                        __file::TestGenerics,
+                    > as _p::field::FieldType>::accessor(self.0, &CallResults::GEN)
+                }
+            }
+        }
+        impl<P> call_results::Pipeline<P>
+        where
+            P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+            P: ::recapn::rpc::PipelineBuilder<
+                ::recapn::any::AnyPtr,
+                Operation = ::recapn_rpc::pipeline::PipelineOp,
+            >,
+        {
+            pub fn qux(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+                )
+            }
+            pub fn gen(self) -> ::recapn::rpc::PipelineOf<__file::TestGenerics, P> {
+                ::recapn::rpc::TypedPipeline::from_pipeline(
+                    self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+                )
+            }
+        }
+        pub mod call_results {
+            use super::{__file, __imports, _p};
+            pub type Reader<'a, T = _p::rpc::Empty> = super::CallResults<
+                _p::StructReader<'a, T>,
+            >;
+            pub type Builder<'a, T = _p::rpc::Empty> = super::CallResults<
+                _p::StructBuilder<'a, T>,
+            >;
+            pub type Pipeline<P> = super::CallResults<::recapn::rpc::Pipeline<P>>;
         }
     }
     #[derive(Clone)]
@@ -17100,6 +19093,19 @@ pub mod test_generics {
             data: 0u16,
             ptrs: 6u16,
         };
+    }
+    impl ::recapn::rpc::Pipelinable for UseAliases {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = use_aliases::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for use_aliases::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
     }
     impl UseAliases {
         const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
@@ -17289,6 +19295,45 @@ pub mod test_generics {
             }
         }
     }
+    impl<P> use_aliases::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+        pub fn inner(self) -> ::recapn::rpc::PipelineOf<Inner, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+        pub fn inner2(self) -> ::recapn::rpc::PipelineOf<Inner2, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+            )
+        }
+        pub fn inner2_bind(self) -> ::recapn::rpc::PipelineOf<Inner2, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(3u16)),
+            )
+        }
+        pub fn inner2_text(self) -> ::recapn::rpc::PipelineOf<Inner2, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(4u16)),
+            )
+        }
+        pub fn rev_foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(5u16)),
+            )
+        }
+    }
     pub mod use_aliases {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::UseAliases<
@@ -17297,6 +19342,7 @@ pub mod test_generics {
         pub type Builder<'a, T = _p::rpc::Empty> = super::UseAliases<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::UseAliases<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct Ug<T = _p::Family>(T);
@@ -17394,7 +19440,21 @@ pub mod test_generics {
     }
     impl _p::FieldGroup for Ug {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            <i32 as _p::field::FieldType>::clear(s, &Ug::UGFOO);
+            unsafe {
+                <i32 as _p::field::FieldType>::clear(s, &Ug::UGFOO);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for Ug {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = ug::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline for ug::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl Ug {
@@ -17419,6 +19479,7 @@ pub mod test_generics {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::Ug<_p::StructReader<'a, T>>;
         pub type Builder<'a, T = _p::rpc::Empty> = super::Ug<_p::StructBuilder<'a, T>>;
+        pub type Pipeline<P> = super::Ug<::recapn::rpc::Pipeline<P>>;
     }
 }
 #[derive(Clone)]
@@ -17518,6 +19579,19 @@ impl _p::ty::Struct for BoxedText {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for BoxedText {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = boxed_text::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for boxed_text::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl BoxedText {
     const TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
@@ -17550,6 +19624,7 @@ pub mod boxed_text {
     pub type Builder<'a, T = _p::rpc::Empty> = super::BoxedText<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::BoxedText<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestGenericsWrapper<T = _p::Family>(T);
@@ -17650,6 +19725,19 @@ impl _p::ty::Struct for TestGenericsWrapper {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestGenericsWrapper {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_generics_wrapper::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_generics_wrapper::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestGenericsWrapper {
     const VALUE: _p::Descriptor<_p::Struct<TestGenerics>> = _p::Descriptor::<
         _p::Struct<TestGenerics>,
@@ -17689,6 +19777,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_generics_wrapper::Builder<'p, T> {
         }
     }
 }
+impl<P> test_generics_wrapper::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn value(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_generics_wrapper {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestGenericsWrapper<
@@ -17697,6 +19799,7 @@ pub mod test_generics_wrapper {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestGenericsWrapper<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestGenericsWrapper<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestGenericsWrapper2<T = _p::Family>(T);
@@ -17797,6 +19900,19 @@ impl _p::ty::Struct for TestGenericsWrapper2 {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestGenericsWrapper2 {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_generics_wrapper2::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_generics_wrapper2::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestGenericsWrapper2 {
     const VALUE: _p::Descriptor<_p::Struct<TestGenericsWrapper>> = _p::Descriptor::<
         _p::Struct<TestGenericsWrapper>,
@@ -17840,6 +19956,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_generics_wrapper2::Builder<'p, T> {
         }
     }
 }
+impl<P> test_generics_wrapper2::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn value(self) -> ::recapn::rpc::PipelineOf<TestGenericsWrapper, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_generics_wrapper2 {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestGenericsWrapper2<
@@ -17848,6 +19978,557 @@ pub mod test_generics_wrapper2 {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestGenericsWrapper2<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestGenericsWrapper2<::recapn::rpc::Pipeline<P>>;
+}
+#[derive(Clone, Debug)]
+pub struct TestImplicitMethodParams(::recapn_rpc::client::Client);
+impl TestImplicitMethodParams {
+    pub fn call(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_implicit_method_params::CallParams,
+        TestGenerics,
+    > {
+        self.0.call(10058534285777328794u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestImplicitMethodParams {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestImplicitMethodParamsServer> ::recapn_rpc::server::FromServer<T>
+for TestImplicitMethodParams {
+    type Dispatcher = TestImplicitMethodParamsDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestImplicitMethodParamsDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestImplicitMethodParamsServer {
+    fn call(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_implicit_method_params::CallParams,
+            TestGenerics,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestImplicitMethodParams.call' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestImplicitMethodParamsDispatcher<T>(pub T);
+impl<T> TestImplicitMethodParamsDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestImplicitMethodParams";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestImplicitMethodParamsDispatcher<T>
+where
+    T: TestImplicitMethodParamsServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (10058534285777328794u64, 0u16) => {
+                self.0.call(request.into_call_context()).into()
+            }
+            (10058534285777328794u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_implicit_method_params {
+    use super::{__file, __imports, _p};
+    pub use super::TestImplicitMethodParams as Client;
+    pub use super::TestImplicitMethodParamsServer as Server;
+    pub use super::TestImplicitMethodParamsDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct CallParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallParams {
+        const ID: u64 = 17888170929607787654u64;
+    }
+    impl<T> _p::IntoFamily for CallParams<T> {
+        type Family = CallParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for call_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for call_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallParams {
+        type Reader<'a, T: _p::rpc::Table> = call_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallParams {
+        const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const BAR: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_params::Reader<'p, T> {
+        #[inline]
+        pub fn foo(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &CallParams::FOO)
+            }
+        }
+        #[inline]
+        pub fn bar(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &CallParams::BAR)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_params::Builder<'p, T> {
+        #[inline]
+        pub fn foo(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallParams::FOO,
+                )
+            }
+        }
+        #[inline]
+        pub fn bar(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallParams::BAR,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_foo(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &CallParams::FOO)
+            }
+        }
+        #[inline]
+        pub fn into_bar(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &CallParams::BAR)
+            }
+        }
+    }
+    impl<P> call_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+        pub fn bar(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
+    pub mod call_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallParams<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestImplicitMethodParamsInGeneric(::recapn_rpc::client::Client);
+impl TestImplicitMethodParamsInGeneric {
+    pub fn call(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_implicit_method_params_in_generic::CallParams,
+        TestGenerics,
+    > {
+        self.0.call(16112979978201007305u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestImplicitMethodParamsInGeneric {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestImplicitMethodParamsInGenericServer> ::recapn_rpc::server::FromServer<T>
+for TestImplicitMethodParamsInGeneric {
+    type Dispatcher = TestImplicitMethodParamsInGenericDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestImplicitMethodParamsInGenericDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestImplicitMethodParamsInGenericServer {
+    fn call(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_implicit_method_params_in_generic::CallParams,
+            TestGenerics,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestImplicitMethodParamsInGeneric.call' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestImplicitMethodParamsInGenericDispatcher<T>(pub T);
+impl<T> TestImplicitMethodParamsInGenericDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestImplicitMethodParamsInGeneric";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestImplicitMethodParamsInGenericDispatcher<T>
+where
+    T: TestImplicitMethodParamsInGenericServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (16112979978201007305u64, 0u16) => {
+                self.0.call(request.into_call_context()).into()
+            }
+            (16112979978201007305u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_implicit_method_params_in_generic {
+    use super::{__file, __imports, _p};
+    pub use super::TestImplicitMethodParamsInGeneric as Client;
+    pub use super::TestImplicitMethodParamsInGenericServer as Server;
+    pub use super::TestImplicitMethodParamsInGenericDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct CallParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallParams {
+        const ID: u64 = 11145157995779381022u64;
+    }
+    impl<T> _p::IntoFamily for CallParams<T> {
+        type Family = CallParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for call_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for call_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallParams {
+        type Reader<'a, T: _p::rpc::Table> = call_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallParams {
+        const FOO: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const BAR: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_params::Reader<'p, T> {
+        #[inline]
+        pub fn foo(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &CallParams::FOO)
+            }
+        }
+        #[inline]
+        pub fn bar(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &CallParams::BAR)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_params::Builder<'p, T> {
+        #[inline]
+        pub fn foo(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallParams::FOO,
+                )
+            }
+        }
+        #[inline]
+        pub fn bar(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallParams::BAR,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_foo(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &CallParams::FOO)
+            }
+        }
+        #[inline]
+        pub fn into_bar(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &CallParams::BAR)
+            }
+        }
+    }
+    impl<P> call_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn foo(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+        pub fn bar(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
+    pub mod call_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallParams<::recapn::rpc::Pipeline<P>>;
+    }
 }
 #[derive(Clone)]
 pub struct TestGenericsUnion<T = _p::Family>(T);
@@ -17947,6 +20628,19 @@ impl _p::ty::Struct for TestGenericsUnion {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestGenericsUnion {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_generics_union::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_generics_union::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestGenericsUnion {
     const FOO: _p::VariantDescriptor<_p::AnyPtr> = _p::VariantDescriptor::<_p::AnyPtr> {
         variant: _p::VariantInfo {
@@ -18045,6 +20739,7 @@ pub mod test_generics_union {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestGenericsUnion<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestGenericsUnion<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         Foo(_p::ViewOf<T, _p::AnyPtr>),
         Bar(_p::ViewOf<T, _p::AnyPtr>),
@@ -18056,22 +20751,22 @@ pub mod test_generics_union {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Foo(
+                        Which::Foo(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestGenericsUnion::FOO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestGenericsUnion::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -18088,22 +20783,22 @@ pub mod test_generics_union {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::Foo(
+                        Which::Foo(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestGenericsUnion::FOO.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <_p::AnyPtr as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestGenericsUnion::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -18207,6 +20902,19 @@ impl _p::ty::Struct for TestUseGenerics {
         data: 0u16,
         ptrs: 20u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestUseGenerics {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_use_generics::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_use_generics::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestUseGenerics {
     const BASIC: _p::Descriptor<_p::Struct<TestGenerics>> = _p::Descriptor::<
@@ -18949,7 +21657,9 @@ impl TestUseGenerics {
         slot: 18u32,
         default: ::core::option::Option::None,
     };
-    const GENERIC_CAP: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+    const GENERIC_CAP: _p::Descriptor<_p::Capability<test_generics::Interface>> = _p::Descriptor::<
+        _p::Capability<test_generics::Interface>,
+    > {
         slot: 19u32,
         default: ::core::option::Option::None,
     };
@@ -19145,12 +21855,13 @@ impl<'p, T: _p::rpc::Table + 'p> test_use_generics::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn generic_cap(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+    pub fn generic_cap(
+        &self,
+    ) -> _p::Accessor<'_, 'p, T, _p::Capability<test_generics::Interface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestUseGenerics::GENERIC_CAP,
-            )
+            <_p::Capability<
+                test_generics::Interface,
+            > as _p::field::FieldType>::accessor(&self.0, &TestUseGenerics::GENERIC_CAP)
         }
     }
 }
@@ -19373,9 +22084,13 @@ impl<'p, T: _p::rpc::Table + 'p> test_use_generics::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn generic_cap(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+    pub fn generic_cap(
+        &mut self,
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<test_generics::Interface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
+            <_p::Capability<
+                test_generics::Interface,
+            > as _p::field::FieldType>::accessor(
                 &mut self.0,
                 &TestUseGenerics::GENERIC_CAP,
             )
@@ -19576,13 +22291,124 @@ impl<'p, T: _p::rpc::Table + 'p> test_use_generics::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_generic_cap(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+    pub fn into_generic_cap(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::Capability<test_generics::Interface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                self.0,
-                &TestUseGenerics::GENERIC_CAP,
-            )
+            <_p::Capability<
+                test_generics::Interface,
+            > as _p::field::FieldType>::accessor(self.0, &TestUseGenerics::GENERIC_CAP)
         }
+    }
+}
+impl<P> test_use_generics::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn basic(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn inner(self) -> ::recapn::rpc::PipelineOf<test_generics::Inner, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+    pub fn inner2(self) -> ::recapn::rpc::PipelineOf<test_generics::Inner2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+        )
+    }
+    pub fn unspecified(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(3u16)),
+        )
+    }
+    pub fn unspecified_inner(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_generics::Inner2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(4u16)),
+        )
+    }
+    pub fn default(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(5u16)),
+        )
+    }
+    pub fn default_inner(self) -> ::recapn::rpc::PipelineOf<test_generics::Inner, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(6u16)),
+        )
+    }
+    pub fn default_user(self) -> ::recapn::rpc::PipelineOf<TestUseGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(7u16)),
+        )
+    }
+    pub fn wrapper(self) -> ::recapn::rpc::PipelineOf<TestGenericsWrapper, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(8u16)),
+        )
+    }
+    pub fn default_wrapper(self) -> ::recapn::rpc::PipelineOf<TestGenericsWrapper, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(9u16)),
+        )
+    }
+    pub fn default_wrapper2(self) -> ::recapn::rpc::PipelineOf<TestGenericsWrapper2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(10u16)),
+        )
+    }
+    pub fn alias_foo(self) -> ::recapn::rpc::PipelineOf<TestAllTypes, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(11u16)),
+        )
+    }
+    pub fn alias_inner(self) -> ::recapn::rpc::PipelineOf<test_generics::Inner, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(12u16)),
+        )
+    }
+    pub fn alias_inner2(self) -> ::recapn::rpc::PipelineOf<test_generics::Inner2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(13u16)),
+        )
+    }
+    pub fn alias_inner2_bind(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_generics::Inner2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(14u16)),
+        )
+    }
+    pub fn alias_inner2_text(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_generics::Inner2, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(15u16)),
+        )
+    }
+    pub fn use_aliases(self) -> ::recapn::rpc::PipelineOf<test_generics::UseAliases, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(17u16)),
+        )
+    }
+    pub fn cap(self) -> ::recapn::rpc::PipelineOf<TestGenerics, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(18u16)),
+        )
+    }
+    pub fn generic_cap(self) -> test_generics::Interface {
+        ::recapn::ty::Capability::from_client(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(19u16)).into_cap(),
+        )
     }
 }
 pub mod test_use_generics {
@@ -19593,6 +22419,7 @@ pub mod test_use_generics {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestUseGenerics<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestUseGenerics<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestEmptyStruct<T = _p::Family>(T);
@@ -19691,6 +22518,19 @@ impl _p::ty::Struct for TestEmptyStruct {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestEmptyStruct {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_empty_struct::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_empty_struct::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestEmptyStruct {}
 impl<'p, T: _p::rpc::Table + 'p> test_empty_struct::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_empty_struct::Builder<'p, T> {}
@@ -19702,6 +22542,7 @@ pub mod test_empty_struct {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestEmptyStruct<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestEmptyStruct<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestConstants<T = _p::Family>(T);
@@ -19800,6 +22641,19 @@ impl _p::ty::Struct for TestConstants {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestConstants {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_constants::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_constants::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestConstants {}
 impl<'p, T: _p::rpc::Table + 'p> test_constants::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_constants::Builder<'p, T> {}
@@ -19811,6 +22665,7 @@ pub mod test_constants {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestConstants<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestConstants<::recapn::rpc::Pipeline<P>>;
     pub const VOID_CONST: () = ();
     pub const BOOL_CONST: bool = true;
     pub const INT8_CONST: i8 = -123i8;
@@ -21873,6 +24728,19 @@ impl _p::ty::Struct for TestAnyPointerConstants {
         ptrs: 4u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestAnyPointerConstants {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_any_pointer_constants::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_any_pointer_constants::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestAnyPointerConstants {
     const ANY_KIND_AS_STRUCT: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
         slot: 0u32,
@@ -22005,6 +24873,36 @@ impl<'p, T: _p::rpc::Table + 'p> test_any_pointer_constants::Builder<'p, T> {
         }
     }
 }
+impl<P> test_any_pointer_constants::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn any_kind_as_struct(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn any_struct_as_struct(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+    pub fn any_kind_as_list(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(2u16)),
+        )
+    }
+}
 pub mod test_any_pointer_constants {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestAnyPointerConstants<
@@ -22013,6 +24911,7 @@ pub mod test_any_pointer_constants {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestAnyPointerConstants<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestAnyPointerConstants<::recapn::rpc::Pipeline<P>>;
 }
 pub const ANY_POINTER_CONSTANTS: _p::ty::ConstPtr<_p::Struct<TestAnyPointerConstants>> = unsafe {
     _p::ty::ConstPtr::new(
@@ -22538,10 +25437,23 @@ impl _p::ty::Struct for TestListOfAny {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestListOfAny {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_list_of_any::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_list_of_any::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestListOfAny {
-    const CAP_LIST: _p::Descriptor<_p::List<_p::AnyPtr>> = _p::Descriptor::<
-        _p::List<_p::AnyPtr>,
-    > {
+    const CAP_LIST: _p::Descriptor<
+        _p::List<_p::Capability<::recapn_rpc::client::Client>>,
+    > = _p::Descriptor::<_p::List<_p::Capability<::recapn_rpc::client::Client>>> {
         slot: 0u32,
         default: ::core::option::Option::None,
     };
@@ -22554,10 +25466,17 @@ impl TestListOfAny {
 }
 impl<'p, T: _p::rpc::Table + 'p> test_list_of_any::Reader<'p, T> {
     #[inline]
-    pub fn cap_list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::AnyPtr>> {
+    pub fn cap_list(
+        &self,
+    ) -> _p::Accessor<
+        '_,
+        'p,
+        T,
+        _p::List<_p::Capability<::recapn_rpc::client::Client>>,
+    > {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<::recapn_rpc::client::Client>,
             > as _p::field::FieldType>::accessor(&self.0, &TestListOfAny::CAP_LIST)
         }
     }
@@ -22572,10 +25491,17 @@ impl<'p, T: _p::rpc::Table + 'p> test_list_of_any::Reader<'p, T> {
 }
 impl<'p, T: _p::rpc::Table + 'p> test_list_of_any::Builder<'p, T> {
     #[inline]
-    pub fn cap_list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::AnyPtr>> {
+    pub fn cap_list(
+        &mut self,
+    ) -> _p::AccessorMut<
+        '_,
+        'p,
+        T,
+        _p::List<_p::Capability<::recapn_rpc::client::Client>>,
+    > {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<::recapn_rpc::client::Client>,
             > as _p::field::FieldType>::accessor(&mut self.0, &TestListOfAny::CAP_LIST)
         }
     }
@@ -22588,10 +25514,16 @@ impl<'p, T: _p::rpc::Table + 'p> test_list_of_any::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_cap_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::AnyPtr>> {
+    pub fn into_cap_list(
+        self,
+    ) -> _p::AccessorOwned<
+        'p,
+        T,
+        _p::List<_p::Capability<::recapn_rpc::client::Client>>,
+    > {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<::recapn_rpc::client::Client>,
             > as _p::field::FieldType>::accessor(self.0, &TestListOfAny::CAP_LIST)
         }
     }
@@ -22612,6 +25544,13624 @@ pub mod test_list_of_any {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestListOfAny<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestListOfAny<::recapn::rpc::Pipeline<P>>;
+}
+#[derive(Clone, Debug)]
+pub struct TestInterface(::recapn_rpc::client::Client);
+impl TestInterface {
+    pub fn foo(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_interface::FooParams,
+        test_interface::FooResults,
+    > {
+        self.0.call(9865999890858873522u64, 0u16)
+    }
+    pub fn bar(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_interface::BarParams,
+        test_interface::BarResults,
+    > {
+        self.0.call(9865999890858873522u64, 1u16)
+    }
+    pub fn baz(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_interface::BazParams,
+        test_interface::BazResults,
+    > {
+        self.0.call(9865999890858873522u64, 2u16)
+    }
+}
+impl ::recapn::ty::Capability for TestInterface {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestInterfaceServer> ::recapn_rpc::server::FromServer<T> for TestInterface {
+    type Dispatcher = TestInterfaceDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestInterfaceDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestInterfaceServer {
+    fn foo(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_interface::FooParams,
+            test_interface::FooResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestInterface.foo' is not implemented for this type",
+                ),
+            )
+    }
+    fn bar(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_interface::BarParams,
+            test_interface::BarResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestInterface.bar' is not implemented for this type",
+                ),
+            )
+    }
+    fn baz(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_interface::BazParams,
+            test_interface::BazResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestInterface.baz' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestInterfaceDispatcher<T>(pub T);
+impl<T> TestInterfaceDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestInterface";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestInterfaceDispatcher<T>
+where
+    T: TestInterfaceServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (9865999890858873522u64, 0u16) => {
+                self.0.foo(request.into_call_context()).into()
+            }
+            (9865999890858873522u64, 1u16) => {
+                self.0.bar(request.into_call_context()).into()
+            }
+            (9865999890858873522u64, 2u16) => {
+                self.0.baz(request.into_call_context()).into()
+            }
+            (9865999890858873522u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_interface {
+    use super::{__file, __imports, _p};
+    pub use super::TestInterface as Client;
+    pub use super::TestInterfaceServer as Server;
+    pub use super::TestInterfaceDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct FooParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FooParams {
+        const ID: u64 = 13291509812746105745u64;
+    }
+    impl<T> _p::IntoFamily for FooParams<T> {
+        type Family = FooParams;
+    }
+    impl<T: _p::Capable> _p::Capable for FooParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FooParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FooParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FooParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for foo_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for foo_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FooParams {
+        type Reader<'a, T: _p::rpc::Table> = foo_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = foo_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FooParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FooParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = foo_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for foo_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FooParams {
+        const I: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+        const J: _p::Descriptor<bool> = _p::Descriptor::<bool> {
+            slot: 32u32,
+            default: false,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Reader<'p, T> {
+        #[inline]
+        pub fn i(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &FooParams::I) }
+        }
+        #[inline]
+        pub fn j(&self) -> _p::Accessor<'_, 'p, T, bool> {
+            unsafe { <bool as _p::field::FieldType>::accessor(&self.0, &FooParams::J) }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Builder<'p, T> {
+        #[inline]
+        pub fn i(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &FooParams::I)
+            }
+        }
+        #[inline]
+        pub fn j(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(&mut self.0, &FooParams::J)
+            }
+        }
+    }
+    pub mod foo_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FooParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct FooResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FooResults {
+        const ID: u64 = 12704596127248370596u64;
+    }
+    impl<T> _p::IntoFamily for FooResults<T> {
+        type Family = FooResults;
+    }
+    impl<T: _p::Capable> _p::Capable for FooResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FooResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FooResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for foo_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FooResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: foo_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for foo_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for foo_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: foo_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for foo_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for foo_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for foo_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FooResults {
+        type Reader<'a, T: _p::rpc::Table> = foo_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = foo_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FooResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FooResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = foo_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for foo_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FooResults {
+        const X: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_results::Reader<'p, T> {
+        #[inline]
+        pub fn x(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &FooResults::X)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_results::Builder<'p, T> {
+        #[inline]
+        pub fn x(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &FooResults::X)
+            }
+        }
+        #[inline]
+        pub fn into_x(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &FooResults::X)
+            }
+        }
+    }
+    pub mod foo_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FooResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FooResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FooResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct BarParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BarParams {
+        const ID: u64 = 15007270711913096552u64;
+    }
+    impl<T> _p::IntoFamily for BarParams<T> {
+        type Family = BarParams;
+    }
+    impl<T: _p::Capable> _p::Capable for BarParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BarParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BarParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for bar_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for bar_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BarParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<bar_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: bar_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for bar_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for bar_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for bar_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<bar_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: bar_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for bar_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for bar_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for bar_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BarParams {
+        type Reader<'a, T: _p::rpc::Table> = bar_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = bar_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BarParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BarParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = bar_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for bar_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BarParams {}
+    impl<'p, T: _p::rpc::Table + 'p> bar_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> bar_params::Builder<'p, T> {}
+    pub mod bar_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BarParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BarParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BarParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct BarResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BarResults {
+        const ID: u64 = 11236834972411614511u64;
+    }
+    impl<T> _p::IntoFamily for BarResults<T> {
+        type Family = BarResults;
+    }
+    impl<T: _p::Capable> _p::Capable for BarResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BarResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BarResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for bar_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for bar_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BarResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<bar_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: bar_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for bar_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for bar_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for bar_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<bar_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: bar_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for bar_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for bar_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for bar_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BarResults {
+        type Reader<'a, T: _p::rpc::Table> = bar_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = bar_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BarResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BarResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = bar_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for bar_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BarResults {}
+    impl<'p, T: _p::rpc::Table + 'p> bar_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> bar_results::Builder<'p, T> {}
+    pub mod bar_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BarResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BarResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BarResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct BazParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BazParams {
+        const ID: u64 = 15685064138702311356u64;
+    }
+    impl<T> _p::IntoFamily for BazParams<T> {
+        type Family = BazParams;
+    }
+    impl<T: _p::Capable> _p::Capable for BazParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BazParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BazParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for baz_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for baz_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BazParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<baz_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: baz_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for baz_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for baz_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for baz_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<baz_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: baz_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for baz_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for baz_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for baz_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BazParams {
+        type Reader<'a, T: _p::rpc::Table> = baz_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = baz_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BazParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BazParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = baz_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for baz_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BazParams {
+        const S: _p::Descriptor<_p::Struct<super::TestAllTypes>> = _p::Descriptor::<
+            _p::Struct<super::TestAllTypes>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> baz_params::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<super::TestAllTypes>> {
+            unsafe {
+                <_p::Struct<
+                    super::TestAllTypes,
+                > as _p::field::FieldType>::accessor(&self.0, &BazParams::S)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> baz_params::Builder<'p, T> {
+        #[inline]
+        pub fn s(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Struct<super::TestAllTypes>> {
+            unsafe {
+                <_p::Struct<
+                    super::TestAllTypes,
+                > as _p::field::FieldType>::accessor(&mut self.0, &BazParams::S)
+            }
+        }
+        #[inline]
+        pub fn into_s(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Struct<super::TestAllTypes>> {
+            unsafe {
+                <_p::Struct<
+                    super::TestAllTypes,
+                > as _p::field::FieldType>::accessor(self.0, &BazParams::S)
+            }
+        }
+    }
+    impl<P> baz_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn s(self) -> ::recapn::rpc::PipelineOf<super::TestAllTypes, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+    }
+    pub mod baz_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BazParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BazParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BazParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct BazResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BazResults {
+        const ID: u64 = 11212222885340338989u64;
+    }
+    impl<T> _p::IntoFamily for BazResults<T> {
+        type Family = BazResults;
+    }
+    impl<T: _p::Capable> _p::Capable for BazResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BazResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BazResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for baz_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for baz_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BazResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<baz_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: baz_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for baz_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for baz_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for baz_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<baz_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: baz_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for baz_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for baz_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for baz_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BazResults {
+        type Reader<'a, T: _p::rpc::Table> = baz_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = baz_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BazResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BazResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = baz_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for baz_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BazResults {}
+    impl<'p, T: _p::rpc::Table + 'p> baz_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> baz_results::Builder<'p, T> {}
+    pub mod baz_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BazResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BazResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BazResults<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestExtends(::recapn_rpc::client::Client);
+impl TestExtends {
+    pub fn qux(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_extends::QuxParams,
+        test_extends::QuxResults,
+    > {
+        self.0.call(16494920484927878984u64, 0u16)
+    }
+    pub fn corge(
+        &self,
+    ) -> ::recapn_rpc::client::Request<TestAllTypes, test_extends::CorgeResults> {
+        self.0.call(16494920484927878984u64, 1u16)
+    }
+    pub fn grault(
+        &self,
+    ) -> ::recapn_rpc::client::Request<test_extends::GraultParams, TestAllTypes> {
+        self.0.call(16494920484927878984u64, 2u16)
+    }
+}
+impl ::recapn::ty::Capability for TestExtends {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestExtendsServer> ::recapn_rpc::server::FromServer<T> for TestExtends {
+    type Dispatcher = TestExtendsDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestExtendsDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestExtendsServer {
+    fn qux(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_extends::QuxParams,
+            test_extends::QuxResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestExtends.qux' is not implemented for this type",
+                ),
+            )
+    }
+    fn corge(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<TestAllTypes, test_extends::CorgeResults>,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestExtends.corge' is not implemented for this type",
+                ),
+            )
+    }
+    fn grault(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<test_extends::GraultParams, TestAllTypes>,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestExtends.grault' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestExtendsDispatcher<T>(pub T);
+impl<T> TestExtendsDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestExtends";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestExtendsDispatcher<T>
+where
+    T: TestExtendsServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (16494920484927878984u64, 0u16) => {
+                self.0.qux(request.into_call_context()).into()
+            }
+            (16494920484927878984u64, 1u16) => {
+                self.0.corge(request.into_call_context()).into()
+            }
+            (16494920484927878984u64, 2u16) => {
+                self.0.grault(request.into_call_context()).into()
+            }
+            (16494920484927878984u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_extends {
+    use super::{__file, __imports, _p};
+    pub use super::TestExtends as Client;
+    pub use super::TestExtendsServer as Server;
+    pub use super::TestExtendsDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct QuxParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for QuxParams {
+        const ID: u64 = 9485913786011762455u64;
+    }
+    impl<T> _p::IntoFamily for QuxParams<T> {
+        type Family = QuxParams;
+    }
+    impl<T: _p::Capable> _p::Capable for QuxParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = QuxParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (QuxParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for qux_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for qux_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            QuxParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<qux_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: qux_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for qux_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for qux_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for qux_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<qux_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: qux_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for qux_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for qux_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for qux_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for QuxParams {
+        type Reader<'a, T: _p::rpc::Table> = qux_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = qux_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for QuxParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for QuxParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = qux_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for qux_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl QuxParams {}
+    impl<'p, T: _p::rpc::Table + 'p> qux_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> qux_params::Builder<'p, T> {}
+    pub mod qux_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::QuxParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::QuxParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::QuxParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct QuxResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for QuxResults {
+        const ID: u64 = 10253356159560274909u64;
+    }
+    impl<T> _p::IntoFamily for QuxResults<T> {
+        type Family = QuxResults;
+    }
+    impl<T: _p::Capable> _p::Capable for QuxResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = QuxResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (QuxResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for qux_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for qux_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            QuxResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<qux_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: qux_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for qux_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for qux_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for qux_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<qux_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: qux_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for qux_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for qux_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for qux_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for QuxResults {
+        type Reader<'a, T: _p::rpc::Table> = qux_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = qux_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for QuxResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for QuxResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = qux_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for qux_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl QuxResults {}
+    impl<'p, T: _p::rpc::Table + 'p> qux_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> qux_results::Builder<'p, T> {}
+    pub mod qux_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::QuxResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::QuxResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::QuxResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CorgeResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CorgeResults {
+        const ID: u64 = 12463277879220222681u64;
+    }
+    impl<T> _p::IntoFamily for CorgeResults<T> {
+        type Family = CorgeResults;
+    }
+    impl<T: _p::Capable> _p::Capable for CorgeResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CorgeResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CorgeResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for corge_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for corge_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CorgeResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<corge_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: corge_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for corge_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for corge_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for corge_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<corge_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: corge_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for corge_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for corge_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for corge_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CorgeResults {
+        type Reader<'a, T: _p::rpc::Table> = corge_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = corge_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CorgeResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CorgeResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = corge_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for corge_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CorgeResults {}
+    impl<'p, T: _p::rpc::Table + 'p> corge_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> corge_results::Builder<'p, T> {}
+    pub mod corge_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CorgeResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CorgeResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CorgeResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GraultParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GraultParams {
+        const ID: u64 = 17561844919342631670u64;
+    }
+    impl<T> _p::IntoFamily for GraultParams<T> {
+        type Family = GraultParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GraultParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GraultParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GraultParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for grault_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for grault_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GraultParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<grault_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: grault_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for grault_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for grault_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for grault_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<grault_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: grault_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for grault_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for grault_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for grault_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GraultParams {
+        type Reader<'a, T: _p::rpc::Table> = grault_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = grault_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GraultParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GraultParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = grault_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for grault_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GraultParams {}
+    impl<'p, T: _p::rpc::Table + 'p> grault_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> grault_params::Builder<'p, T> {}
+    pub mod grault_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GraultParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GraultParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GraultParams<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestExtends2(::recapn_rpc::client::Client);
+impl TestExtends2 {}
+impl ::recapn::ty::Capability for TestExtends2 {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestExtends2Server> ::recapn_rpc::server::FromServer<T> for TestExtends2 {
+    type Dispatcher = TestExtends2Dispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestExtends2Dispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestExtends2Server {}
+pub struct TestExtends2Dispatcher<T>(pub T);
+impl<T> TestExtends2Dispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestExtends2";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestExtends2Dispatcher<T>
+where
+    T: TestExtends2Server,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (11013518732491786115u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_extends2 {
+    use super::{__file, __imports, _p};
+    pub use super::TestExtends2 as Client;
+    pub use super::TestExtends2Server as Server;
+    pub use super::TestExtends2Dispatcher as Dispatcher;
+}
+#[derive(Clone, Debug)]
+pub struct TestPipeline(::recapn_rpc::client::Client);
+impl TestPipeline {
+    pub fn get_cap(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_pipeline::GetCapParams,
+        test_pipeline::GetCapResults,
+    > {
+        self.0.call(11935670180855499984u64, 0u16)
+    }
+    pub fn test_pointers(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_pipeline::TestPointersParams,
+        test_pipeline::TestPointersResults,
+    > {
+        self.0.call(11935670180855499984u64, 1u16)
+    }
+    pub fn get_any_cap(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_pipeline::GetAnyCapParams,
+        test_pipeline::GetAnyCapResults,
+    > {
+        self.0.call(11935670180855499984u64, 2u16)
+    }
+    pub fn get_cap_pipeline_only(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_pipeline::GetCapPipelineOnlyParams,
+        test_pipeline::GetCapPipelineOnlyResults,
+    > {
+        self.0.call(11935670180855499984u64, 3u16)
+    }
+}
+impl ::recapn::ty::Capability for TestPipeline {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestPipelineServer> ::recapn_rpc::server::FromServer<T> for TestPipeline {
+    type Dispatcher = TestPipelineDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestPipelineDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestPipelineServer {
+    fn get_cap(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_pipeline::GetCapParams,
+            test_pipeline::GetCapResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestPipeline.getCap' is not implemented for this type",
+                ),
+            )
+    }
+    fn test_pointers(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_pipeline::TestPointersParams,
+            test_pipeline::TestPointersResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestPipeline.testPointers' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_any_cap(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_pipeline::GetAnyCapParams,
+            test_pipeline::GetAnyCapResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestPipeline.getAnyCap' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_cap_pipeline_only(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_pipeline::GetCapPipelineOnlyParams,
+            test_pipeline::GetCapPipelineOnlyResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestPipeline.getCapPipelineOnly' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestPipelineDispatcher<T>(pub T);
+impl<T> TestPipelineDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestPipeline";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestPipelineDispatcher<T>
+where
+    T: TestPipelineServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (11935670180855499984u64, 0u16) => {
+                self.0.get_cap(request.into_call_context()).into()
+            }
+            (11935670180855499984u64, 1u16) => {
+                self.0.test_pointers(request.into_call_context()).into()
+            }
+            (11935670180855499984u64, 2u16) => {
+                self.0.get_any_cap(request.into_call_context()).into()
+            }
+            (11935670180855499984u64, 3u16) => {
+                self.0.get_cap_pipeline_only(request.into_call_context()).into()
+            }
+            (11935670180855499984u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_pipeline {
+    use super::{__file, __imports, _p};
+    pub use super::TestPipeline as Client;
+    pub use super::TestPipelineServer as Server;
+    pub use super::TestPipelineDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct Box<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Box {
+        const ID: u64 = 12732413170934490801u64;
+    }
+    impl<T> _p::IntoFamily for Box<T> {
+        type Family = Box;
+    }
+    impl<T: _p::Capable> _p::Capable for Box<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = Box<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (Box(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for r#box::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for r#box::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            Box(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<r#box::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: r#box::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for r#box::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for r#box::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for r#box::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<r#box::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: r#box::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for r#box::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for r#box::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for r#box::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for Box {
+        type Reader<'a, T: _p::rpc::Table> = r#box::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = r#box::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for Box {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for Box {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = r#box::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for r#box::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl Box {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> r#box::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &Box::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> r#box::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &Box::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &Box::CAP)
+            }
+        }
+    }
+    impl<P> r#box::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod r#box {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::Box<_p::StructReader<'a, T>>;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::Box<_p::StructBuilder<'a, T>>;
+        pub type Pipeline<P> = super::Box<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct AnyBox<T = _p::Family>(T);
+    impl _p::ty::SchemaType for AnyBox {
+        const ID: u64 = 10683291868624358091u64;
+    }
+    impl<T> _p::IntoFamily for AnyBox<T> {
+        type Family = AnyBox;
+    }
+    impl<T: _p::Capable> _p::Capable for AnyBox<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = AnyBox<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (AnyBox(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for any_box::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for any_box::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            AnyBox(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<any_box::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: any_box::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for any_box::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for any_box::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for any_box::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<any_box::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: any_box::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for any_box::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for any_box::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for any_box::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for AnyBox {
+        type Reader<'a, T: _p::rpc::Table> = any_box::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = any_box::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for AnyBox {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for AnyBox {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = any_box::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for any_box::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl AnyBox {
+        const CAP: _p::Descriptor<_p::Capability<::recapn_rpc::client::Client>> = _p::Descriptor::<
+            _p::Capability<::recapn_rpc::client::Client>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> any_box::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(&self.0, &AnyBox::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> any_box::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(&mut self.0, &AnyBox::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(self.0, &AnyBox::CAP)
+            }
+        }
+    }
+    impl<P> any_box::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> ::recapn_rpc::client::Client {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod any_box {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::AnyBox<_p::StructReader<'a, T>>;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::AnyBox<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::AnyBox<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetCapParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCapParams {
+        const ID: u64 = 14405008945353945140u64;
+    }
+    impl<T> _p::IntoFamily for GetCapParams<T> {
+        type Family = GetCapParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCapParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCapParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCapParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_cap_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_cap_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCapParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_cap_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_cap_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for get_cap_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_cap_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_cap_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_cap_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_cap_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_cap_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCapParams {
+        type Reader<'a, T: _p::rpc::Table> = get_cap_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_cap_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCapParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCapParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_cap_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_cap_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCapParams {
+        const N: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+        const IN_CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_params::Reader<'p, T> {
+        #[inline]
+        pub fn n(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &GetCapParams::N) }
+        }
+        #[inline]
+        pub fn in_cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &GetCapParams::IN_CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_params::Builder<'p, T> {
+        #[inline]
+        pub fn n(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &GetCapParams::N)
+            }
+        }
+        #[inline]
+        pub fn in_cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &GetCapParams::IN_CAP)
+            }
+        }
+        #[inline]
+        pub fn into_in_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &GetCapParams::IN_CAP)
+            }
+        }
+    }
+    impl<P> get_cap_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn in_cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod get_cap_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCapParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCapParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCapParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetCapResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCapResults {
+        const ID: u64 = 12845438895455899615u64;
+    }
+    impl<T> _p::IntoFamily for GetCapResults<T> {
+        type Family = GetCapResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCapResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCapResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCapResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_cap_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_cap_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCapResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_cap_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_cap_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for get_cap_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_cap_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_cap_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_cap_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_cap_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_cap_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCapResults {
+        type Reader<'a, T: _p::rpc::Table> = get_cap_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_cap_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCapResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCapResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_cap_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_cap_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCapResults {
+        const S: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const OUT_BOX: _p::Descriptor<_p::Struct<Box>> = _p::Descriptor::<
+            _p::Struct<Box>,
+        > {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_results::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &GetCapResults::S)
+            }
+        }
+        #[inline]
+        pub fn out_box(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(&self.0, &GetCapResults::OUT_BOX)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_results::Builder<'p, T> {
+        #[inline]
+        pub fn s(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCapResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn out_box(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCapResults::OUT_BOX,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_s(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &GetCapResults::S)
+            }
+        }
+        #[inline]
+        pub fn into_out_box(self) -> _p::AccessorOwned<'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(self.0, &GetCapResults::OUT_BOX)
+            }
+        }
+    }
+    impl<P> get_cap_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn out_box(self) -> ::recapn::rpc::PipelineOf<Box, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
+    pub mod get_cap_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCapResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCapResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCapResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct TestPointersParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for TestPointersParams {
+        const ID: u64 = 11962948622648574367u64;
+    }
+    impl<T> _p::IntoFamily for TestPointersParams<T> {
+        type Family = TestPointersParams;
+    }
+    impl<T: _p::Capable> _p::Capable for TestPointersParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = TestPointersParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (TestPointersParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for test_pointers_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for test_pointers_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            TestPointersParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<test_pointers_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: test_pointers_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for test_pointers_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for test_pointers_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for test_pointers_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<test_pointers_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: test_pointers_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for test_pointers_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for test_pointers_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for test_pointers_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for TestPointersParams {
+        type Reader<'a, T: _p::rpc::Table> = test_pointers_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = test_pointers_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for TestPointersParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 3u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for TestPointersParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = test_pointers_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for test_pointers_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl TestPointersParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const OBJ: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+        const LIST: _p::Descriptor<_p::List<_p::Capability<super::TestInterface>>> = _p::Descriptor::<
+            _p::List<_p::Capability<super::TestInterface>>,
+        > {
+            slot: 2u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> test_pointers_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &TestPointersParams::CAP)
+            }
+        }
+        #[inline]
+        pub fn obj(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &TestPointersParams::OBJ,
+                )
+            }
+        }
+        #[inline]
+        pub fn list(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Capability<super::TestInterface>>> {
+            unsafe {
+                <_p::List<
+                    _p::Capability<super::TestInterface>,
+                > as _p::field::FieldType>::accessor(&self.0, &TestPointersParams::LIST)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> test_pointers_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &TestPointersParams::CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn obj(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &TestPointersParams::OBJ,
+                )
+            }
+        }
+        #[inline]
+        pub fn list(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Capability<super::TestInterface>>> {
+            unsafe {
+                <_p::List<
+                    _p::Capability<super::TestInterface>,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &TestPointersParams::LIST,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &TestPointersParams::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_obj(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    self.0,
+                    &TestPointersParams::OBJ,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_list(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::List<_p::Capability<super::TestInterface>>> {
+            unsafe {
+                <_p::List<
+                    _p::Capability<super::TestInterface>,
+                > as _p::field::FieldType>::accessor(self.0, &TestPointersParams::LIST)
+            }
+        }
+    }
+    impl<P> test_pointers_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+        pub fn obj(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
+    pub mod test_pointers_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::TestPointersParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::TestPointersParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::TestPointersParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct TestPointersResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for TestPointersResults {
+        const ID: u64 = 10293632761614856406u64;
+    }
+    impl<T> _p::IntoFamily for TestPointersResults<T> {
+        type Family = TestPointersResults;
+    }
+    impl<T: _p::Capable> _p::Capable for TestPointersResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = TestPointersResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (TestPointersResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for test_pointers_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for test_pointers_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            TestPointersResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<test_pointers_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: test_pointers_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for test_pointers_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for test_pointers_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for test_pointers_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<test_pointers_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: test_pointers_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for test_pointers_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for test_pointers_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for test_pointers_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for TestPointersResults {
+        type Reader<'a, T: _p::rpc::Table> = test_pointers_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = test_pointers_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for TestPointersResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for TestPointersResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = test_pointers_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for test_pointers_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl TestPointersResults {}
+    impl<'p, T: _p::rpc::Table + 'p> test_pointers_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> test_pointers_results::Builder<'p, T> {}
+    pub mod test_pointers_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::TestPointersResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::TestPointersResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::TestPointersResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetAnyCapParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetAnyCapParams {
+        const ID: u64 = 17934296148215414094u64;
+    }
+    impl<T> _p::IntoFamily for GetAnyCapParams<T> {
+        type Family = GetAnyCapParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetAnyCapParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetAnyCapParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetAnyCapParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_any_cap_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_any_cap_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetAnyCapParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_any_cap_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_any_cap_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_any_cap_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_any_cap_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_any_cap_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_any_cap_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_any_cap_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_any_cap_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_any_cap_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_any_cap_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetAnyCapParams {
+        type Reader<'a, T: _p::rpc::Table> = get_any_cap_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_any_cap_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetAnyCapParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetAnyCapParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_any_cap_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_any_cap_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetAnyCapParams {
+        const N: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+        const IN_CAP: _p::Descriptor<_p::Capability<::recapn_rpc::client::Client>> = _p::Descriptor::<
+            _p::Capability<::recapn_rpc::client::Client>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_any_cap_params::Reader<'p, T> {
+        #[inline]
+        pub fn n(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&self.0, &GetAnyCapParams::N)
+            }
+        }
+        #[inline]
+        pub fn in_cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(&self.0, &GetAnyCapParams::IN_CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_any_cap_params::Builder<'p, T> {
+        #[inline]
+        pub fn n(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &GetAnyCapParams::N)
+            }
+        }
+        #[inline]
+        pub fn in_cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetAnyCapParams::IN_CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_in_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<::recapn_rpc::client::Client>> {
+            unsafe {
+                <_p::Capability<
+                    ::recapn_rpc::client::Client,
+                > as _p::field::FieldType>::accessor(self.0, &GetAnyCapParams::IN_CAP)
+            }
+        }
+    }
+    impl<P> get_any_cap_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn in_cap(self) -> ::recapn_rpc::client::Client {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod get_any_cap_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetAnyCapParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetAnyCapParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetAnyCapParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetAnyCapResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetAnyCapResults {
+        const ID: u64 = 13782339536319606649u64;
+    }
+    impl<T> _p::IntoFamily for GetAnyCapResults<T> {
+        type Family = GetAnyCapResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetAnyCapResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetAnyCapResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetAnyCapResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_any_cap_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_any_cap_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetAnyCapResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_any_cap_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_any_cap_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_any_cap_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_any_cap_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_any_cap_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_any_cap_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_any_cap_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_any_cap_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_any_cap_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_any_cap_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetAnyCapResults {
+        type Reader<'a, T: _p::rpc::Table> = get_any_cap_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_any_cap_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetAnyCapResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetAnyCapResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_any_cap_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_any_cap_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetAnyCapResults {
+        const S: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const OUT_BOX: _p::Descriptor<_p::Struct<AnyBox>> = _p::Descriptor::<
+            _p::Struct<AnyBox>,
+        > {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_any_cap_results::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetAnyCapResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn out_box(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<AnyBox>> {
+            unsafe {
+                <_p::Struct<
+                    AnyBox,
+                > as _p::field::FieldType>::accessor(&self.0, &GetAnyCapResults::OUT_BOX)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_any_cap_results::Builder<'p, T> {
+        #[inline]
+        pub fn s(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetAnyCapResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn out_box(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<AnyBox>> {
+            unsafe {
+                <_p::Struct<
+                    AnyBox,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetAnyCapResults::OUT_BOX,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_s(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &GetAnyCapResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_out_box(self) -> _p::AccessorOwned<'p, T, _p::Struct<AnyBox>> {
+            unsafe {
+                <_p::Struct<
+                    AnyBox,
+                > as _p::field::FieldType>::accessor(self.0, &GetAnyCapResults::OUT_BOX)
+            }
+        }
+    }
+    impl<P> get_any_cap_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn out_box(self) -> ::recapn::rpc::PipelineOf<AnyBox, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+            )
+        }
+    }
+    pub mod get_any_cap_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetAnyCapResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetAnyCapResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetAnyCapResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetCapPipelineOnlyParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCapPipelineOnlyParams {
+        const ID: u64 = 10145795735422172806u64;
+    }
+    impl<T> _p::IntoFamily for GetCapPipelineOnlyParams<T> {
+        type Family = GetCapPipelineOnlyParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCapPipelineOnlyParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCapPipelineOnlyParams<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCapPipelineOnlyParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_cap_pipeline_only_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_cap_pipeline_only_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCapPipelineOnlyParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_cap_pipeline_only_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_pipeline_only_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_cap_pipeline_only_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_cap_pipeline_only_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_cap_pipeline_only_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_cap_pipeline_only_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_pipeline_only_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_cap_pipeline_only_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_cap_pipeline_only_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_cap_pipeline_only_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCapPipelineOnlyParams {
+        type Reader<'a, T: _p::rpc::Table> = get_cap_pipeline_only_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_cap_pipeline_only_params::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for GetCapPipelineOnlyParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCapPipelineOnlyParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_cap_pipeline_only_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_cap_pipeline_only_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCapPipelineOnlyParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_pipeline_only_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_pipeline_only_params::Builder<'p, T> {}
+    pub mod get_cap_pipeline_only_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCapPipelineOnlyParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCapPipelineOnlyParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCapPipelineOnlyParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct GetCapPipelineOnlyResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCapPipelineOnlyResults {
+        const ID: u64 = 17443820342583637707u64;
+    }
+    impl<T> _p::IntoFamily for GetCapPipelineOnlyResults<T> {
+        type Family = GetCapPipelineOnlyResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCapPipelineOnlyResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCapPipelineOnlyResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCapPipelineOnlyResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_cap_pipeline_only_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_cap_pipeline_only_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCapPipelineOnlyResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_cap_pipeline_only_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_pipeline_only_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_cap_pipeline_only_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_cap_pipeline_only_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_cap_pipeline_only_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_cap_pipeline_only_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_cap_pipeline_only_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_cap_pipeline_only_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_cap_pipeline_only_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_cap_pipeline_only_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCapPipelineOnlyResults {
+        type Reader<'a, T: _p::rpc::Table> = get_cap_pipeline_only_results::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = get_cap_pipeline_only_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for GetCapPipelineOnlyResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCapPipelineOnlyResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_cap_pipeline_only_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_cap_pipeline_only_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCapPipelineOnlyResults {
+        const OUT_BOX: _p::Descriptor<_p::Struct<Box>> = _p::Descriptor::<
+            _p::Struct<Box>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_pipeline_only_results::Reader<'p, T> {
+        #[inline]
+        pub fn out_box(&self) -> _p::Accessor<'_, 'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetCapPipelineOnlyResults::OUT_BOX,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_cap_pipeline_only_results::Builder<'p, T> {
+        #[inline]
+        pub fn out_box(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCapPipelineOnlyResults::OUT_BOX,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_out_box(self) -> _p::AccessorOwned<'p, T, _p::Struct<Box>> {
+            unsafe {
+                <_p::Struct<
+                    Box,
+                > as _p::field::FieldType>::accessor(
+                    self.0,
+                    &GetCapPipelineOnlyResults::OUT_BOX,
+                )
+            }
+        }
+    }
+    impl<P> get_cap_pipeline_only_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn out_box(self) -> ::recapn::rpc::PipelineOf<Box, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+    }
+    pub mod get_cap_pipeline_only_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCapPipelineOnlyResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCapPipelineOnlyResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCapPipelineOnlyResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestCallOrder(::recapn_rpc::client::Client);
+impl TestCallOrder {
+    pub fn get_call_sequence(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_call_order::GetCallSequenceParams,
+        test_call_order::GetCallSequenceResults,
+    > {
+        self.0.call(11594359141811814481u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestCallOrder {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestCallOrderServer> ::recapn_rpc::server::FromServer<T> for TestCallOrder {
+    type Dispatcher = TestCallOrderDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestCallOrderDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestCallOrderServer {
+    fn get_call_sequence(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_call_order::GetCallSequenceParams,
+            test_call_order::GetCallSequenceResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestCallOrder.getCallSequence' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestCallOrderDispatcher<T>(pub T);
+impl<T> TestCallOrderDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestCallOrder";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestCallOrderDispatcher<T>
+where
+    T: TestCallOrderServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (11594359141811814481u64, 0u16) => {
+                self.0.get_call_sequence(request.into_call_context()).into()
+            }
+            (11594359141811814481u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_call_order {
+    use super::{__file, __imports, _p};
+    pub use super::TestCallOrder as Client;
+    pub use super::TestCallOrderServer as Server;
+    pub use super::TestCallOrderDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct GetCallSequenceParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCallSequenceParams {
+        const ID: u64 = 10312835045008307420u64;
+    }
+    impl<T> _p::IntoFamily for GetCallSequenceParams<T> {
+        type Family = GetCallSequenceParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCallSequenceParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCallSequenceParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCallSequenceParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_call_sequence_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_call_sequence_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCallSequenceParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_call_sequence_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_call_sequence_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_call_sequence_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_call_sequence_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_call_sequence_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_call_sequence_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_call_sequence_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_call_sequence_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_call_sequence_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_call_sequence_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCallSequenceParams {
+        type Reader<'a, T: _p::rpc::Table> = get_call_sequence_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_call_sequence_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCallSequenceParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCallSequenceParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_call_sequence_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_call_sequence_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCallSequenceParams {
+        const EXPECTED: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_call_sequence_params::Reader<'p, T> {
+        #[inline]
+        pub fn expected(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetCallSequenceParams::EXPECTED,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_call_sequence_params::Builder<'p, T> {
+        #[inline]
+        pub fn expected(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCallSequenceParams::EXPECTED,
+                )
+            }
+        }
+    }
+    pub mod get_call_sequence_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCallSequenceParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCallSequenceParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCallSequenceParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetCallSequenceResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCallSequenceResults {
+        const ID: u64 = 16058629828715276983u64;
+    }
+    impl<T> _p::IntoFamily for GetCallSequenceResults<T> {
+        type Family = GetCallSequenceResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCallSequenceResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCallSequenceResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCallSequenceResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_call_sequence_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_call_sequence_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCallSequenceResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_call_sequence_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_call_sequence_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_call_sequence_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_call_sequence_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_call_sequence_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_call_sequence_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_call_sequence_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_call_sequence_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_call_sequence_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_call_sequence_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCallSequenceResults {
+        type Reader<'a, T: _p::rpc::Table> = get_call_sequence_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_call_sequence_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCallSequenceResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCallSequenceResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_call_sequence_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_call_sequence_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCallSequenceResults {
+        const N: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_call_sequence_results::Reader<'p, T> {
+        #[inline]
+        pub fn n(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetCallSequenceResults::N,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_call_sequence_results::Builder<'p, T> {
+        #[inline]
+        pub fn n(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCallSequenceResults::N,
+                )
+            }
+        }
+    }
+    pub mod get_call_sequence_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCallSequenceResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCallSequenceResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCallSequenceResults<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestTailCallee(::recapn_rpc::client::Client);
+impl TestTailCallee {
+    pub fn foo(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_tail_callee::FooParams,
+        test_tail_callee::TailResult,
+    > {
+        self.0.call(15985132292242203195u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestTailCallee {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestTailCalleeServer> ::recapn_rpc::server::FromServer<T> for TestTailCallee {
+    type Dispatcher = TestTailCalleeDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestTailCalleeDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestTailCalleeServer {
+    fn foo(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_tail_callee::FooParams,
+            test_tail_callee::TailResult,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestTailCallee.foo' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestTailCalleeDispatcher<T>(pub T);
+impl<T> TestTailCalleeDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestTailCallee";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestTailCalleeDispatcher<T>
+where
+    T: TestTailCalleeServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (15985132292242203195u64, 0u16) => {
+                self.0.foo(request.into_call_context()).into()
+            }
+            (15985132292242203195u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_tail_callee {
+    use super::{__file, __imports, _p};
+    pub use super::TestTailCallee as Client;
+    pub use super::TestTailCalleeServer as Server;
+    pub use super::TestTailCalleeDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct TailResult<T = _p::Family>(T);
+    impl _p::ty::SchemaType for TailResult {
+        const ID: u64 = 12244493928653733145u64;
+    }
+    impl<T> _p::IntoFamily for TailResult<T> {
+        type Family = TailResult;
+    }
+    impl<T: _p::Capable> _p::Capable for TailResult<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = TailResult<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (TailResult(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for tail_result::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for tail_result::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            TailResult(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<tail_result::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: tail_result::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for tail_result::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for tail_result::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for tail_result::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<tail_result::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: tail_result::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for tail_result::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for tail_result::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for tail_result::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for TailResult {
+        type Reader<'a, T: _p::rpc::Table> = tail_result::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = tail_result::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for TailResult {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for TailResult {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = tail_result::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for tail_result::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl TailResult {
+        const I: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+        const T: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const C: _p::Descriptor<_p::Capability<super::TestCallOrder>> = _p::Descriptor::<
+            _p::Capability<super::TestCallOrder>,
+        > {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> tail_result::Reader<'p, T> {
+        #[inline]
+        pub fn i(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe { <u32 as _p::field::FieldType>::accessor(&self.0, &TailResult::I) }
+        }
+        #[inline]
+        pub fn t(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &TailResult::T)
+            }
+        }
+        #[inline]
+        pub fn c(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&self.0, &TailResult::C)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> tail_result::Builder<'p, T> {
+        #[inline]
+        pub fn i(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &TailResult::I)
+            }
+        }
+        #[inline]
+        pub fn t(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &TailResult::T)
+            }
+        }
+        #[inline]
+        pub fn c(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&mut self.0, &TailResult::C)
+            }
+        }
+        #[inline]
+        pub fn into_t(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &TailResult::T)
+            }
+        }
+        #[inline]
+        pub fn into_c(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(self.0, &TailResult::C)
+            }
+        }
+    }
+    impl<P> tail_result::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn c(self) -> super::TestCallOrder {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod tail_result {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::TailResult<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::TailResult<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::TailResult<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct FooParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FooParams {
+        const ID: u64 = 14258941516656494935u64;
+    }
+    impl<T> _p::IntoFamily for FooParams<T> {
+        type Family = FooParams;
+    }
+    impl<T: _p::Capable> _p::Capable for FooParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FooParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FooParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FooParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for foo_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for foo_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FooParams {
+        type Reader<'a, T: _p::rpc::Table> = foo_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = foo_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FooParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FooParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = foo_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for foo_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FooParams {
+        const I: _p::Descriptor<i32> = _p::Descriptor::<i32> {
+            slot: 0u32,
+            default: 0i32,
+        };
+        const T: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Reader<'p, T> {
+        #[inline]
+        pub fn i(&self) -> _p::Accessor<'_, 'p, T, i32> {
+            unsafe { <i32 as _p::field::FieldType>::accessor(&self.0, &FooParams::I) }
+        }
+        #[inline]
+        pub fn t(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &FooParams::T)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Builder<'p, T> {
+        #[inline]
+        pub fn i(&mut self) -> _p::AccessorMut<'_, 'p, T, i32> {
+            unsafe {
+                <i32 as _p::field::FieldType>::accessor(&mut self.0, &FooParams::I)
+            }
+        }
+        #[inline]
+        pub fn t(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &FooParams::T)
+            }
+        }
+        #[inline]
+        pub fn into_t(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &FooParams::T)
+            }
+        }
+    }
+    pub mod foo_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FooParams<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestTailCaller(::recapn_rpc::client::Client);
+impl TestTailCaller {
+    pub fn foo(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_tail_caller::FooParams,
+        test_tail_callee::TailResult,
+    > {
+        self.0.call(9731139705278181429u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestTailCaller {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestTailCallerServer> ::recapn_rpc::server::FromServer<T> for TestTailCaller {
+    type Dispatcher = TestTailCallerDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestTailCallerDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestTailCallerServer {
+    fn foo(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_tail_caller::FooParams,
+            test_tail_callee::TailResult,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestTailCaller.foo' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestTailCallerDispatcher<T>(pub T);
+impl<T> TestTailCallerDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestTailCaller";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestTailCallerDispatcher<T>
+where
+    T: TestTailCallerServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (9731139705278181429u64, 0u16) => {
+                self.0.foo(request.into_call_context()).into()
+            }
+            (9731139705278181429u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_tail_caller {
+    use super::{__file, __imports, _p};
+    pub use super::TestTailCaller as Client;
+    pub use super::TestTailCallerServer as Server;
+    pub use super::TestTailCallerDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct FooParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FooParams {
+        const ID: u64 = 12716520019104402117u64;
+    }
+    impl<T> _p::IntoFamily for FooParams<T> {
+        type Family = FooParams;
+    }
+    impl<T: _p::Capable> _p::Capable for FooParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FooParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FooParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FooParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for foo_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for foo_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for foo_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<foo_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: foo_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for foo_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FooParams {
+        type Reader<'a, T: _p::rpc::Table> = foo_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = foo_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FooParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FooParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = foo_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for foo_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FooParams {
+        const I: _p::Descriptor<i32> = _p::Descriptor::<i32> {
+            slot: 0u32,
+            default: 0i32,
+        };
+        const CALLEE: _p::Descriptor<_p::Capability<super::TestTailCallee>> = _p::Descriptor::<
+            _p::Capability<super::TestTailCallee>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Reader<'p, T> {
+        #[inline]
+        pub fn i(&self) -> _p::Accessor<'_, 'p, T, i32> {
+            unsafe { <i32 as _p::field::FieldType>::accessor(&self.0, &FooParams::I) }
+        }
+        #[inline]
+        pub fn callee(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestTailCallee>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestTailCallee,
+                > as _p::field::FieldType>::accessor(&self.0, &FooParams::CALLEE)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> foo_params::Builder<'p, T> {
+        #[inline]
+        pub fn i(&mut self) -> _p::AccessorMut<'_, 'p, T, i32> {
+            unsafe {
+                <i32 as _p::field::FieldType>::accessor(&mut self.0, &FooParams::I)
+            }
+        }
+        #[inline]
+        pub fn callee(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestTailCallee>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestTailCallee,
+                > as _p::field::FieldType>::accessor(&mut self.0, &FooParams::CALLEE)
+            }
+        }
+        #[inline]
+        pub fn into_callee(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestTailCallee>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestTailCallee,
+                > as _p::field::FieldType>::accessor(self.0, &FooParams::CALLEE)
+            }
+        }
+    }
+    impl<P> foo_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn callee(self) -> super::TestTailCallee {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod foo_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FooParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FooParams<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestStreaming(::recapn_rpc::client::Client);
+impl TestStreaming {
+    pub fn do_stream_i(
+        &self,
+    ) -> ::recapn_rpc::client::StreamingRequest<test_streaming::DoStreamIParams> {
+        self.0.streaming_call(15696256203392019902u64, 0u16)
+    }
+    pub fn do_stream_j(
+        &self,
+    ) -> ::recapn_rpc::client::StreamingRequest<test_streaming::DoStreamJParams> {
+        self.0.streaming_call(15696256203392019902u64, 1u16)
+    }
+    pub fn finish_stream(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_streaming::FinishStreamParams,
+        test_streaming::FinishStreamResults,
+    > {
+        self.0.call(15696256203392019902u64, 2u16)
+    }
+}
+impl ::recapn::ty::Capability for TestStreaming {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestStreamingServer> ::recapn_rpc::server::FromServer<T> for TestStreaming {
+    type Dispatcher = TestStreamingDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestStreamingDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestStreamingServer {
+    fn do_stream_i(
+        &mut self,
+        ctx: ::recapn_rpc::server::StreamContext<test_streaming::DoStreamIParams>,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestStreaming.doStreamI' is not implemented for this type",
+                ),
+            )
+    }
+    fn do_stream_j(
+        &mut self,
+        ctx: ::recapn_rpc::server::StreamContext<test_streaming::DoStreamJParams>,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestStreaming.doStreamJ' is not implemented for this type",
+                ),
+            )
+    }
+    fn finish_stream(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_streaming::FinishStreamParams,
+            test_streaming::FinishStreamResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestStreaming.finishStream' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestStreamingDispatcher<T>(pub T);
+impl<T> TestStreamingDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestStreaming";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestStreamingDispatcher<T>
+where
+    T: TestStreamingServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (15696256203392019902u64, 0u16) => {
+                self.0.do_stream_i(request.into_stream_context()).into()
+            }
+            (15696256203392019902u64, 1u16) => {
+                self.0.do_stream_j(request.into_stream_context()).into()
+            }
+            (15696256203392019902u64, 2u16) => {
+                self.0.finish_stream(request.into_call_context()).into()
+            }
+            (15696256203392019902u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_streaming {
+    use super::{__file, __imports, _p};
+    pub use super::TestStreaming as Client;
+    pub use super::TestStreamingServer as Server;
+    pub use super::TestStreamingDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct DoStreamIParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for DoStreamIParams {
+        const ID: u64 = 11911322145005248048u64;
+    }
+    impl<T> _p::IntoFamily for DoStreamIParams<T> {
+        type Family = DoStreamIParams;
+    }
+    impl<T: _p::Capable> _p::Capable for DoStreamIParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = DoStreamIParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (DoStreamIParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for do_stream_i_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for do_stream_i_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            DoStreamIParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<do_stream_i_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: do_stream_i_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for do_stream_i_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for do_stream_i_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for do_stream_i_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<do_stream_i_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: do_stream_i_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for do_stream_i_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for do_stream_i_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for do_stream_i_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for DoStreamIParams {
+        type Reader<'a, T: _p::rpc::Table> = do_stream_i_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = do_stream_i_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for DoStreamIParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for DoStreamIParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = do_stream_i_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for do_stream_i_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl DoStreamIParams {
+        const I: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> do_stream_i_params::Reader<'p, T> {
+        #[inline]
+        pub fn i(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&self.0, &DoStreamIParams::I)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> do_stream_i_params::Builder<'p, T> {
+        #[inline]
+        pub fn i(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &DoStreamIParams::I)
+            }
+        }
+    }
+    pub mod do_stream_i_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::DoStreamIParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::DoStreamIParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::DoStreamIParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct DoStreamJParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for DoStreamJParams {
+        const ID: u64 = 15675747840007536927u64;
+    }
+    impl<T> _p::IntoFamily for DoStreamJParams<T> {
+        type Family = DoStreamJParams;
+    }
+    impl<T: _p::Capable> _p::Capable for DoStreamJParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = DoStreamJParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (DoStreamJParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for do_stream_j_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for do_stream_j_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            DoStreamJParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<do_stream_j_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: do_stream_j_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for do_stream_j_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for do_stream_j_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for do_stream_j_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<do_stream_j_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: do_stream_j_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for do_stream_j_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for do_stream_j_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for do_stream_j_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for DoStreamJParams {
+        type Reader<'a, T: _p::rpc::Table> = do_stream_j_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = do_stream_j_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for DoStreamJParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for DoStreamJParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = do_stream_j_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for do_stream_j_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl DoStreamJParams {
+        const J: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> do_stream_j_params::Reader<'p, T> {
+        #[inline]
+        pub fn j(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&self.0, &DoStreamJParams::J)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> do_stream_j_params::Builder<'p, T> {
+        #[inline]
+        pub fn j(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(&mut self.0, &DoStreamJParams::J)
+            }
+        }
+    }
+    pub mod do_stream_j_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::DoStreamJParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::DoStreamJParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::DoStreamJParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct FinishStreamParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FinishStreamParams {
+        const ID: u64 = 17131374040049671396u64;
+    }
+    impl<T> _p::IntoFamily for FinishStreamParams<T> {
+        type Family = FinishStreamParams;
+    }
+    impl<T: _p::Capable> _p::Capable for FinishStreamParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FinishStreamParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FinishStreamParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for finish_stream_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for finish_stream_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FinishStreamParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<finish_stream_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: finish_stream_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for finish_stream_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for finish_stream_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for finish_stream_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<finish_stream_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: finish_stream_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for finish_stream_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for finish_stream_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for finish_stream_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FinishStreamParams {
+        type Reader<'a, T: _p::rpc::Table> = finish_stream_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = finish_stream_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FinishStreamParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FinishStreamParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = finish_stream_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for finish_stream_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FinishStreamParams {}
+    impl<'p, T: _p::rpc::Table + 'p> finish_stream_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> finish_stream_params::Builder<'p, T> {}
+    pub mod finish_stream_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FinishStreamParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FinishStreamParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FinishStreamParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct FinishStreamResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for FinishStreamResults {
+        const ID: u64 = 9341970100845441156u64;
+    }
+    impl<T> _p::IntoFamily for FinishStreamResults<T> {
+        type Family = FinishStreamResults;
+    }
+    impl<T: _p::Capable> _p::Capable for FinishStreamResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = FinishStreamResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (FinishStreamResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for finish_stream_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for finish_stream_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            FinishStreamResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<finish_stream_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: finish_stream_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for finish_stream_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for finish_stream_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for finish_stream_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<finish_stream_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: finish_stream_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for finish_stream_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for finish_stream_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for finish_stream_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for FinishStreamResults {
+        type Reader<'a, T: _p::rpc::Table> = finish_stream_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = finish_stream_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for FinishStreamResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for FinishStreamResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = finish_stream_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for finish_stream_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl FinishStreamResults {
+        const TOTAL_I: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 0u32,
+        };
+        const TOTAL_J: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 1u32,
+            default: 0u32,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> finish_stream_results::Reader<'p, T> {
+        #[inline]
+        pub fn total_i(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &FinishStreamResults::TOTAL_I,
+                )
+            }
+        }
+        #[inline]
+        pub fn total_j(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &FinishStreamResults::TOTAL_J,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> finish_stream_results::Builder<'p, T> {
+        #[inline]
+        pub fn total_i(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &FinishStreamResults::TOTAL_I,
+                )
+            }
+        }
+        #[inline]
+        pub fn total_j(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &FinishStreamResults::TOTAL_J,
+                )
+            }
+        }
+    }
+    pub mod finish_stream_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::FinishStreamResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::FinishStreamResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::FinishStreamResults<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestHandle(::recapn_rpc::client::Client);
+impl TestHandle {}
+impl ::recapn::ty::Capability for TestHandle {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestHandleServer> ::recapn_rpc::server::FromServer<T> for TestHandle {
+    type Dispatcher = TestHandleDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestHandleDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestHandleServer {}
+pub struct TestHandleDispatcher<T>(pub T);
+impl<T> TestHandleDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestHandle";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestHandleDispatcher<T>
+where
+    T: TestHandleServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (11785461720995412501u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_handle {
+    use super::{__file, __imports, _p};
+    pub use super::TestHandle as Client;
+    pub use super::TestHandleServer as Server;
+    pub use super::TestHandleDispatcher as Dispatcher;
+}
+#[derive(Clone, Debug)]
+pub struct TestMoreStuff(::recapn_rpc::client::Client);
+impl TestMoreStuff {
+    pub fn call_foo(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::CallFooParams,
+        test_more_stuff::CallFooResults,
+    > {
+        self.0.call(15980754968839795663u64, 0u16)
+    }
+    pub fn call_foo_when_resolved(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::CallFooWhenResolvedParams,
+        test_more_stuff::CallFooWhenResolvedResults,
+    > {
+        self.0.call(15980754968839795663u64, 1u16)
+    }
+    pub fn never_return(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::NeverReturnParams,
+        test_more_stuff::NeverReturnResults,
+    > {
+        self.0.call(15980754968839795663u64, 2u16)
+    }
+    pub fn hold(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::HoldParams,
+        test_more_stuff::HoldResults,
+    > {
+        self.0.call(15980754968839795663u64, 3u16)
+    }
+    pub fn call_held(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::CallHeldParams,
+        test_more_stuff::CallHeldResults,
+    > {
+        self.0.call(15980754968839795663u64, 4u16)
+    }
+    pub fn get_held(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::GetHeldParams,
+        test_more_stuff::GetHeldResults,
+    > {
+        self.0.call(15980754968839795663u64, 5u16)
+    }
+    pub fn echo(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::EchoParams,
+        test_more_stuff::EchoResults,
+    > {
+        self.0.call(15980754968839795663u64, 6u16)
+    }
+    pub fn expect_cancel(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::ExpectCancelParams,
+        test_more_stuff::ExpectCancelResults,
+    > {
+        self.0.call(15980754968839795663u64, 7u16)
+    }
+    pub fn method_with_defaults(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::MethodWithDefaultsParams,
+        test_more_stuff::MethodWithDefaultsResults,
+    > {
+        self.0.call(15980754968839795663u64, 8u16)
+    }
+    pub fn get_handle(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::GetHandleParams,
+        test_more_stuff::GetHandleResults,
+    > {
+        self.0.call(15980754968839795663u64, 9u16)
+    }
+    pub fn get_null(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::GetNullParams,
+        test_more_stuff::GetNullResults,
+    > {
+        self.0.call(15980754968839795663u64, 10u16)
+    }
+    pub fn get_enormous_string(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::GetEnormousStringParams,
+        test_more_stuff::GetEnormousStringResults,
+    > {
+        self.0.call(15980754968839795663u64, 11u16)
+    }
+    pub fn method_with_null_default(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::MethodWithNullDefaultParams,
+        test_more_stuff::MethodWithNullDefaultResults,
+    > {
+        self.0.call(15980754968839795663u64, 12u16)
+    }
+    pub fn write_to_fd(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::WriteToFdParams,
+        test_more_stuff::WriteToFdResults,
+    > {
+        self.0.call(15980754968839795663u64, 13u16)
+    }
+    pub fn throw_exception(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::ThrowExceptionParams,
+        test_more_stuff::ThrowExceptionResults,
+    > {
+        self.0.call(15980754968839795663u64, 14u16)
+    }
+    pub fn throw_remote_exception(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_more_stuff::ThrowRemoteExceptionParams,
+        test_more_stuff::ThrowRemoteExceptionResults,
+    > {
+        self.0.call(15980754968839795663u64, 15u16)
+    }
+}
+impl ::recapn::ty::Capability for TestMoreStuff {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestMoreStuffServer> ::recapn_rpc::server::FromServer<T> for TestMoreStuff {
+    type Dispatcher = TestMoreStuffDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestMoreStuffDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestMoreStuffServer {
+    fn call_foo(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::CallFooParams,
+            test_more_stuff::CallFooResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.callFoo' is not implemented for this type",
+                ),
+            )
+    }
+    fn call_foo_when_resolved(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::CallFooWhenResolvedParams,
+            test_more_stuff::CallFooWhenResolvedResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.callFooWhenResolved' is not implemented for this type",
+                ),
+            )
+    }
+    fn never_return(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::NeverReturnParams,
+            test_more_stuff::NeverReturnResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.neverReturn' is not implemented for this type",
+                ),
+            )
+    }
+    fn hold(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::HoldParams,
+            test_more_stuff::HoldResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.hold' is not implemented for this type",
+                ),
+            )
+    }
+    fn call_held(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::CallHeldParams,
+            test_more_stuff::CallHeldResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.callHeld' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_held(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::GetHeldParams,
+            test_more_stuff::GetHeldResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.getHeld' is not implemented for this type",
+                ),
+            )
+    }
+    fn echo(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::EchoParams,
+            test_more_stuff::EchoResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.echo' is not implemented for this type",
+                ),
+            )
+    }
+    fn expect_cancel(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::ExpectCancelParams,
+            test_more_stuff::ExpectCancelResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.expectCancel' is not implemented for this type",
+                ),
+            )
+    }
+    fn method_with_defaults(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::MethodWithDefaultsParams,
+            test_more_stuff::MethodWithDefaultsResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.methodWithDefaults' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_handle(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::GetHandleParams,
+            test_more_stuff::GetHandleResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.getHandle' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_null(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::GetNullParams,
+            test_more_stuff::GetNullResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.getNull' is not implemented for this type",
+                ),
+            )
+    }
+    fn get_enormous_string(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::GetEnormousStringParams,
+            test_more_stuff::GetEnormousStringResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.getEnormousString' is not implemented for this type",
+                ),
+            )
+    }
+    fn method_with_null_default(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::MethodWithNullDefaultParams,
+            test_more_stuff::MethodWithNullDefaultResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.methodWithNullDefault' is not implemented for this type",
+                ),
+            )
+    }
+    fn write_to_fd(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::WriteToFdParams,
+            test_more_stuff::WriteToFdResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.writeToFd' is not implemented for this type",
+                ),
+            )
+    }
+    fn throw_exception(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::ThrowExceptionParams,
+            test_more_stuff::ThrowExceptionResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.throwException' is not implemented for this type",
+                ),
+            )
+    }
+    fn throw_remote_exception(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_more_stuff::ThrowRemoteExceptionParams,
+            test_more_stuff::ThrowRemoteExceptionResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMoreStuff.throwRemoteException' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestMoreStuffDispatcher<T>(pub T);
+impl<T> TestMoreStuffDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestMoreStuff";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestMoreStuffDispatcher<T>
+where
+    T: TestMoreStuffServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (15980754968839795663u64, 0u16) => {
+                self.0.call_foo(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 1u16) => {
+                self.0.call_foo_when_resolved(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 2u16) => {
+                self.0.never_return(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 3u16) => {
+                self.0.hold(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 4u16) => {
+                self.0.call_held(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 5u16) => {
+                self.0.get_held(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 6u16) => {
+                self.0.echo(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 7u16) => {
+                self.0.expect_cancel(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 8u16) => {
+                self.0.method_with_defaults(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 9u16) => {
+                self.0.get_handle(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 10u16) => {
+                self.0.get_null(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 11u16) => {
+                self.0.get_enormous_string(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 12u16) => {
+                self.0.method_with_null_default(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 13u16) => {
+                self.0.write_to_fd(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 14u16) => {
+                self.0.throw_exception(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, 15u16) => {
+                self.0.throw_remote_exception(request.into_call_context()).into()
+            }
+            (15980754968839795663u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_more_stuff {
+    use super::{__file, __imports, _p};
+    pub use super::TestMoreStuff as Client;
+    pub use super::TestMoreStuffServer as Server;
+    pub use super::TestMoreStuffDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct CallFooParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallFooParams {
+        const ID: u64 = 10600246574596552420u64;
+    }
+    impl<T> _p::IntoFamily for CallFooParams<T> {
+        type Family = CallFooParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallFooParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallFooParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallFooParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_foo_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_foo_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallFooParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_foo_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_foo_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for call_foo_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_foo_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_foo_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_foo_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_foo_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallFooParams {
+        type Reader<'a, T: _p::rpc::Table> = call_foo_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_foo_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallFooParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallFooParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_foo_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_foo_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallFooParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &CallFooParams::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &CallFooParams::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &CallFooParams::CAP)
+            }
+        }
+    }
+    impl<P> call_foo_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod call_foo_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallFooParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallFooParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallFooParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallFooResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallFooResults {
+        const ID: u64 = 11108294558382738896u64;
+    }
+    impl<T> _p::IntoFamily for CallFooResults<T> {
+        type Family = CallFooResults;
+    }
+    impl<T: _p::Capable> _p::Capable for CallFooResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallFooResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallFooResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_foo_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_foo_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallFooResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_foo_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_foo_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_foo_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_foo_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_foo_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_foo_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_foo_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_foo_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallFooResults {
+        type Reader<'a, T: _p::rpc::Table> = call_foo_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_foo_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallFooResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallFooResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_foo_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_foo_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallFooResults {
+        const S: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_results::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &CallFooResults::S)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_results::Builder<'p, T> {
+        #[inline]
+        pub fn s(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallFooResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_s(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &CallFooResults::S)
+            }
+        }
+    }
+    pub mod call_foo_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallFooResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallFooResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallFooResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallFooWhenResolvedParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallFooWhenResolvedParams {
+        const ID: u64 = 18067439002729735032u64;
+    }
+    impl<T> _p::IntoFamily for CallFooWhenResolvedParams<T> {
+        type Family = CallFooWhenResolvedParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallFooWhenResolvedParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallFooWhenResolvedParams<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallFooWhenResolvedParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_foo_when_resolved_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_foo_when_resolved_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallFooWhenResolvedParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_foo_when_resolved_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_when_resolved_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_foo_when_resolved_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_foo_when_resolved_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_foo_when_resolved_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_foo_when_resolved_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_when_resolved_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_foo_when_resolved_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_foo_when_resolved_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_foo_when_resolved_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallFooWhenResolvedParams {
+        type Reader<'a, T: _p::rpc::Table> = call_foo_when_resolved_params::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = call_foo_when_resolved_params::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for CallFooWhenResolvedParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallFooWhenResolvedParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_foo_when_resolved_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_foo_when_resolved_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallFooWhenResolvedParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_when_resolved_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallFooWhenResolvedParams::CAP,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_when_resolved_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallFooWhenResolvedParams::CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    self.0,
+                    &CallFooWhenResolvedParams::CAP,
+                )
+            }
+        }
+    }
+    impl<P> call_foo_when_resolved_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod call_foo_when_resolved_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallFooWhenResolvedParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallFooWhenResolvedParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallFooWhenResolvedParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct CallFooWhenResolvedResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallFooWhenResolvedResults {
+        const ID: u64 = 11911143508192407440u64;
+    }
+    impl<T> _p::IntoFamily for CallFooWhenResolvedResults<T> {
+        type Family = CallFooWhenResolvedResults;
+    }
+    impl<T: _p::Capable> _p::Capable for CallFooWhenResolvedResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallFooWhenResolvedResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallFooWhenResolvedResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_foo_when_resolved_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_foo_when_resolved_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallFooWhenResolvedResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_foo_when_resolved_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_when_resolved_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_foo_when_resolved_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_foo_when_resolved_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_foo_when_resolved_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_foo_when_resolved_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_foo_when_resolved_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_foo_when_resolved_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_foo_when_resolved_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_foo_when_resolved_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallFooWhenResolvedResults {
+        type Reader<'a, T: _p::rpc::Table> = call_foo_when_resolved_results::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = call_foo_when_resolved_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for CallFooWhenResolvedResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallFooWhenResolvedResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_foo_when_resolved_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_foo_when_resolved_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallFooWhenResolvedResults {
+        const S: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_when_resolved_results::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallFooWhenResolvedResults::S,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_foo_when_resolved_results::Builder<'p, T> {
+        #[inline]
+        pub fn s(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallFooWhenResolvedResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_s(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &CallFooWhenResolvedResults::S,
+                )
+            }
+        }
+    }
+    pub mod call_foo_when_resolved_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallFooWhenResolvedResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallFooWhenResolvedResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallFooWhenResolvedResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct NeverReturnParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for NeverReturnParams {
+        const ID: u64 = 10736124417015093291u64;
+    }
+    impl<T> _p::IntoFamily for NeverReturnParams<T> {
+        type Family = NeverReturnParams;
+    }
+    impl<T: _p::Capable> _p::Capable for NeverReturnParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = NeverReturnParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (NeverReturnParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for never_return_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for never_return_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            NeverReturnParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<never_return_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: never_return_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for never_return_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for never_return_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for never_return_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<never_return_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: never_return_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for never_return_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for never_return_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for never_return_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for NeverReturnParams {
+        type Reader<'a, T: _p::rpc::Table> = never_return_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = never_return_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for NeverReturnParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for NeverReturnParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = never_return_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for never_return_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl NeverReturnParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> never_return_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &NeverReturnParams::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> never_return_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &NeverReturnParams::CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &NeverReturnParams::CAP)
+            }
+        }
+    }
+    impl<P> never_return_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod never_return_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::NeverReturnParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::NeverReturnParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::NeverReturnParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct NeverReturnResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for NeverReturnResults {
+        const ID: u64 = 16065718634413671900u64;
+    }
+    impl<T> _p::IntoFamily for NeverReturnResults<T> {
+        type Family = NeverReturnResults;
+    }
+    impl<T: _p::Capable> _p::Capable for NeverReturnResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = NeverReturnResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (NeverReturnResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for never_return_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for never_return_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            NeverReturnResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<never_return_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: never_return_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for never_return_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for never_return_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for never_return_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<never_return_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: never_return_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for never_return_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for never_return_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for never_return_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for NeverReturnResults {
+        type Reader<'a, T: _p::rpc::Table> = never_return_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = never_return_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for NeverReturnResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for NeverReturnResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = never_return_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for never_return_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl NeverReturnResults {
+        const CAP_COPY: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> never_return_results::Reader<'p, T> {
+        #[inline]
+        pub fn cap_copy(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &NeverReturnResults::CAP_COPY,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> never_return_results::Builder<'p, T> {
+        #[inline]
+        pub fn cap_copy(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &NeverReturnResults::CAP_COPY,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_cap_copy(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    self.0,
+                    &NeverReturnResults::CAP_COPY,
+                )
+            }
+        }
+    }
+    impl<P> never_return_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap_copy(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod never_return_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::NeverReturnResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::NeverReturnResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::NeverReturnResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct HoldParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for HoldParams {
+        const ID: u64 = 18337689818057510488u64;
+    }
+    impl<T> _p::IntoFamily for HoldParams<T> {
+        type Family = HoldParams;
+    }
+    impl<T: _p::Capable> _p::Capable for HoldParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = HoldParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (HoldParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for hold_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for hold_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            HoldParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<hold_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: hold_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for hold_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for hold_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for hold_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<hold_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: hold_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for hold_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for hold_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for hold_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for HoldParams {
+        type Reader<'a, T: _p::rpc::Table> = hold_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = hold_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for HoldParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for HoldParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = hold_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for hold_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl HoldParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> hold_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &HoldParams::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> hold_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &HoldParams::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &HoldParams::CAP)
+            }
+        }
+    }
+    impl<P> hold_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod hold_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::HoldParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::HoldParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::HoldParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct HoldResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for HoldResults {
+        const ID: u64 = 17886603456061375433u64;
+    }
+    impl<T> _p::IntoFamily for HoldResults<T> {
+        type Family = HoldResults;
+    }
+    impl<T: _p::Capable> _p::Capable for HoldResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = HoldResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (HoldResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for hold_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for hold_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            HoldResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<hold_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: hold_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for hold_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for hold_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for hold_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<hold_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: hold_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for hold_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for hold_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for hold_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for HoldResults {
+        type Reader<'a, T: _p::rpc::Table> = hold_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = hold_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for HoldResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for HoldResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = hold_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for hold_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl HoldResults {}
+    impl<'p, T: _p::rpc::Table + 'p> hold_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> hold_results::Builder<'p, T> {}
+    pub mod hold_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::HoldResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::HoldResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::HoldResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallHeldParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallHeldParams {
+        const ID: u64 = 17925986706996036542u64;
+    }
+    impl<T> _p::IntoFamily for CallHeldParams<T> {
+        type Family = CallHeldParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallHeldParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallHeldParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallHeldParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_held_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_held_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallHeldParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_held_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_held_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_held_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_held_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_held_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_held_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_held_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_held_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_held_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_held_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallHeldParams {
+        type Reader<'a, T: _p::rpc::Table> = call_held_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_held_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallHeldParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallHeldParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_held_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_held_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallHeldParams {}
+    impl<'p, T: _p::rpc::Table + 'p> call_held_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> call_held_params::Builder<'p, T> {}
+    pub mod call_held_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallHeldParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallHeldParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallHeldParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallHeldResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallHeldResults {
+        const ID: u64 = 16544314016947533176u64;
+    }
+    impl<T> _p::IntoFamily for CallHeldResults<T> {
+        type Family = CallHeldResults;
+    }
+    impl<T: _p::Capable> _p::Capable for CallHeldResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallHeldResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallHeldResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_held_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_held_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallHeldResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_held_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_held_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_held_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_held_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for call_held_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_held_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_held_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_held_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_held_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_held_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallHeldResults {
+        type Reader<'a, T: _p::rpc::Table> = call_held_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_held_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallHeldResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallHeldResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_held_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_held_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallHeldResults {
+        const S: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_held_results::Reader<'p, T> {
+        #[inline]
+        pub fn s(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallHeldResults::S,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_held_results::Builder<'p, T> {
+        #[inline]
+        pub fn s(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallHeldResults::S,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_s(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &CallHeldResults::S)
+            }
+        }
+    }
+    pub mod call_held_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallHeldResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallHeldResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallHeldResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetHeldParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetHeldParams {
+        const ID: u64 = 18374616274083977187u64;
+    }
+    impl<T> _p::IntoFamily for GetHeldParams<T> {
+        type Family = GetHeldParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetHeldParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetHeldParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetHeldParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_held_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_held_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetHeldParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_held_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_held_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_held_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for get_held_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_held_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_held_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_held_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_held_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_held_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_held_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetHeldParams {
+        type Reader<'a, T: _p::rpc::Table> = get_held_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_held_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetHeldParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetHeldParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_held_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_held_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetHeldParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_held_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_held_params::Builder<'p, T> {}
+    pub mod get_held_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetHeldParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetHeldParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetHeldParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetHeldResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetHeldResults {
+        const ID: u64 = 17243742432335456206u64;
+    }
+    impl<T> _p::IntoFamily for GetHeldResults<T> {
+        type Family = GetHeldResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetHeldResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetHeldResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetHeldResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_held_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_held_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetHeldResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_held_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_held_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_held_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_held_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_held_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_held_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_held_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_held_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_held_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_held_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetHeldResults {
+        type Reader<'a, T: _p::rpc::Table> = get_held_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_held_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetHeldResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetHeldResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_held_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_held_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetHeldResults {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_held_results::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &GetHeldResults::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_held_results::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &GetHeldResults::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &GetHeldResults::CAP)
+            }
+        }
+    }
+    impl<P> get_held_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod get_held_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetHeldResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetHeldResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetHeldResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct EchoParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for EchoParams {
+        const ID: u64 = 13868033473662759865u64;
+    }
+    impl<T> _p::IntoFamily for EchoParams<T> {
+        type Family = EchoParams;
+    }
+    impl<T: _p::Capable> _p::Capable for EchoParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = EchoParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (EchoParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for echo_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for echo_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            EchoParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<echo_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: echo_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for echo_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for echo_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for echo_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<echo_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: echo_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for echo_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for echo_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for echo_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for EchoParams {
+        type Reader<'a, T: _p::rpc::Table> = echo_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = echo_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for EchoParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for EchoParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = echo_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for echo_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl EchoParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestCallOrder>> = _p::Descriptor::<
+            _p::Capability<super::TestCallOrder>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> echo_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&self.0, &EchoParams::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> echo_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&mut self.0, &EchoParams::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(self.0, &EchoParams::CAP)
+            }
+        }
+    }
+    impl<P> echo_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestCallOrder {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod echo_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::EchoParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::EchoParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::EchoParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct EchoResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for EchoResults {
+        const ID: u64 = 11971206859231943570u64;
+    }
+    impl<T> _p::IntoFamily for EchoResults<T> {
+        type Family = EchoResults;
+    }
+    impl<T: _p::Capable> _p::Capable for EchoResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = EchoResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (EchoResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for echo_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for echo_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            EchoResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<echo_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: echo_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for echo_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for echo_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for echo_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<echo_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: echo_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for echo_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for echo_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for echo_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for EchoResults {
+        type Reader<'a, T: _p::rpc::Table> = echo_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = echo_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for EchoResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for EchoResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = echo_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for echo_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl EchoResults {
+        const CAP: _p::Descriptor<_p::Capability<super::TestCallOrder>> = _p::Descriptor::<
+            _p::Capability<super::TestCallOrder>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> echo_results::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&self.0, &EchoResults::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> echo_results::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(&mut self.0, &EchoResults::CAP)
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestCallOrder>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestCallOrder,
+                > as _p::field::FieldType>::accessor(self.0, &EchoResults::CAP)
+            }
+        }
+    }
+    impl<P> echo_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestCallOrder {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod echo_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::EchoResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::EchoResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::EchoResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ExpectCancelParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ExpectCancelParams {
+        const ID: u64 = 11658749440784522929u64;
+    }
+    impl<T> _p::IntoFamily for ExpectCancelParams<T> {
+        type Family = ExpectCancelParams;
+    }
+    impl<T: _p::Capable> _p::Capable for ExpectCancelParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ExpectCancelParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ExpectCancelParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for expect_cancel_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for expect_cancel_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ExpectCancelParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<expect_cancel_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: expect_cancel_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for expect_cancel_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for expect_cancel_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for expect_cancel_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<expect_cancel_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: expect_cancel_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for expect_cancel_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for expect_cancel_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for expect_cancel_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ExpectCancelParams {
+        type Reader<'a, T: _p::rpc::Table> = expect_cancel_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = expect_cancel_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ExpectCancelParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ExpectCancelParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = expect_cancel_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for expect_cancel_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ExpectCancelParams {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> expect_cancel_params::Reader<'p, T> {
+        #[inline]
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &ExpectCancelParams::CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> expect_cancel_params::Builder<'p, T> {
+        #[inline]
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &ExpectCancelParams::CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &ExpectCancelParams::CAP)
+            }
+        }
+    }
+    impl<P> expect_cancel_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod expect_cancel_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ExpectCancelParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ExpectCancelParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ExpectCancelParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ExpectCancelResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ExpectCancelResults {
+        const ID: u64 = 9961604035226145134u64;
+    }
+    impl<T> _p::IntoFamily for ExpectCancelResults<T> {
+        type Family = ExpectCancelResults;
+    }
+    impl<T: _p::Capable> _p::Capable for ExpectCancelResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ExpectCancelResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ExpectCancelResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for expect_cancel_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for expect_cancel_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ExpectCancelResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<expect_cancel_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: expect_cancel_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for expect_cancel_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for expect_cancel_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for expect_cancel_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<expect_cancel_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: expect_cancel_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for expect_cancel_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for expect_cancel_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for expect_cancel_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ExpectCancelResults {
+        type Reader<'a, T: _p::rpc::Table> = expect_cancel_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = expect_cancel_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ExpectCancelResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ExpectCancelResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = expect_cancel_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for expect_cancel_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ExpectCancelResults {}
+    impl<'p, T: _p::rpc::Table + 'p> expect_cancel_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> expect_cancel_results::Builder<'p, T> {}
+    pub mod expect_cancel_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ExpectCancelResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ExpectCancelResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ExpectCancelResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct MethodWithDefaultsParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MethodWithDefaultsParams {
+        const ID: u64 = 11031015495520287729u64;
+    }
+    impl<T> _p::IntoFamily for MethodWithDefaultsParams<T> {
+        type Family = MethodWithDefaultsParams;
+    }
+    impl<T: _p::Capable> _p::Capable for MethodWithDefaultsParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MethodWithDefaultsParams<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MethodWithDefaultsParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_defaults_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for method_with_defaults_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MethodWithDefaultsParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_defaults_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: method_with_defaults_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for method_with_defaults_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for method_with_defaults_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_defaults_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_defaults_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: method_with_defaults_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for method_with_defaults_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for method_with_defaults_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for method_with_defaults_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MethodWithDefaultsParams {
+        type Reader<'a, T: _p::rpc::Table> = method_with_defaults_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = method_with_defaults_params::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for MethodWithDefaultsParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MethodWithDefaultsParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = method_with_defaults_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for method_with_defaults_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MethodWithDefaultsParams {
+        const A: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const B: _p::Descriptor<u32> = _p::Descriptor::<u32> {
+            slot: 0u32,
+            default: 123u32,
+        };
+        const C: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 1u32,
+            default: ::core::option::Option::Some(_p::text::Reader::from_slice(b"foo\0")),
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_defaults_params::Reader<'p, T> {
+        #[inline]
+        pub fn a(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithDefaultsParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn b(&self) -> _p::Accessor<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithDefaultsParams::B,
+                )
+            }
+        }
+        #[inline]
+        pub fn c(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithDefaultsParams::C,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_defaults_params::Builder<'p, T> {
+        #[inline]
+        pub fn a(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithDefaultsParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn b(&mut self) -> _p::AccessorMut<'_, 'p, T, u32> {
+            unsafe {
+                <u32 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithDefaultsParams::B,
+                )
+            }
+        }
+        #[inline]
+        pub fn c(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithDefaultsParams::C,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_a(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithDefaultsParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_c(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithDefaultsParams::C,
+                )
+            }
+        }
+    }
+    pub mod method_with_defaults_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MethodWithDefaultsParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MethodWithDefaultsParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MethodWithDefaultsParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct MethodWithDefaultsResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MethodWithDefaultsResults {
+        const ID: u64 = 11276457593013955670u64;
+    }
+    impl<T> _p::IntoFamily for MethodWithDefaultsResults<T> {
+        type Family = MethodWithDefaultsResults;
+    }
+    impl<T: _p::Capable> _p::Capable for MethodWithDefaultsResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MethodWithDefaultsResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MethodWithDefaultsResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_defaults_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for method_with_defaults_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MethodWithDefaultsResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_defaults_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: method_with_defaults_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for method_with_defaults_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for method_with_defaults_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_defaults_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_defaults_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: method_with_defaults_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for method_with_defaults_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for method_with_defaults_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for method_with_defaults_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MethodWithDefaultsResults {
+        type Reader<'a, T: _p::rpc::Table> = method_with_defaults_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = method_with_defaults_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for MethodWithDefaultsResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MethodWithDefaultsResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = method_with_defaults_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for method_with_defaults_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MethodWithDefaultsResults {
+        const D: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const E: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 1u32,
+            default: ::core::option::Option::Some(_p::text::Reader::from_slice(b"bar\0")),
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_defaults_results::Reader<'p, T> {
+        #[inline]
+        pub fn d(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithDefaultsResults::D,
+                )
+            }
+        }
+        #[inline]
+        pub fn e(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithDefaultsResults::E,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_defaults_results::Builder<'p, T> {
+        #[inline]
+        pub fn d(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithDefaultsResults::D,
+                )
+            }
+        }
+        #[inline]
+        pub fn e(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithDefaultsResults::E,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_d(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithDefaultsResults::D,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_e(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithDefaultsResults::E,
+                )
+            }
+        }
+    }
+    pub mod method_with_defaults_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MethodWithDefaultsResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MethodWithDefaultsResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MethodWithDefaultsResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct GetHandleParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetHandleParams {
+        const ID: u64 = 16920064082556523169u64;
+    }
+    impl<T> _p::IntoFamily for GetHandleParams<T> {
+        type Family = GetHandleParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetHandleParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetHandleParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetHandleParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_handle_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_handle_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetHandleParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_handle_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_handle_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_handle_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_handle_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_handle_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_handle_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_handle_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_handle_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_handle_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_handle_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetHandleParams {
+        type Reader<'a, T: _p::rpc::Table> = get_handle_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_handle_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetHandleParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetHandleParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_handle_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_handle_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetHandleParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_handle_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_handle_params::Builder<'p, T> {}
+    pub mod get_handle_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetHandleParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetHandleParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetHandleParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetHandleResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetHandleResults {
+        const ID: u64 = 14071793307966119912u64;
+    }
+    impl<T> _p::IntoFamily for GetHandleResults<T> {
+        type Family = GetHandleResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetHandleResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetHandleResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetHandleResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_handle_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_handle_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetHandleResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_handle_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_handle_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_handle_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_handle_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_handle_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_handle_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_handle_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_handle_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_handle_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_handle_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetHandleResults {
+        type Reader<'a, T: _p::rpc::Table> = get_handle_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_handle_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetHandleResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetHandleResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_handle_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_handle_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetHandleResults {
+        const HANDLE: _p::Descriptor<_p::Capability<super::TestHandle>> = _p::Descriptor::<
+            _p::Capability<super::TestHandle>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_handle_results::Reader<'p, T> {
+        #[inline]
+        pub fn handle(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestHandle>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestHandle,
+                > as _p::field::FieldType>::accessor(&self.0, &GetHandleResults::HANDLE)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_handle_results::Builder<'p, T> {
+        #[inline]
+        pub fn handle(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestHandle>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestHandle,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetHandleResults::HANDLE,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_handle(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestHandle>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestHandle,
+                > as _p::field::FieldType>::accessor(self.0, &GetHandleResults::HANDLE)
+            }
+        }
+    }
+    impl<P> get_handle_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn handle(self) -> super::TestHandle {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod get_handle_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetHandleResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetHandleResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetHandleResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetNullParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetNullParams {
+        const ID: u64 = 15585057315246399986u64;
+    }
+    impl<T> _p::IntoFamily for GetNullParams<T> {
+        type Family = GetNullParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetNullParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetNullParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetNullParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_null_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_null_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetNullParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_null_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_null_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_null_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for get_null_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_null_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_null_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_null_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_null_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_null_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_null_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetNullParams {
+        type Reader<'a, T: _p::rpc::Table> = get_null_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_null_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetNullParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetNullParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_null_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_null_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetNullParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_null_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_null_params::Builder<'p, T> {}
+    pub mod get_null_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetNullParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetNullParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetNullParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetNullResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetNullResults {
+        const ID: u64 = 16615289268763506289u64;
+    }
+    impl<T> _p::IntoFamily for GetNullResults<T> {
+        type Family = GetNullResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetNullResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetNullResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetNullResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_null_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_null_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetNullResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_null_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_null_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_null_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_null_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for get_null_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_null_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_null_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_null_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_null_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_null_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetNullResults {
+        type Reader<'a, T: _p::rpc::Table> = get_null_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_null_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetNullResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetNullResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_null_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_null_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetNullResults {
+        const NULL_CAP: _p::Descriptor<_p::Capability<super::TestMoreStuff>> = _p::Descriptor::<
+            _p::Capability<super::TestMoreStuff>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_null_results::Reader<'p, T> {
+        #[inline]
+        pub fn null_cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestMoreStuff>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestMoreStuff,
+                > as _p::field::FieldType>::accessor(&self.0, &GetNullResults::NULL_CAP)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_null_results::Builder<'p, T> {
+        #[inline]
+        pub fn null_cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestMoreStuff>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestMoreStuff,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetNullResults::NULL_CAP,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_null_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestMoreStuff>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestMoreStuff,
+                > as _p::field::FieldType>::accessor(self.0, &GetNullResults::NULL_CAP)
+            }
+        }
+    }
+    impl<P> get_null_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn null_cap(self) -> super::TestMoreStuff {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod get_null_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetNullResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetNullResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetNullResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetEnormousStringParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetEnormousStringParams {
+        const ID: u64 = 9249817726570844282u64;
+    }
+    impl<T> _p::IntoFamily for GetEnormousStringParams<T> {
+        type Family = GetEnormousStringParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetEnormousStringParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetEnormousStringParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetEnormousStringParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_enormous_string_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_enormous_string_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetEnormousStringParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_enormous_string_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_enormous_string_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_enormous_string_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_enormous_string_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_enormous_string_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_enormous_string_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_enormous_string_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_enormous_string_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_enormous_string_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_enormous_string_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetEnormousStringParams {
+        type Reader<'a, T: _p::rpc::Table> = get_enormous_string_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_enormous_string_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetEnormousStringParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetEnormousStringParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_enormous_string_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_enormous_string_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetEnormousStringParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_enormous_string_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_enormous_string_params::Builder<'p, T> {}
+    pub mod get_enormous_string_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetEnormousStringParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetEnormousStringParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetEnormousStringParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct GetEnormousStringResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetEnormousStringResults {
+        const ID: u64 = 9659786974620886448u64;
+    }
+    impl<T> _p::IntoFamily for GetEnormousStringResults<T> {
+        type Family = GetEnormousStringResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetEnormousStringResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetEnormousStringResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetEnormousStringResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_enormous_string_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_enormous_string_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetEnormousStringResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_enormous_string_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_enormous_string_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_enormous_string_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_enormous_string_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_enormous_string_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_enormous_string_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_enormous_string_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_enormous_string_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_enormous_string_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_enormous_string_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetEnormousStringResults {
+        type Reader<'a, T: _p::rpc::Table> = get_enormous_string_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_enormous_string_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for GetEnormousStringResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetEnormousStringResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_enormous_string_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_enormous_string_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetEnormousStringResults {
+        const STR: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_enormous_string_results::Reader<'p, T> {
+        #[inline]
+        pub fn str(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetEnormousStringResults::STR,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_enormous_string_results::Builder<'p, T> {
+        #[inline]
+        pub fn str(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetEnormousStringResults::STR,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_str(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &GetEnormousStringResults::STR,
+                )
+            }
+        }
+    }
+    pub mod get_enormous_string_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetEnormousStringResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetEnormousStringResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetEnormousStringResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct MethodWithNullDefaultParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MethodWithNullDefaultParams {
+        const ID: u64 = 18127702748581259087u64;
+    }
+    impl<T> _p::IntoFamily for MethodWithNullDefaultParams<T> {
+        type Family = MethodWithNullDefaultParams;
+    }
+    impl<T: _p::Capable> _p::Capable for MethodWithNullDefaultParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MethodWithNullDefaultParams<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MethodWithNullDefaultParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_null_default_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for method_with_null_default_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MethodWithNullDefaultParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_null_default_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: method_with_null_default_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for method_with_null_default_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for method_with_null_default_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_null_default_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_null_default_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: method_with_null_default_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for method_with_null_default_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for method_with_null_default_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for method_with_null_default_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MethodWithNullDefaultParams {
+        type Reader<'a, T: _p::rpc::Table> = method_with_null_default_params::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = method_with_null_default_params::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for MethodWithNullDefaultParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MethodWithNullDefaultParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = method_with_null_default_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for method_with_null_default_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MethodWithNullDefaultParams {
+        const A: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const B: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_null_default_params::Reader<'p, T> {
+        #[inline]
+        pub fn a(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithNullDefaultParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn b(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &MethodWithNullDefaultParams::B,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> method_with_null_default_params::Builder<'p, T> {
+        #[inline]
+        pub fn a(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithNullDefaultParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn b(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MethodWithNullDefaultParams::B,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_a(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithNullDefaultParams::A,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_b(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    self.0,
+                    &MethodWithNullDefaultParams::B,
+                )
+            }
+        }
+    }
+    impl<P> method_with_null_default_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn b(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod method_with_null_default_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MethodWithNullDefaultParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MethodWithNullDefaultParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MethodWithNullDefaultParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct MethodWithNullDefaultResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MethodWithNullDefaultResults {
+        const ID: u64 = 9540652069752429815u64;
+    }
+    impl<T> _p::IntoFamily for MethodWithNullDefaultResults<T> {
+        type Family = MethodWithNullDefaultResults;
+    }
+    impl<T: _p::Capable> _p::Capable for MethodWithNullDefaultResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MethodWithNullDefaultResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MethodWithNullDefaultResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_null_default_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for method_with_null_default_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MethodWithNullDefaultResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_null_default_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: method_with_null_default_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for method_with_null_default_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for method_with_null_default_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for method_with_null_default_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<method_with_null_default_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: method_with_null_default_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for method_with_null_default_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for method_with_null_default_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for method_with_null_default_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MethodWithNullDefaultResults {
+        type Reader<'a, T: _p::rpc::Table> = method_with_null_default_results::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = method_with_null_default_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for MethodWithNullDefaultResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MethodWithNullDefaultResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = method_with_null_default_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for method_with_null_default_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MethodWithNullDefaultResults {}
+    impl<'p, T: _p::rpc::Table + 'p> method_with_null_default_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> method_with_null_default_results::Builder<'p, T> {}
+    pub mod method_with_null_default_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MethodWithNullDefaultResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MethodWithNullDefaultResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MethodWithNullDefaultResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct WriteToFdParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for WriteToFdParams {
+        const ID: u64 = 14742186683928583980u64;
+    }
+    impl<T> _p::IntoFamily for WriteToFdParams<T> {
+        type Family = WriteToFdParams;
+    }
+    impl<T: _p::Capable> _p::Capable for WriteToFdParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = WriteToFdParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (WriteToFdParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for write_to_fd_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for write_to_fd_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            WriteToFdParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<write_to_fd_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: write_to_fd_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for write_to_fd_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for write_to_fd_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for write_to_fd_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<write_to_fd_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: write_to_fd_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for write_to_fd_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for write_to_fd_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for write_to_fd_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for WriteToFdParams {
+        type Reader<'a, T: _p::rpc::Table> = write_to_fd_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = write_to_fd_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for WriteToFdParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 2u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for WriteToFdParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = write_to_fd_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for write_to_fd_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl WriteToFdParams {
+        const FD_CAP1: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const FD_CAP2: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 1u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> write_to_fd_params::Reader<'p, T> {
+        #[inline]
+        pub fn fd_cap1(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &WriteToFdParams::FD_CAP1)
+            }
+        }
+        #[inline]
+        pub fn fd_cap2(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &WriteToFdParams::FD_CAP2)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> write_to_fd_params::Builder<'p, T> {
+        #[inline]
+        pub fn fd_cap1(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &WriteToFdParams::FD_CAP1,
+                )
+            }
+        }
+        #[inline]
+        pub fn fd_cap2(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &WriteToFdParams::FD_CAP2,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_fd_cap1(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &WriteToFdParams::FD_CAP1)
+            }
+        }
+        #[inline]
+        pub fn into_fd_cap2(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &WriteToFdParams::FD_CAP2)
+            }
+        }
+    }
+    impl<P> write_to_fd_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn fd_cap1(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+        pub fn fd_cap2(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod write_to_fd_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::WriteToFdParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::WriteToFdParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::WriteToFdParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct WriteToFdResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for WriteToFdResults {
+        const ID: u64 = 14618299985185510316u64;
+    }
+    impl<T> _p::IntoFamily for WriteToFdResults<T> {
+        type Family = WriteToFdResults;
+    }
+    impl<T: _p::Capable> _p::Capable for WriteToFdResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = WriteToFdResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (WriteToFdResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for write_to_fd_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for write_to_fd_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            WriteToFdResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<write_to_fd_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: write_to_fd_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for write_to_fd_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for write_to_fd_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for write_to_fd_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<write_to_fd_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: write_to_fd_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for write_to_fd_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for write_to_fd_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for write_to_fd_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for WriteToFdResults {
+        type Reader<'a, T: _p::rpc::Table> = write_to_fd_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = write_to_fd_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for WriteToFdResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for WriteToFdResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = write_to_fd_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for write_to_fd_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl WriteToFdResults {
+        const FD_CAP3: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const SECOND_FD_PRESENT: _p::Descriptor<bool> = _p::Descriptor::<bool> {
+            slot: 0u32,
+            default: false,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> write_to_fd_results::Reader<'p, T> {
+        #[inline]
+        pub fn fd_cap3(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &WriteToFdResults::FD_CAP3)
+            }
+        }
+        #[inline]
+        pub fn second_fd_present(&self) -> _p::Accessor<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &WriteToFdResults::SECOND_FD_PRESENT,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> write_to_fd_results::Builder<'p, T> {
+        #[inline]
+        pub fn fd_cap3(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &WriteToFdResults::FD_CAP3,
+                )
+            }
+        }
+        #[inline]
+        pub fn second_fd_present(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &WriteToFdResults::SECOND_FD_PRESENT,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_fd_cap3(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
+            unsafe {
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &WriteToFdResults::FD_CAP3)
+            }
+        }
+    }
+    impl<P> write_to_fd_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn fd_cap3(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod write_to_fd_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::WriteToFdResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::WriteToFdResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::WriteToFdResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ThrowExceptionParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ThrowExceptionParams {
+        const ID: u64 = 14168657759357549444u64;
+    }
+    impl<T> _p::IntoFamily for ThrowExceptionParams<T> {
+        type Family = ThrowExceptionParams;
+    }
+    impl<T: _p::Capable> _p::Capable for ThrowExceptionParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ThrowExceptionParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ThrowExceptionParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_exception_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for throw_exception_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ThrowExceptionParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_exception_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: throw_exception_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for throw_exception_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for throw_exception_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_exception_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_exception_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: throw_exception_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for throw_exception_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for throw_exception_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for throw_exception_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ThrowExceptionParams {
+        type Reader<'a, T: _p::rpc::Table> = throw_exception_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = throw_exception_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ThrowExceptionParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ThrowExceptionParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = throw_exception_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for throw_exception_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ThrowExceptionParams {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_exception_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_exception_params::Builder<'p, T> {}
+    pub mod throw_exception_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ThrowExceptionParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ThrowExceptionParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ThrowExceptionParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ThrowExceptionResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ThrowExceptionResults {
+        const ID: u64 = 15495231939900005035u64;
+    }
+    impl<T> _p::IntoFamily for ThrowExceptionResults<T> {
+        type Family = ThrowExceptionResults;
+    }
+    impl<T: _p::Capable> _p::Capable for ThrowExceptionResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ThrowExceptionResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ThrowExceptionResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_exception_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for throw_exception_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ThrowExceptionResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_exception_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: throw_exception_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for throw_exception_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for throw_exception_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_exception_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_exception_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: throw_exception_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for throw_exception_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for throw_exception_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for throw_exception_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ThrowExceptionResults {
+        type Reader<'a, T: _p::rpc::Table> = throw_exception_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = throw_exception_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ThrowExceptionResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ThrowExceptionResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = throw_exception_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for throw_exception_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ThrowExceptionResults {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_exception_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_exception_results::Builder<'p, T> {}
+    pub mod throw_exception_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ThrowExceptionResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ThrowExceptionResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ThrowExceptionResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ThrowRemoteExceptionParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ThrowRemoteExceptionParams {
+        const ID: u64 = 14662618004940417242u64;
+    }
+    impl<T> _p::IntoFamily for ThrowRemoteExceptionParams<T> {
+        type Family = ThrowRemoteExceptionParams;
+    }
+    impl<T: _p::Capable> _p::Capable for ThrowRemoteExceptionParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ThrowRemoteExceptionParams<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ThrowRemoteExceptionParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_remote_exception_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for throw_remote_exception_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ThrowRemoteExceptionParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_remote_exception_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: throw_remote_exception_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for throw_remote_exception_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for throw_remote_exception_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_remote_exception_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_remote_exception_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: throw_remote_exception_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for throw_remote_exception_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for throw_remote_exception_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for throw_remote_exception_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ThrowRemoteExceptionParams {
+        type Reader<'a, T: _p::rpc::Table> = throw_remote_exception_params::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = throw_remote_exception_params::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for ThrowRemoteExceptionParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ThrowRemoteExceptionParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = throw_remote_exception_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for throw_remote_exception_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ThrowRemoteExceptionParams {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_remote_exception_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_remote_exception_params::Builder<'p, T> {}
+    pub mod throw_remote_exception_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ThrowRemoteExceptionParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ThrowRemoteExceptionParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ThrowRemoteExceptionParams<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+    #[derive(Clone)]
+    pub struct ThrowRemoteExceptionResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ThrowRemoteExceptionResults {
+        const ID: u64 = 11790548660990929857u64;
+    }
+    impl<T> _p::IntoFamily for ThrowRemoteExceptionResults<T> {
+        type Family = ThrowRemoteExceptionResults;
+    }
+    impl<T: _p::Capable> _p::Capable for ThrowRemoteExceptionResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ThrowRemoteExceptionResults<
+            T::ImbuedWith<T2>,
+        >;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ThrowRemoteExceptionResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_remote_exception_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for throw_remote_exception_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ThrowRemoteExceptionResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_remote_exception_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: throw_remote_exception_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for throw_remote_exception_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for throw_remote_exception_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for throw_remote_exception_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<throw_remote_exception_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: throw_remote_exception_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for throw_remote_exception_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for throw_remote_exception_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for throw_remote_exception_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ThrowRemoteExceptionResults {
+        type Reader<'a, T: _p::rpc::Table> = throw_remote_exception_results::Reader<
+            'a,
+            T,
+        >;
+        type Builder<'a, T: _p::rpc::Table> = throw_remote_exception_results::Builder<
+            'a,
+            T,
+        >;
+    }
+    impl _p::ty::Struct for ThrowRemoteExceptionResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ThrowRemoteExceptionResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = throw_remote_exception_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for throw_remote_exception_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ThrowRemoteExceptionResults {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_remote_exception_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> throw_remote_exception_results::Builder<'p, T> {}
+    pub mod throw_remote_exception_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ThrowRemoteExceptionResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ThrowRemoteExceptionResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ThrowRemoteExceptionResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestMembrane(::recapn_rpc::client::Client);
+impl TestMembrane {
+    pub fn make_thing(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_membrane::MakeThingParams,
+        test_membrane::MakeThingResults,
+    > {
+        self.0.call(13870398341137210380u64, 0u16)
+    }
+    pub fn call_pass_through(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_membrane::CallPassThroughParams,
+        test_membrane::Result,
+    > {
+        self.0.call(13870398341137210380u64, 1u16)
+    }
+    pub fn call_intercept(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_membrane::CallInterceptParams,
+        test_membrane::Result,
+    > {
+        self.0.call(13870398341137210380u64, 2u16)
+    }
+    pub fn loopback(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_membrane::LoopbackParams,
+        test_membrane::LoopbackResults,
+    > {
+        self.0.call(13870398341137210380u64, 3u16)
+    }
+    pub fn wait_forever(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_membrane::WaitForeverParams,
+        test_membrane::WaitForeverResults,
+    > {
+        self.0.call(13870398341137210380u64, 4u16)
+    }
+}
+impl ::recapn::ty::Capability for TestMembrane {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestMembraneServer> ::recapn_rpc::server::FromServer<T> for TestMembrane {
+    type Dispatcher = TestMembraneDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestMembraneDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestMembraneServer {
+    fn make_thing(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_membrane::MakeThingParams,
+            test_membrane::MakeThingResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMembrane.makeThing' is not implemented for this type",
+                ),
+            )
+    }
+    fn call_pass_through(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_membrane::CallPassThroughParams,
+            test_membrane::Result,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMembrane.callPassThrough' is not implemented for this type",
+                ),
+            )
+    }
+    fn call_intercept(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_membrane::CallInterceptParams,
+            test_membrane::Result,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMembrane.callIntercept' is not implemented for this type",
+                ),
+            )
+    }
+    fn loopback(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_membrane::LoopbackParams,
+            test_membrane::LoopbackResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMembrane.loopback' is not implemented for this type",
+                ),
+            )
+    }
+    fn wait_forever(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_membrane::WaitForeverParams,
+            test_membrane::WaitForeverResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestMembrane.waitForever' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestMembraneDispatcher<T>(pub T);
+impl<T> TestMembraneDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestMembrane";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestMembraneDispatcher<T>
+where
+    T: TestMembraneServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (13870398341137210380u64, 0u16) => {
+                self.0.make_thing(request.into_call_context()).into()
+            }
+            (13870398341137210380u64, 1u16) => {
+                self.0.call_pass_through(request.into_call_context()).into()
+            }
+            (13870398341137210380u64, 2u16) => {
+                self.0.call_intercept(request.into_call_context()).into()
+            }
+            (13870398341137210380u64, 3u16) => {
+                self.0.loopback(request.into_call_context()).into()
+            }
+            (13870398341137210380u64, 4u16) => {
+                self.0.wait_forever(request.into_call_context()).into()
+            }
+            (13870398341137210380u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_membrane {
+    use super::{__file, __imports, _p};
+    pub use super::TestMembrane as Client;
+    pub use super::TestMembraneServer as Server;
+    pub use super::TestMembraneDispatcher as Dispatcher;
+    #[derive(Clone, Debug)]
+    pub struct Thing(::recapn_rpc::client::Client);
+    impl Thing {
+        pub fn pass_through(
+            &self,
+        ) -> ::recapn_rpc::client::Request<thing::PassThroughParams, Result> {
+            self.0.call(10615798940090972439u64, 0u16)
+        }
+        pub fn intercept(
+            &self,
+        ) -> ::recapn_rpc::client::Request<thing::InterceptParams, Result> {
+            self.0.call(10615798940090972439u64, 1u16)
+        }
+    }
+    impl ::recapn::ty::Capability for Thing {
+        type Client = ::recapn_rpc::client::Client;
+        fn from_client(c: Self::Client) -> Self {
+            Self(c)
+        }
+        fn into_inner(self) -> Self::Client {
+            self.0
+        }
+    }
+    impl<T: ThingServer> ::recapn_rpc::server::FromServer<T> for Thing {
+        type Dispatcher = ThingDispatcher<T>;
+        #[inline]
+        fn from_server(
+            server: T,
+        ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+            let (client, dispatcher) = ::recapn_rpc::server::new_server(
+                ThingDispatcher(server),
+            );
+            (Self(client), dispatcher)
+        }
+    }
+    pub trait ThingServer {
+        fn pass_through(
+            &mut self,
+            ctx: ::recapn_rpc::server::CallContext<thing::PassThroughParams, Result>,
+        ) -> ::recapn_rpc::server::CallResult {
+            ctx.response
+                .error(
+                    ::recapn_rpc::Error::unimplemented(
+                        "'capnp/test.capnp:TestMembrane.Thing.passThrough' is not implemented for this type",
+                    ),
+                )
+        }
+        fn intercept(
+            &mut self,
+            ctx: ::recapn_rpc::server::CallContext<thing::InterceptParams, Result>,
+        ) -> ::recapn_rpc::server::CallResult {
+            ctx.response
+                .error(
+                    ::recapn_rpc::Error::unimplemented(
+                        "'capnp/test.capnp:TestMembrane.Thing.intercept' is not implemented for this type",
+                    ),
+                )
+        }
+    }
+    pub struct ThingDispatcher<T>(pub T);
+    impl<T> ThingDispatcher<T> {
+        pub const NAME: &str = "capnp/test.capnp:TestMembrane.Thing";
+    }
+    impl<T> ::recapn_rpc::server::Dispatch for ThingDispatcher<T>
+    where
+        T: ThingServer,
+    {
+        fn dispatch(
+            &mut self,
+            request: ::recapn_rpc::server::DispatchRequest,
+        ) -> ::recapn_rpc::server::DispatchResponse {
+            match (request.interface(), request.method()) {
+                (10615798940090972439u64, 0u16) => {
+                    self.0.pass_through(request.into_call_context()).into()
+                }
+                (10615798940090972439u64, 1u16) => {
+                    self.0.intercept(request.into_call_context()).into()
+                }
+                (10615798940090972439u64, _) => request.unimplemented_method(Self::NAME),
+                (_, _) => request.unimplemented_interface(Self::NAME),
+            }
+        }
+    }
+    pub mod thing {
+        use super::{__file, __imports, _p};
+        pub use super::Thing as Client;
+        pub use super::ThingServer as Server;
+        pub use super::ThingDispatcher as Dispatcher;
+        #[derive(Clone)]
+        pub struct PassThroughParams<T = _p::Family>(T);
+        impl _p::ty::SchemaType for PassThroughParams {
+            const ID: u64 = 18418557888324032390u64;
+        }
+        impl<T> _p::IntoFamily for PassThroughParams<T> {
+            type Family = PassThroughParams;
+        }
+        impl<T: _p::Capable> _p::Capable for PassThroughParams<T> {
+            type Table = T::Table;
+            type Imbued = T::Imbued;
+            type ImbuedWith<T2: _p::rpc::Table> = PassThroughParams<T::ImbuedWith<T2>>;
+            #[inline]
+            fn imbued(&self) -> &Self::Imbued {
+                self.0.imbued()
+            }
+            #[inline]
+            fn imbue_release<T2: _p::rpc::Table>(
+                self,
+                new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+            ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+                let (imbued, old) = self.0.imbue_release(new_table);
+                (PassThroughParams(imbued), old)
+            }
+            #[inline]
+            fn imbue_release_into<U>(
+                &self,
+                other: U,
+            ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+            where
+                U: _p::Capable,
+                U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+            {
+                self.0.imbue_release_into(other)
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+        for pass_through_params::Reader<'a, T> {
+            type Ptr = _p::StructReader<'a, T>;
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+        for pass_through_params::Reader<'a, T> {
+            #[inline]
+            fn from(ptr: _p::StructReader<'a, T>) -> Self {
+                PassThroughParams(ptr)
+            }
+        }
+        impl<
+            'a,
+            T: _p::rpc::Table,
+        > core::convert::From<pass_through_params::Reader<'a, T>>
+        for _p::StructReader<'a, T> {
+            #[inline]
+            fn from(reader: pass_through_params::Reader<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+        for pass_through_params::Reader<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructReader<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+        for pass_through_params::Reader<'a, T> {}
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+        for pass_through_params::Builder<'a, T> {
+            type Ptr = _p::StructBuilder<'a, T>;
+        }
+        impl<
+            'a,
+            T: _p::rpc::Table,
+        > core::convert::From<pass_through_params::Builder<'a, T>>
+        for _p::StructBuilder<'a, T> {
+            #[inline]
+            fn from(reader: pass_through_params::Builder<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+        for pass_through_params::Builder<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+        for pass_through_params::Builder<'a, T> {
+            #[inline]
+            fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+                &mut self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+        for pass_through_params::Builder<'a, T> {
+            unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                Self(ptr)
+            }
+        }
+        impl _p::StructView for PassThroughParams {
+            type Reader<'a, T: _p::rpc::Table> = pass_through_params::Reader<'a, T>;
+            type Builder<'a, T: _p::rpc::Table> = pass_through_params::Builder<'a, T>;
+        }
+        impl _p::ty::Struct for PassThroughParams {
+            const SIZE: _p::StructSize = _p::StructSize {
+                data: 0u16,
+                ptrs: 0u16,
+            };
+        }
+        impl ::recapn::rpc::Pipelinable for PassThroughParams {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = pass_through_params::Pipeline<
+                P,
+            >;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for pass_through_params::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
+            }
+        }
+        impl PassThroughParams {}
+        impl<'p, T: _p::rpc::Table + 'p> pass_through_params::Reader<'p, T> {}
+        impl<'p, T: _p::rpc::Table + 'p> pass_through_params::Builder<'p, T> {}
+        pub mod pass_through_params {
+            use super::{__file, __imports, _p};
+            pub type Reader<'a, T = _p::rpc::Empty> = super::PassThroughParams<
+                _p::StructReader<'a, T>,
+            >;
+            pub type Builder<'a, T = _p::rpc::Empty> = super::PassThroughParams<
+                _p::StructBuilder<'a, T>,
+            >;
+            pub type Pipeline<P> = super::PassThroughParams<::recapn::rpc::Pipeline<P>>;
+        }
+        #[derive(Clone)]
+        pub struct InterceptParams<T = _p::Family>(T);
+        impl _p::ty::SchemaType for InterceptParams {
+            const ID: u64 = 17191575492661012293u64;
+        }
+        impl<T> _p::IntoFamily for InterceptParams<T> {
+            type Family = InterceptParams;
+        }
+        impl<T: _p::Capable> _p::Capable for InterceptParams<T> {
+            type Table = T::Table;
+            type Imbued = T::Imbued;
+            type ImbuedWith<T2: _p::rpc::Table> = InterceptParams<T::ImbuedWith<T2>>;
+            #[inline]
+            fn imbued(&self) -> &Self::Imbued {
+                self.0.imbued()
+            }
+            #[inline]
+            fn imbue_release<T2: _p::rpc::Table>(
+                self,
+                new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+            ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+                let (imbued, old) = self.0.imbue_release(new_table);
+                (InterceptParams(imbued), old)
+            }
+            #[inline]
+            fn imbue_release_into<U>(
+                &self,
+                other: U,
+            ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+            where
+                U: _p::Capable,
+                U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+            {
+                self.0.imbue_release_into(other)
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+        for intercept_params::Reader<'a, T> {
+            type Ptr = _p::StructReader<'a, T>;
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+        for intercept_params::Reader<'a, T> {
+            #[inline]
+            fn from(ptr: _p::StructReader<'a, T>) -> Self {
+                InterceptParams(ptr)
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<intercept_params::Reader<'a, T>>
+        for _p::StructReader<'a, T> {
+            #[inline]
+            fn from(reader: intercept_params::Reader<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+        for intercept_params::Reader<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructReader<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+        for intercept_params::Reader<'a, T> {}
+        impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+        for intercept_params::Builder<'a, T> {
+            type Ptr = _p::StructBuilder<'a, T>;
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::From<intercept_params::Builder<'a, T>>
+        for _p::StructBuilder<'a, T> {
+            #[inline]
+            fn from(reader: intercept_params::Builder<'a, T>) -> Self {
+                reader.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+        for intercept_params::Builder<'a, T> {
+            #[inline]
+            fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+                &self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+        for intercept_params::Builder<'a, T> {
+            #[inline]
+            fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+                &mut self.0
+            }
+        }
+        impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+        for intercept_params::Builder<'a, T> {
+            unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+                Self(ptr)
+            }
+        }
+        impl _p::StructView for InterceptParams {
+            type Reader<'a, T: _p::rpc::Table> = intercept_params::Reader<'a, T>;
+            type Builder<'a, T: _p::rpc::Table> = intercept_params::Builder<'a, T>;
+        }
+        impl _p::ty::Struct for InterceptParams {
+            const SIZE: _p::StructSize = _p::StructSize {
+                data: 0u16,
+                ptrs: 0u16,
+            };
+        }
+        impl ::recapn::rpc::Pipelinable for InterceptParams {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = intercept_params::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for intercept_params::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
+            }
+        }
+        impl InterceptParams {}
+        impl<'p, T: _p::rpc::Table + 'p> intercept_params::Reader<'p, T> {}
+        impl<'p, T: _p::rpc::Table + 'p> intercept_params::Builder<'p, T> {}
+        pub mod intercept_params {
+            use super::{__file, __imports, _p};
+            pub type Reader<'a, T = _p::rpc::Empty> = super::InterceptParams<
+                _p::StructReader<'a, T>,
+            >;
+            pub type Builder<'a, T = _p::rpc::Empty> = super::InterceptParams<
+                _p::StructBuilder<'a, T>,
+            >;
+            pub type Pipeline<P> = super::InterceptParams<::recapn::rpc::Pipeline<P>>;
+        }
+    }
+    #[derive(Clone)]
+    pub struct Result<T = _p::Family>(T);
+    impl _p::ty::SchemaType for Result {
+        const ID: u64 = 12737893058841483621u64;
+    }
+    impl<T> _p::IntoFamily for Result<T> {
+        type Family = Result;
+    }
+    impl<T: _p::Capable> _p::Capable for Result<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = Result<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (Result(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for result::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for result::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            Result(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<result::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: result::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for result::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for result::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for result::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<result::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: result::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for result::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for result::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for result::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for Result {
+        type Reader<'a, T: _p::rpc::Table> = result::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = result::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for Result {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for Result {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = result::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for result::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl Result {
+        const TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> result::Reader<'p, T> {
+        #[inline]
+        pub fn text(&self) -> _p::Accessor<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&self.0, &Result::TEXT)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> result::Builder<'p, T> {
+        #[inline]
+        pub fn text(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(&mut self.0, &Result::TEXT)
+            }
+        }
+        #[inline]
+        pub fn into_text(self) -> _p::AccessorOwned<'p, T, _p::Text> {
+            unsafe {
+                <_p::Text as _p::field::FieldType>::accessor(self.0, &Result::TEXT)
+            }
+        }
+    }
+    pub mod result {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::Result<_p::StructReader<'a, T>>;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::Result<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::Result<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct MakeThingParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MakeThingParams {
+        const ID: u64 = 15612901064902075734u64;
+    }
+    impl<T> _p::IntoFamily for MakeThingParams<T> {
+        type Family = MakeThingParams;
+    }
+    impl<T: _p::Capable> _p::Capable for MakeThingParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MakeThingParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MakeThingParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for make_thing_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for make_thing_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MakeThingParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<make_thing_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: make_thing_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for make_thing_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for make_thing_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for make_thing_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<make_thing_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: make_thing_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for make_thing_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for make_thing_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for make_thing_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MakeThingParams {
+        type Reader<'a, T: _p::rpc::Table> = make_thing_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = make_thing_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for MakeThingParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MakeThingParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = make_thing_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for make_thing_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MakeThingParams {}
+    impl<'p, T: _p::rpc::Table + 'p> make_thing_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> make_thing_params::Builder<'p, T> {}
+    pub mod make_thing_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MakeThingParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MakeThingParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MakeThingParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct MakeThingResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for MakeThingResults {
+        const ID: u64 = 16561020369009164073u64;
+    }
+    impl<T> _p::IntoFamily for MakeThingResults<T> {
+        type Family = MakeThingResults;
+    }
+    impl<T: _p::Capable> _p::Capable for MakeThingResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = MakeThingResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (MakeThingResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for make_thing_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for make_thing_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            MakeThingResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<make_thing_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: make_thing_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for make_thing_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for make_thing_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for make_thing_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<make_thing_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: make_thing_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for make_thing_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for make_thing_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for make_thing_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for MakeThingResults {
+        type Reader<'a, T: _p::rpc::Table> = make_thing_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = make_thing_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for MakeThingResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for MakeThingResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = make_thing_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for make_thing_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl MakeThingResults {
+        const THING: _p::Descriptor<_p::Capability<Thing>> = _p::Descriptor::<
+            _p::Capability<Thing>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> make_thing_results::Reader<'p, T> {
+        #[inline]
+        pub fn thing(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(&self.0, &MakeThingResults::THING)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> make_thing_results::Builder<'p, T> {
+        #[inline]
+        pub fn thing(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &MakeThingResults::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_thing(self) -> _p::AccessorOwned<'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(self.0, &MakeThingResults::THING)
+            }
+        }
+    }
+    impl<P> make_thing_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn thing(self) -> Thing {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod make_thing_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::MakeThingResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::MakeThingResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::MakeThingResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallPassThroughParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallPassThroughParams {
+        const ID: u64 = 10690876339246475738u64;
+    }
+    impl<T> _p::IntoFamily for CallPassThroughParams<T> {
+        type Family = CallPassThroughParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallPassThroughParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallPassThroughParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallPassThroughParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_pass_through_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_pass_through_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallPassThroughParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_pass_through_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_pass_through_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_pass_through_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_pass_through_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_pass_through_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_pass_through_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_pass_through_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_pass_through_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_pass_through_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_pass_through_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallPassThroughParams {
+        type Reader<'a, T: _p::rpc::Table> = call_pass_through_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_pass_through_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallPassThroughParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallPassThroughParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_pass_through_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_pass_through_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallPassThroughParams {
+        const THING: _p::Descriptor<_p::Capability<Thing>> = _p::Descriptor::<
+            _p::Capability<Thing>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const TAIL_CALL: _p::Descriptor<bool> = _p::Descriptor::<bool> {
+            slot: 0u32,
+            default: false,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_pass_through_params::Reader<'p, T> {
+        #[inline]
+        pub fn thing(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallPassThroughParams::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn tail_call(&self) -> _p::Accessor<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallPassThroughParams::TAIL_CALL,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_pass_through_params::Builder<'p, T> {
+        #[inline]
+        pub fn thing(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallPassThroughParams::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn tail_call(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallPassThroughParams::TAIL_CALL,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_thing(self) -> _p::AccessorOwned<'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    self.0,
+                    &CallPassThroughParams::THING,
+                )
+            }
+        }
+    }
+    impl<P> call_pass_through_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn thing(self) -> Thing {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod call_pass_through_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallPassThroughParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallPassThroughParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallPassThroughParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct CallInterceptParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for CallInterceptParams {
+        const ID: u64 = 9748510623844293745u64;
+    }
+    impl<T> _p::IntoFamily for CallInterceptParams<T> {
+        type Family = CallInterceptParams;
+    }
+    impl<T: _p::Capable> _p::Capable for CallInterceptParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = CallInterceptParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (CallInterceptParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_intercept_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for call_intercept_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            CallInterceptParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<call_intercept_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: call_intercept_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for call_intercept_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for call_intercept_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for call_intercept_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<call_intercept_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: call_intercept_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for call_intercept_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for call_intercept_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for call_intercept_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for CallInterceptParams {
+        type Reader<'a, T: _p::rpc::Table> = call_intercept_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = call_intercept_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for CallInterceptParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for CallInterceptParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = call_intercept_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for call_intercept_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl CallInterceptParams {
+        const THING: _p::Descriptor<_p::Capability<Thing>> = _p::Descriptor::<
+            _p::Capability<Thing>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+        const TAIL_CALL: _p::Descriptor<bool> = _p::Descriptor::<bool> {
+            slot: 0u32,
+            default: false,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_intercept_params::Reader<'p, T> {
+        #[inline]
+        pub fn thing(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallInterceptParams::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn tail_call(&self) -> _p::Accessor<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &CallInterceptParams::TAIL_CALL,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> call_intercept_params::Builder<'p, T> {
+        #[inline]
+        pub fn thing(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallInterceptParams::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn tail_call(&mut self) -> _p::AccessorMut<'_, 'p, T, bool> {
+            unsafe {
+                <bool as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &CallInterceptParams::TAIL_CALL,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_thing(self) -> _p::AccessorOwned<'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(self.0, &CallInterceptParams::THING)
+            }
+        }
+    }
+    impl<P> call_intercept_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn thing(self) -> Thing {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod call_intercept_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::CallInterceptParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::CallInterceptParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::CallInterceptParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct LoopbackParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for LoopbackParams {
+        const ID: u64 = 9699094961303798473u64;
+    }
+    impl<T> _p::IntoFamily for LoopbackParams<T> {
+        type Family = LoopbackParams;
+    }
+    impl<T: _p::Capable> _p::Capable for LoopbackParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = LoopbackParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (LoopbackParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for loopback_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for loopback_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            LoopbackParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<loopback_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: loopback_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for loopback_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for loopback_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for loopback_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<loopback_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: loopback_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for loopback_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for loopback_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for loopback_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for LoopbackParams {
+        type Reader<'a, T: _p::rpc::Table> = loopback_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = loopback_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for LoopbackParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for LoopbackParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = loopback_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for loopback_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl LoopbackParams {
+        const THING: _p::Descriptor<_p::Capability<Thing>> = _p::Descriptor::<
+            _p::Capability<Thing>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> loopback_params::Reader<'p, T> {
+        #[inline]
+        pub fn thing(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(&self.0, &LoopbackParams::THING)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> loopback_params::Builder<'p, T> {
+        #[inline]
+        pub fn thing(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(&mut self.0, &LoopbackParams::THING)
+            }
+        }
+        #[inline]
+        pub fn into_thing(self) -> _p::AccessorOwned<'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(self.0, &LoopbackParams::THING)
+            }
+        }
+    }
+    impl<P> loopback_params::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn thing(self) -> Thing {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod loopback_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::LoopbackParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::LoopbackParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::LoopbackParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct LoopbackResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for LoopbackResults {
+        const ID: u64 = 17064582748381424476u64;
+    }
+    impl<T> _p::IntoFamily for LoopbackResults<T> {
+        type Family = LoopbackResults;
+    }
+    impl<T: _p::Capable> _p::Capable for LoopbackResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = LoopbackResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (LoopbackResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for loopback_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for loopback_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            LoopbackResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<loopback_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: loopback_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for loopback_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for loopback_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for loopback_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<loopback_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: loopback_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for loopback_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for loopback_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for loopback_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for LoopbackResults {
+        type Reader<'a, T: _p::rpc::Table> = loopback_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = loopback_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for LoopbackResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for LoopbackResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = loopback_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for loopback_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl LoopbackResults {
+        const THING: _p::Descriptor<_p::Capability<Thing>> = _p::Descriptor::<
+            _p::Capability<Thing>,
+        > {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> loopback_results::Reader<'p, T> {
+        #[inline]
+        pub fn thing(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(&self.0, &LoopbackResults::THING)
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> loopback_results::Builder<'p, T> {
+        #[inline]
+        pub fn thing(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &LoopbackResults::THING,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_thing(self) -> _p::AccessorOwned<'p, T, _p::Capability<Thing>> {
+            unsafe {
+                <_p::Capability<
+                    Thing,
+                > as _p::field::FieldType>::accessor(self.0, &LoopbackResults::THING)
+            }
+        }
+    }
+    impl<P> loopback_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn thing(self) -> Thing {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16))
+                    .into_cap(),
+            )
+        }
+    }
+    pub mod loopback_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::LoopbackResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::LoopbackResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::LoopbackResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct WaitForeverParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for WaitForeverParams {
+        const ID: u64 = 10334550637377296383u64;
+    }
+    impl<T> _p::IntoFamily for WaitForeverParams<T> {
+        type Family = WaitForeverParams;
+    }
+    impl<T: _p::Capable> _p::Capable for WaitForeverParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = WaitForeverParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (WaitForeverParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for wait_forever_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for wait_forever_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            WaitForeverParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<wait_forever_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: wait_forever_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for wait_forever_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for wait_forever_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for wait_forever_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<wait_forever_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: wait_forever_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for wait_forever_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for wait_forever_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for wait_forever_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for WaitForeverParams {
+        type Reader<'a, T: _p::rpc::Table> = wait_forever_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = wait_forever_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for WaitForeverParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for WaitForeverParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = wait_forever_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for wait_forever_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl WaitForeverParams {}
+    impl<'p, T: _p::rpc::Table + 'p> wait_forever_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> wait_forever_params::Builder<'p, T> {}
+    pub mod wait_forever_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::WaitForeverParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::WaitForeverParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::WaitForeverParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct WaitForeverResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for WaitForeverResults {
+        const ID: u64 = 14070270601138847233u64;
+    }
+    impl<T> _p::IntoFamily for WaitForeverResults<T> {
+        type Family = WaitForeverResults;
+    }
+    impl<T: _p::Capable> _p::Capable for WaitForeverResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = WaitForeverResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (WaitForeverResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for wait_forever_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for wait_forever_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            WaitForeverResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<wait_forever_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: wait_forever_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for wait_forever_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for wait_forever_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for wait_forever_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<wait_forever_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: wait_forever_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for wait_forever_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for wait_forever_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for wait_forever_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for WaitForeverResults {
+        type Reader<'a, T: _p::rpc::Table> = wait_forever_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = wait_forever_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for WaitForeverResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for WaitForeverResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = wait_forever_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for wait_forever_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl WaitForeverResults {}
+    impl<'p, T: _p::rpc::Table + 'p> wait_forever_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> wait_forever_results::Builder<'p, T> {}
+    pub mod wait_forever_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::WaitForeverResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::WaitForeverResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::WaitForeverResults<::recapn::rpc::Pipeline<P>>;
+    }
 }
 #[derive(Clone)]
 pub struct TestContainMembrane<T = _p::Family>(T);
@@ -22712,13 +39262,28 @@ impl _p::ty::Struct for TestContainMembrane {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestContainMembrane {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_contain_membrane::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_contain_membrane::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestContainMembrane {
-    const CAP: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+    const CAP: _p::Descriptor<_p::Capability<test_membrane::Thing>> = _p::Descriptor::<
+        _p::Capability<test_membrane::Thing>,
+    > {
         slot: 0u32,
         default: ::core::option::Option::None,
     };
-    const LIST: _p::Descriptor<_p::List<_p::AnyPtr>> = _p::Descriptor::<
-        _p::List<_p::AnyPtr>,
+    const LIST: _p::Descriptor<_p::List<_p::Capability<test_membrane::Thing>>> = _p::Descriptor::<
+        _p::List<_p::Capability<test_membrane::Thing>>,
     > {
         slot: 1u32,
         default: ::core::option::Option::None,
@@ -22726,57 +39291,78 @@ impl TestContainMembrane {
 }
 impl<'p, T: _p::rpc::Table + 'p> test_contain_membrane::Reader<'p, T> {
     #[inline]
-    pub fn cap(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+    pub fn cap(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<test_membrane::Thing>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestContainMembrane::CAP,
-            )
+            <_p::Capability<
+                test_membrane::Thing,
+            > as _p::field::FieldType>::accessor(&self.0, &TestContainMembrane::CAP)
         }
     }
     #[inline]
-    pub fn list(&self) -> _p::Accessor<'_, 'p, T, _p::List<_p::AnyPtr>> {
+    pub fn list(
+        &self,
+    ) -> _p::Accessor<'_, 'p, T, _p::List<_p::Capability<test_membrane::Thing>>> {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<test_membrane::Thing>,
             > as _p::field::FieldType>::accessor(&self.0, &TestContainMembrane::LIST)
         }
     }
 }
 impl<'p, T: _p::rpc::Table + 'p> test_contain_membrane::Builder<'p, T> {
     #[inline]
-    pub fn cap(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+    pub fn cap(
+        &mut self,
+    ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<test_membrane::Thing>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestContainMembrane::CAP,
-            )
+            <_p::Capability<
+                test_membrane::Thing,
+            > as _p::field::FieldType>::accessor(&mut self.0, &TestContainMembrane::CAP)
         }
     }
     #[inline]
-    pub fn list(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::AnyPtr>> {
+    pub fn list(
+        &mut self,
+    ) -> _p::AccessorMut<'_, 'p, T, _p::List<_p::Capability<test_membrane::Thing>>> {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<test_membrane::Thing>,
             > as _p::field::FieldType>::accessor(&mut self.0, &TestContainMembrane::LIST)
         }
     }
     #[inline]
-    pub fn into_cap(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+    pub fn into_cap(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::Capability<test_membrane::Thing>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                self.0,
-                &TestContainMembrane::CAP,
-            )
+            <_p::Capability<
+                test_membrane::Thing,
+            > as _p::field::FieldType>::accessor(self.0, &TestContainMembrane::CAP)
         }
     }
     #[inline]
-    pub fn into_list(self) -> _p::AccessorOwned<'p, T, _p::List<_p::AnyPtr>> {
+    pub fn into_list(
+        self,
+    ) -> _p::AccessorOwned<'p, T, _p::List<_p::Capability<test_membrane::Thing>>> {
         unsafe {
             <_p::List<
-                _p::AnyPtr,
+                _p::Capability<test_membrane::Thing>,
             > as _p::field::FieldType>::accessor(self.0, &TestContainMembrane::LIST)
         }
+    }
+}
+impl<P> test_contain_membrane::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn cap(self) -> test_membrane::Thing {
+        ::recapn::ty::Capability::from_client(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)).into_cap(),
+        )
     }
 }
 pub mod test_contain_membrane {
@@ -22787,6 +39373,7 @@ pub mod test_contain_membrane {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestContainMembrane<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestContainMembrane<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestTransferCap<T = _p::Family>(T);
@@ -22885,6 +39472,19 @@ impl _p::ty::Struct for TestTransferCap {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestTransferCap {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_transfer_cap::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_transfer_cap::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestTransferCap {
     const LIST: _p::Descriptor<_p::List<_p::Struct<test_transfer_cap::Element>>> = _p::Descriptor::<
         _p::List<_p::Struct<test_transfer_cap::Element>>,
@@ -22935,6 +39535,7 @@ pub mod test_transfer_cap {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestTransferCap<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestTransferCap<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct Element<T = _p::Family>(T);
     impl _p::ty::SchemaType for Element {
@@ -23035,12 +39636,27 @@ pub mod test_transfer_cap {
             ptrs: 2u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for Element {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = element::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for element::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl Element {
         const TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
             slot: 0u32,
             default: ::core::option::Option::None,
         };
-        const CAP: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+        const CAP: _p::Descriptor<_p::Capability<super::TestInterface>> = _p::Descriptor::<
+            _p::Capability<super::TestInterface>,
+        > {
             slot: 1u32,
             default: ::core::option::Option::None,
         };
@@ -23053,9 +39669,13 @@ pub mod test_transfer_cap {
             }
         }
         #[inline]
-        pub fn cap(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+        pub fn cap(
+            &self,
+        ) -> _p::Accessor<'_, 'p, T, _p::Capability<super::TestInterface>> {
             unsafe {
-                <_p::AnyPtr as _p::field::FieldType>::accessor(&self.0, &Element::CAP)
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&self.0, &Element::CAP)
             }
         }
     }
@@ -23067,12 +39687,13 @@ pub mod test_transfer_cap {
             }
         }
         #[inline]
-        pub fn cap(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+        pub fn cap(
+            &mut self,
+        ) -> _p::AccessorMut<'_, 'p, T, _p::Capability<super::TestInterface>> {
             unsafe {
-                <_p::AnyPtr as _p::field::FieldType>::accessor(
-                    &mut self.0,
-                    &Element::CAP,
-                )
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(&mut self.0, &Element::CAP)
             }
         }
         #[inline]
@@ -23082,10 +39703,31 @@ pub mod test_transfer_cap {
             }
         }
         #[inline]
-        pub fn into_cap(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+        pub fn into_cap(
+            self,
+        ) -> _p::AccessorOwned<'p, T, _p::Capability<super::TestInterface>> {
             unsafe {
-                <_p::AnyPtr as _p::field::FieldType>::accessor(self.0, &Element::CAP)
+                <_p::Capability<
+                    super::TestInterface,
+                > as _p::field::FieldType>::accessor(self.0, &Element::CAP)
             }
+        }
+    }
+    impl<P> element::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn cap(self) -> super::TestInterface {
+            ::recapn::ty::Capability::from_client(
+                self
+                    .0
+                    .push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16))
+                    .into_cap(),
+            )
         }
     }
     pub mod element {
@@ -23096,6 +39738,1557 @@ pub mod test_transfer_cap {
         pub type Builder<'a, T = _p::rpc::Empty> = super::Element<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::Element<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestKeywordMethods(::recapn_rpc::client::Client);
+impl TestKeywordMethods {
+    pub fn delete(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_keyword_methods::DeleteParams,
+        test_keyword_methods::DeleteResults,
+    > {
+        self.0.call(11160837778045172988u64, 0u16)
+    }
+    pub fn class(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_keyword_methods::ClassParams,
+        test_keyword_methods::ClassResults,
+    > {
+        self.0.call(11160837778045172988u64, 1u16)
+    }
+    pub fn void(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_keyword_methods::VoidParams,
+        test_keyword_methods::VoidResults,
+    > {
+        self.0.call(11160837778045172988u64, 2u16)
+    }
+    pub fn r#return(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_keyword_methods::ReturnParams,
+        test_keyword_methods::ReturnResults,
+    > {
+        self.0.call(11160837778045172988u64, 3u16)
+    }
+}
+impl ::recapn::ty::Capability for TestKeywordMethods {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestKeywordMethodsServer> ::recapn_rpc::server::FromServer<T>
+for TestKeywordMethods {
+    type Dispatcher = TestKeywordMethodsDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestKeywordMethodsDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestKeywordMethodsServer {
+    fn delete(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_keyword_methods::DeleteParams,
+            test_keyword_methods::DeleteResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestKeywordMethods.delete' is not implemented for this type",
+                ),
+            )
+    }
+    fn class(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_keyword_methods::ClassParams,
+            test_keyword_methods::ClassResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestKeywordMethods.class' is not implemented for this type",
+                ),
+            )
+    }
+    fn void(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_keyword_methods::VoidParams,
+            test_keyword_methods::VoidResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestKeywordMethods.void' is not implemented for this type",
+                ),
+            )
+    }
+    fn r#return(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_keyword_methods::ReturnParams,
+            test_keyword_methods::ReturnResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestKeywordMethods.return' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestKeywordMethodsDispatcher<T>(pub T);
+impl<T> TestKeywordMethodsDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestKeywordMethods";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestKeywordMethodsDispatcher<T>
+where
+    T: TestKeywordMethodsServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (11160837778045172988u64, 0u16) => {
+                self.0.delete(request.into_call_context()).into()
+            }
+            (11160837778045172988u64, 1u16) => {
+                self.0.class(request.into_call_context()).into()
+            }
+            (11160837778045172988u64, 2u16) => {
+                self.0.void(request.into_call_context()).into()
+            }
+            (11160837778045172988u64, 3u16) => {
+                self.0.r#return(request.into_call_context()).into()
+            }
+            (11160837778045172988u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_keyword_methods {
+    use super::{__file, __imports, _p};
+    pub use super::TestKeywordMethods as Client;
+    pub use super::TestKeywordMethodsServer as Server;
+    pub use super::TestKeywordMethodsDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct DeleteParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for DeleteParams {
+        const ID: u64 = 14572111061821675191u64;
+    }
+    impl<T> _p::IntoFamily for DeleteParams<T> {
+        type Family = DeleteParams;
+    }
+    impl<T: _p::Capable> _p::Capable for DeleteParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = DeleteParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (DeleteParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for delete_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for delete_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            DeleteParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<delete_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: delete_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for delete_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for delete_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for delete_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<delete_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: delete_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for delete_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for delete_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for delete_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for DeleteParams {
+        type Reader<'a, T: _p::rpc::Table> = delete_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = delete_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for DeleteParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for DeleteParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = delete_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for delete_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl DeleteParams {}
+    impl<'p, T: _p::rpc::Table + 'p> delete_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> delete_params::Builder<'p, T> {}
+    pub mod delete_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::DeleteParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::DeleteParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::DeleteParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct DeleteResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for DeleteResults {
+        const ID: u64 = 17200799717532923282u64;
+    }
+    impl<T> _p::IntoFamily for DeleteResults<T> {
+        type Family = DeleteResults;
+    }
+    impl<T: _p::Capable> _p::Capable for DeleteResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = DeleteResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (DeleteResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for delete_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for delete_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            DeleteResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<delete_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: delete_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for delete_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for delete_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for delete_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<delete_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: delete_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for delete_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for delete_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for delete_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for DeleteResults {
+        type Reader<'a, T: _p::rpc::Table> = delete_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = delete_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for DeleteResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for DeleteResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = delete_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for delete_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl DeleteResults {}
+    impl<'p, T: _p::rpc::Table + 'p> delete_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> delete_results::Builder<'p, T> {}
+    pub mod delete_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::DeleteResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::DeleteResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::DeleteResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ClassParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ClassParams {
+        const ID: u64 = 11310130968630505526u64;
+    }
+    impl<T> _p::IntoFamily for ClassParams<T> {
+        type Family = ClassParams;
+    }
+    impl<T: _p::Capable> _p::Capable for ClassParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ClassParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ClassParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for class_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for class_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ClassParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<class_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: class_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for class_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for class_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for class_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<class_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: class_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for class_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for class_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for class_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ClassParams {
+        type Reader<'a, T: _p::rpc::Table> = class_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = class_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ClassParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ClassParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = class_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for class_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ClassParams {}
+    impl<'p, T: _p::rpc::Table + 'p> class_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> class_params::Builder<'p, T> {}
+    pub mod class_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ClassParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ClassParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ClassParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ClassResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ClassResults {
+        const ID: u64 = 13845534651635132376u64;
+    }
+    impl<T> _p::IntoFamily for ClassResults<T> {
+        type Family = ClassResults;
+    }
+    impl<T: _p::Capable> _p::Capable for ClassResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ClassResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ClassResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for class_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for class_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ClassResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<class_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: class_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for class_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for class_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for class_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<class_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: class_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for class_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for class_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for class_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ClassResults {
+        type Reader<'a, T: _p::rpc::Table> = class_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = class_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ClassResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ClassResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = class_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for class_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ClassResults {}
+    impl<'p, T: _p::rpc::Table + 'p> class_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> class_results::Builder<'p, T> {}
+    pub mod class_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ClassResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ClassResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ClassResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct VoidParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for VoidParams {
+        const ID: u64 = 11862630279967176535u64;
+    }
+    impl<T> _p::IntoFamily for VoidParams<T> {
+        type Family = VoidParams;
+    }
+    impl<T: _p::Capable> _p::Capable for VoidParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = VoidParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (VoidParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for void_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for void_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            VoidParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<void_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: void_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for void_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for void_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for void_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<void_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: void_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for void_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for void_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for void_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for VoidParams {
+        type Reader<'a, T: _p::rpc::Table> = void_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = void_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for VoidParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for VoidParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = void_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for void_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl VoidParams {}
+    impl<'p, T: _p::rpc::Table + 'p> void_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> void_params::Builder<'p, T> {}
+    pub mod void_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::VoidParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::VoidParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::VoidParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct VoidResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for VoidResults {
+        const ID: u64 = 16033508673745628843u64;
+    }
+    impl<T> _p::IntoFamily for VoidResults<T> {
+        type Family = VoidResults;
+    }
+    impl<T: _p::Capable> _p::Capable for VoidResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = VoidResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (VoidResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for void_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for void_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            VoidResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<void_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: void_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for void_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for void_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for void_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<void_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: void_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for void_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for void_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for void_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for VoidResults {
+        type Reader<'a, T: _p::rpc::Table> = void_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = void_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for VoidResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for VoidResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = void_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for void_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl VoidResults {}
+    impl<'p, T: _p::rpc::Table + 'p> void_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> void_results::Builder<'p, T> {}
+    pub mod void_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::VoidResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::VoidResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::VoidResults<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ReturnParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ReturnParams {
+        const ID: u64 = 11061249017603067043u64;
+    }
+    impl<T> _p::IntoFamily for ReturnParams<T> {
+        type Family = ReturnParams;
+    }
+    impl<T: _p::Capable> _p::Capable for ReturnParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ReturnParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ReturnParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for return_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for return_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ReturnParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<return_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: return_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for return_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for return_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for return_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<return_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: return_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for return_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for return_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder for return_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ReturnParams {
+        type Reader<'a, T: _p::rpc::Table> = return_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = return_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ReturnParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ReturnParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = return_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for return_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ReturnParams {}
+    impl<'p, T: _p::rpc::Table + 'p> return_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> return_params::Builder<'p, T> {}
+    pub mod return_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ReturnParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ReturnParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ReturnParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct ReturnResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for ReturnResults {
+        const ID: u64 = 13188917817277847855u64;
+    }
+    impl<T> _p::IntoFamily for ReturnResults<T> {
+        type Family = ReturnResults;
+    }
+    impl<T: _p::Capable> _p::Capable for ReturnResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = ReturnResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (ReturnResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for return_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for return_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            ReturnResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<return_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: return_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for return_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader for return_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr for return_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<return_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: return_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for return_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for return_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for return_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for ReturnResults {
+        type Reader<'a, T: _p::rpc::Table> = return_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = return_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for ReturnResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for ReturnResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = return_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for return_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl ReturnResults {}
+    impl<'p, T: _p::rpc::Table + 'p> return_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> return_results::Builder<'p, T> {}
+    pub mod return_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::ReturnResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::ReturnResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::ReturnResults<::recapn::rpc::Pipeline<P>>;
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestAuthenticatedBootstrap(::recapn_rpc::client::Client);
+impl TestAuthenticatedBootstrap {
+    pub fn get_caller_id(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_authenticated_bootstrap::GetCallerIdParams,
+        test_authenticated_bootstrap::GetCallerIdResults,
+    > {
+        self.0.call(16893789964317726925u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestAuthenticatedBootstrap {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestAuthenticatedBootstrapServer> ::recapn_rpc::server::FromServer<T>
+for TestAuthenticatedBootstrap {
+    type Dispatcher = TestAuthenticatedBootstrapDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestAuthenticatedBootstrapDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestAuthenticatedBootstrapServer {
+    fn get_caller_id(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_authenticated_bootstrap::GetCallerIdParams,
+            test_authenticated_bootstrap::GetCallerIdResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestAuthenticatedBootstrap.getCallerId' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestAuthenticatedBootstrapDispatcher<T>(pub T);
+impl<T> TestAuthenticatedBootstrapDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestAuthenticatedBootstrap";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestAuthenticatedBootstrapDispatcher<T>
+where
+    T: TestAuthenticatedBootstrapServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (16893789964317726925u64, 0u16) => {
+                self.0.get_caller_id(request.into_call_context()).into()
+            }
+            (16893789964317726925u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_authenticated_bootstrap {
+    use super::{__file, __imports, _p};
+    pub use super::TestAuthenticatedBootstrap as Client;
+    pub use super::TestAuthenticatedBootstrapServer as Server;
+    pub use super::TestAuthenticatedBootstrapDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct GetCallerIdParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCallerIdParams {
+        const ID: u64 = 10287081523000758270u64;
+    }
+    impl<T> _p::IntoFamily for GetCallerIdParams<T> {
+        type Family = GetCallerIdParams;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCallerIdParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCallerIdParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCallerIdParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_caller_id_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_caller_id_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCallerIdParams(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_caller_id_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_caller_id_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_caller_id_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_caller_id_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_caller_id_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_caller_id_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_caller_id_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_caller_id_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_caller_id_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_caller_id_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCallerIdParams {
+        type Reader<'a, T: _p::rpc::Table> = get_caller_id_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_caller_id_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCallerIdParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCallerIdParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_caller_id_params::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_caller_id_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCallerIdParams {}
+    impl<'p, T: _p::rpc::Table + 'p> get_caller_id_params::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> get_caller_id_params::Builder<'p, T> {}
+    pub mod get_caller_id_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCallerIdParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCallerIdParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCallerIdParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct GetCallerIdResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for GetCallerIdResults {
+        const ID: u64 = 14347614599128956519u64;
+    }
+    impl<T> _p::IntoFamily for GetCallerIdResults<T> {
+        type Family = GetCallerIdResults;
+    }
+    impl<T: _p::Capable> _p::Capable for GetCallerIdResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = GetCallerIdResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (GetCallerIdResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_caller_id_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for get_caller_id_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            GetCallerIdResults(ptr)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<get_caller_id_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: get_caller_id_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for get_caller_id_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for get_caller_id_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for get_caller_id_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<get_caller_id_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: get_caller_id_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for get_caller_id_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for get_caller_id_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for get_caller_id_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for GetCallerIdResults {
+        type Reader<'a, T: _p::rpc::Table> = get_caller_id_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = get_caller_id_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for GetCallerIdResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 1u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for GetCallerIdResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = get_caller_id_results::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for get_caller_id_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl GetCallerIdResults {
+        const CALLER: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+            slot: 0u32,
+            default: ::core::option::Option::None,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_caller_id_results::Reader<'p, T> {
+        #[inline]
+        pub fn caller(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &GetCallerIdResults::CALLER,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> get_caller_id_results::Builder<'p, T> {
+        #[inline]
+        pub fn caller(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &GetCallerIdResults::CALLER,
+                )
+            }
+        }
+        #[inline]
+        pub fn into_caller(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+            unsafe {
+                <_p::AnyPtr as _p::field::FieldType>::accessor(
+                    self.0,
+                    &GetCallerIdResults::CALLER,
+                )
+            }
+        }
+    }
+    impl<P> get_caller_id_results::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn caller(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+    }
+    pub mod get_caller_id_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::GetCallerIdResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::GetCallerIdResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::GetCallerIdResults<::recapn::rpc::Pipeline<P>>;
     }
 }
 #[derive(Clone)]
@@ -23195,6 +41388,19 @@ impl _p::ty::Struct for TestSturdyRef {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestSturdyRef {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_sturdy_ref::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_sturdy_ref::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestSturdyRef {
     const HOST_ID: _p::Descriptor<_p::Struct<TestSturdyRefHostId>> = _p::Descriptor::<
         _p::Struct<TestSturdyRefHostId>,
@@ -23266,6 +41472,25 @@ impl<'p, T: _p::rpc::Table + 'p> test_sturdy_ref::Builder<'p, T> {
         }
     }
 }
+impl<P> test_sturdy_ref::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn host_id(self) -> ::recapn::rpc::PipelineOf<TestSturdyRefHostId, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn object_id(self) -> ::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+}
 pub mod test_sturdy_ref {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestSturdyRef<
@@ -23274,6 +41499,7 @@ pub mod test_sturdy_ref {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestSturdyRef<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestSturdyRef<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestSturdyRefHostId<T = _p::Family>(T);
@@ -23375,6 +41601,19 @@ impl _p::ty::Struct for TestSturdyRefHostId {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestSturdyRefHostId {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_sturdy_ref_host_id::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_sturdy_ref_host_id::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestSturdyRefHostId {
     const HOST: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
         slot: 0u32,
@@ -23420,6 +41659,7 @@ pub mod test_sturdy_ref_host_id {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestSturdyRefHostId<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestSturdyRefHostId<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestSturdyRefObjectId<T = _p::Family>(T);
@@ -23525,6 +41765,19 @@ impl _p::ty::Struct for TestSturdyRefObjectId {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestSturdyRefObjectId {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_sturdy_ref_object_id::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_sturdy_ref_object_id::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestSturdyRefObjectId {
     const TAG: _p::Descriptor<_p::Enum<test_sturdy_ref_object_id::Tag>> = _p::Descriptor::<
         _p::Enum<test_sturdy_ref_object_id::Tag>,
@@ -23568,6 +41821,7 @@ pub mod test_sturdy_ref_object_id {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestSturdyRefObjectId<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestSturdyRefObjectId<::recapn::rpc::Pipeline<P>>;
     #[repr(u16)]
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
     pub enum Tag {
@@ -23702,6 +41956,19 @@ impl _p::ty::Struct for TestProvisionId {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestProvisionId {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_provision_id::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_provision_id::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestProvisionId {}
 impl<'p, T: _p::rpc::Table + 'p> test_provision_id::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_provision_id::Builder<'p, T> {}
@@ -23713,6 +41980,7 @@ pub mod test_provision_id {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestProvisionId<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestProvisionId<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestRecipientId<T = _p::Family>(T);
@@ -23811,6 +42079,19 @@ impl _p::ty::Struct for TestRecipientId {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestRecipientId {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_recipient_id::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_recipient_id::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestRecipientId {}
 impl<'p, T: _p::rpc::Table + 'p> test_recipient_id::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_recipient_id::Builder<'p, T> {}
@@ -23822,6 +42103,7 @@ pub mod test_recipient_id {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestRecipientId<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestRecipientId<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestThirdPartyCapId<T = _p::Family>(T);
@@ -23923,6 +42205,19 @@ impl _p::ty::Struct for TestThirdPartyCapId {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestThirdPartyCapId {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_third_party_cap_id::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_third_party_cap_id::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestThirdPartyCapId {}
 impl<'p, T: _p::rpc::Table + 'p> test_third_party_cap_id::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_third_party_cap_id::Builder<'p, T> {}
@@ -23934,6 +42229,7 @@ pub mod test_third_party_cap_id {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestThirdPartyCapId<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestThirdPartyCapId<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestJoinResult<T = _p::Family>(T);
@@ -24032,6 +42328,19 @@ impl _p::ty::Struct for TestJoinResult {
         ptrs: 0u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestJoinResult {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_join_result::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_join_result::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestJoinResult {}
 impl<'p, T: _p::rpc::Table + 'p> test_join_result::Reader<'p, T> {}
 impl<'p, T: _p::rpc::Table + 'p> test_join_result::Builder<'p, T> {}
@@ -24043,6 +42352,7 @@ pub mod test_join_result {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestJoinResult<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestJoinResult<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestNameAnnotation<T = _p::Family>(T);
@@ -24142,6 +42452,19 @@ impl _p::ty::Struct for TestNameAnnotation {
         data: 1u16,
         ptrs: 1u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestNameAnnotation {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_name_annotation::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_name_annotation::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestNameAnnotation {
     const ANOTHER_BAD_FIELD_NAME: _p::Descriptor<
@@ -24283,6 +42606,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_name_annotation::Builder<'p, T> {
         unsafe { <test_name_annotation::Which<_> as _p::UnionViewer<_>>::get(self) }
     }
 }
+impl<P> test_name_annotation::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn badly_named_union(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_name_annotation::BadlyNamedUnion, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_name_annotation {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestNameAnnotation<
@@ -24291,6 +42628,7 @@ pub mod test_name_annotation {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestNameAnnotation<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestNameAnnotation<::recapn::rpc::Pipeline<P>>;
     pub enum Which<T: _p::Viewable = _p::Family> {
         BadFieldName(_p::ViewOf<T, bool>),
         Bar(_p::ViewOf<T, i8>),
@@ -24302,22 +42640,22 @@ pub mod test_name_annotation {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::BadFieldName(
+                        Which::BadFieldName(unsafe {
                             <bool as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestNameAnnotation::BAD_FIELD_NAME.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <i8 as _p::field::FieldType>::accessor(
                                 &repr.0,
                                 &super::TestNameAnnotation::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -24334,22 +42672,22 @@ pub mod test_name_annotation {
             match tag {
                 0u16 => {
                     Ok(
-                        Which::BadFieldName(
+                        Which::BadFieldName(unsafe {
                             <bool as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestNameAnnotation::BAD_FIELD_NAME.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 1u16 => {
                     Ok(
-                        Which::Bar(
+                        Which::Bar(unsafe {
                             <i8 as _p::field::FieldType>::accessor(
                                 &mut repr.0,
                                 &super::TestNameAnnotation::BAR.field,
-                            ),
-                        ),
+                            )
+                        }),
                     )
                 }
                 unknown => Err(_p::NotInSchema(unknown)),
@@ -24486,6 +42824,19 @@ pub mod test_name_annotation {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for NestedStruct {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = nested_struct::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for nested_struct::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl NestedStruct {
         const BAD_NESTED_FIELD_NAME: _p::Descriptor<bool> = _p::Descriptor::<bool> {
             slot: 0u32,
@@ -24559,6 +42910,22 @@ pub mod test_name_annotation {
             }
         }
     }
+    impl<P> nested_struct::Pipeline<P>
+    where
+        P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+        P: ::recapn::rpc::PipelineBuilder<
+            ::recapn::any::AnyPtr,
+            Operation = ::recapn_rpc::pipeline::PipelineOp,
+        >,
+    {
+        pub fn another_bad_nested_field_name(
+            self,
+        ) -> ::recapn::rpc::PipelineOf<NestedStruct, P> {
+            ::recapn::rpc::TypedPipeline::from_pipeline(
+                self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+            )
+        }
+    }
     pub mod nested_struct {
         use super::{__file, __imports, _p};
         pub type Reader<'a, T = _p::rpc::Empty> = super::NestedStruct<
@@ -24567,6 +42934,7 @@ pub mod test_name_annotation {
         pub type Builder<'a, T = _p::rpc::Empty> = super::NestedStruct<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::NestedStruct<::recapn::rpc::Pipeline<P>>;
         #[repr(u16)]
         #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
         pub enum DeeplyNestedEnum {
@@ -24696,13 +43064,30 @@ pub mod test_name_annotation {
     }
     impl _p::FieldGroup for BadlyNamedUnion {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            s.set_field_unchecked(3usize, 0);
-            <_p::Group<
-                badly_named_union::BadlyNamedGroup,
-            > as _p::field::FieldType>::clear(
-                s,
-                &BadlyNamedUnion::BADLY_NAMED_GROUP.field,
-            );
+            unsafe {
+                s.set_field_unchecked(3usize, 0);
+            }
+            unsafe {
+                <_p::Group<
+                    badly_named_union::BadlyNamedGroup,
+                > as _p::field::FieldType>::clear(
+                    s,
+                    &BadlyNamedUnion::BADLY_NAMED_GROUP.field,
+                );
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for BadlyNamedUnion {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = badly_named_union::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for badly_named_union::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl BadlyNamedUnion {
@@ -24813,6 +43198,7 @@ pub mod test_name_annotation {
         pub type Builder<'a, T = _p::rpc::Empty> = super::BadlyNamedUnion<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::BadlyNamedUnion<::recapn::rpc::Pipeline<P>>;
         pub enum Which<T: _p::Viewable = _p::Family> {
             BadlyNamedGroup(_p::ViewOf<T, _p::Group<BadlyNamedGroup>>),
             Baz(_p::ViewOf<T, _p::Struct<super::NestedStruct>>),
@@ -24827,26 +43213,26 @@ pub mod test_name_annotation {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::BadlyNamedGroup(
+                            Which::BadlyNamedGroup(unsafe {
                                 <_p::Group<
                                     BadlyNamedGroup,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::BadlyNamedUnion::BADLY_NAMED_GROUP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <_p::Struct<
                                     super::NestedStruct,
                                 > as _p::field::FieldType>::accessor(
                                     &repr.0,
                                     &super::BadlyNamedUnion::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -24863,26 +43249,26 @@ pub mod test_name_annotation {
                 match tag {
                     0u16 => {
                         Ok(
-                            Which::BadlyNamedGroup(
+                            Which::BadlyNamedGroup(unsafe {
                                 <_p::Group<
                                     BadlyNamedGroup,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::BadlyNamedUnion::BADLY_NAMED_GROUP.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     1u16 => {
                         Ok(
-                            Which::Baz(
+                            Which::Baz(unsafe {
                                 <_p::Struct<
                                     super::NestedStruct,
                                 > as _p::field::FieldType>::accessor(
                                     &mut repr.0,
                                     &super::BadlyNamedUnion::BAZ.field,
-                                ),
-                            ),
+                                )
+                            }),
                         )
                     }
                     unknown => Err(_p::NotInSchema(unknown)),
@@ -24994,8 +43380,25 @@ pub mod test_name_annotation {
             unsafe fn clear<'a, 'b, T: _p::rpc::Table>(
                 s: &'a mut _p::StructBuilder<'b, T>,
             ) {
-                <() as _p::field::FieldType>::clear(s, &BadlyNamedGroup::FOO);
-                <() as _p::field::FieldType>::clear(s, &BadlyNamedGroup::BAR);
+                unsafe {
+                    <() as _p::field::FieldType>::clear(s, &BadlyNamedGroup::FOO);
+                }
+                unsafe {
+                    <() as _p::field::FieldType>::clear(s, &BadlyNamedGroup::BAR);
+                }
+            }
+        }
+        impl ::recapn::rpc::Pipelinable for BadlyNamedGroup {
+            type Pipeline<P: ::recapn::rpc::Pipelined> = badly_named_group::Pipeline<P>;
+        }
+        impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+        for badly_named_group::Pipeline<P> {
+            type Pipeline = P;
+            fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+                Self(p)
+            }
+            fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+                self.0
             }
         }
         impl BadlyNamedGroup {
@@ -25050,7 +43453,388 @@ pub mod test_name_annotation {
             pub type Builder<'a, T = _p::rpc::Empty> = super::BadlyNamedGroup<
                 _p::StructBuilder<'a, T>,
             >;
+            pub type Pipeline<P> = super::BadlyNamedGroup<::recapn::rpc::Pipeline<P>>;
         }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TestNameAnnotationInterface(::recapn_rpc::client::Client);
+impl TestNameAnnotationInterface {
+    pub fn badly_named_method(
+        &self,
+    ) -> ::recapn_rpc::client::Request<
+        test_name_annotation_interface::BadlyNamedMethodParams,
+        test_name_annotation_interface::BadlyNamedMethodResults,
+    > {
+        self.0.call(15065286897585459595u64, 0u16)
+    }
+}
+impl ::recapn::ty::Capability for TestNameAnnotationInterface {
+    type Client = ::recapn_rpc::client::Client;
+    fn from_client(c: Self::Client) -> Self {
+        Self(c)
+    }
+    fn into_inner(self) -> Self::Client {
+        self.0
+    }
+}
+impl<T: TestNameAnnotationInterfaceServer> ::recapn_rpc::server::FromServer<T>
+for TestNameAnnotationInterface {
+    type Dispatcher = TestNameAnnotationInterfaceDispatcher<T>;
+    #[inline]
+    fn from_server(
+        server: T,
+    ) -> (Self, ::recapn_rpc::server::Dispatcher<Self::Dispatcher>) {
+        let (client, dispatcher) = ::recapn_rpc::server::new_server(
+            TestNameAnnotationInterfaceDispatcher(server),
+        );
+        (Self(client), dispatcher)
+    }
+}
+pub trait TestNameAnnotationInterfaceServer {
+    fn badly_named_method(
+        &mut self,
+        ctx: ::recapn_rpc::server::CallContext<
+            test_name_annotation_interface::BadlyNamedMethodParams,
+            test_name_annotation_interface::BadlyNamedMethodResults,
+        >,
+    ) -> ::recapn_rpc::server::CallResult {
+        ctx.response
+            .error(
+                ::recapn_rpc::Error::unimplemented(
+                    "'capnp/test.capnp:TestNameAnnotationInterface.badlyNamedMethod' is not implemented for this type",
+                ),
+            )
+    }
+}
+pub struct TestNameAnnotationInterfaceDispatcher<T>(pub T);
+impl<T> TestNameAnnotationInterfaceDispatcher<T> {
+    pub const NAME: &str = "capnp/test.capnp:TestNameAnnotationInterface";
+}
+impl<T> ::recapn_rpc::server::Dispatch for TestNameAnnotationInterfaceDispatcher<T>
+where
+    T: TestNameAnnotationInterfaceServer,
+{
+    fn dispatch(
+        &mut self,
+        request: ::recapn_rpc::server::DispatchRequest,
+    ) -> ::recapn_rpc::server::DispatchResponse {
+        match (request.interface(), request.method()) {
+            (15065286897585459595u64, 0u16) => {
+                self.0.badly_named_method(request.into_call_context()).into()
+            }
+            (15065286897585459595u64, _) => request.unimplemented_method(Self::NAME),
+            (_, _) => request.unimplemented_interface(Self::NAME),
+        }
+    }
+}
+pub mod test_name_annotation_interface {
+    use super::{__file, __imports, _p};
+    pub use super::TestNameAnnotationInterface as Client;
+    pub use super::TestNameAnnotationInterfaceServer as Server;
+    pub use super::TestNameAnnotationInterfaceDispatcher as Dispatcher;
+    #[derive(Clone)]
+    pub struct BadlyNamedMethodParams<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BadlyNamedMethodParams {
+        const ID: u64 = 13920340828705447913u64;
+    }
+    impl<T> _p::IntoFamily for BadlyNamedMethodParams<T> {
+        type Family = BadlyNamedMethodParams;
+    }
+    impl<T: _p::Capable> _p::Capable for BadlyNamedMethodParams<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BadlyNamedMethodParams<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BadlyNamedMethodParams(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for badly_named_method_params::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for badly_named_method_params::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BadlyNamedMethodParams(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<badly_named_method_params::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: badly_named_method_params::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for badly_named_method_params::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for badly_named_method_params::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for badly_named_method_params::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<badly_named_method_params::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: badly_named_method_params::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for badly_named_method_params::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for badly_named_method_params::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for badly_named_method_params::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BadlyNamedMethodParams {
+        type Reader<'a, T: _p::rpc::Table> = badly_named_method_params::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = badly_named_method_params::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BadlyNamedMethodParams {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 1u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BadlyNamedMethodParams {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = badly_named_method_params::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for badly_named_method_params::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BadlyNamedMethodParams {
+        const BADLY_NAMED_PARAM: _p::Descriptor<u8> = _p::Descriptor::<u8> {
+            slot: 0u32,
+            default: 0u8,
+        };
+    }
+    impl<'p, T: _p::rpc::Table + 'p> badly_named_method_params::Reader<'p, T> {
+        #[inline]
+        pub fn badly_named_param(&self) -> _p::Accessor<'_, 'p, T, u8> {
+            unsafe {
+                <u8 as _p::field::FieldType>::accessor(
+                    &self.0,
+                    &BadlyNamedMethodParams::BADLY_NAMED_PARAM,
+                )
+            }
+        }
+    }
+    impl<'p, T: _p::rpc::Table + 'p> badly_named_method_params::Builder<'p, T> {
+        #[inline]
+        pub fn badly_named_param(&mut self) -> _p::AccessorMut<'_, 'p, T, u8> {
+            unsafe {
+                <u8 as _p::field::FieldType>::accessor(
+                    &mut self.0,
+                    &BadlyNamedMethodParams::BADLY_NAMED_PARAM,
+                )
+            }
+        }
+    }
+    pub mod badly_named_method_params {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BadlyNamedMethodParams<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BadlyNamedMethodParams<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BadlyNamedMethodParams<::recapn::rpc::Pipeline<P>>;
+    }
+    #[derive(Clone)]
+    pub struct BadlyNamedMethodResults<T = _p::Family>(T);
+    impl _p::ty::SchemaType for BadlyNamedMethodResults {
+        const ID: u64 = 15907784484776275078u64;
+    }
+    impl<T> _p::IntoFamily for BadlyNamedMethodResults<T> {
+        type Family = BadlyNamedMethodResults;
+    }
+    impl<T: _p::Capable> _p::Capable for BadlyNamedMethodResults<T> {
+        type Table = T::Table;
+        type Imbued = T::Imbued;
+        type ImbuedWith<T2: _p::rpc::Table> = BadlyNamedMethodResults<T::ImbuedWith<T2>>;
+        #[inline]
+        fn imbued(&self) -> &Self::Imbued {
+            self.0.imbued()
+        }
+        #[inline]
+        fn imbue_release<T2: _p::rpc::Table>(
+            self,
+            new_table: <Self::ImbuedWith<T2> as _p::Capable>::Imbued,
+        ) -> (Self::ImbuedWith<T2>, Self::Imbued) {
+            let (imbued, old) = self.0.imbue_release(new_table);
+            (BadlyNamedMethodResults(imbued), old)
+        }
+        #[inline]
+        fn imbue_release_into<U>(
+            &self,
+            other: U,
+        ) -> (U::ImbuedWith<Self::Table>, U::Imbued)
+        where
+            U: _p::Capable,
+            U::ImbuedWith<Self::Table>: _p::Capable<Imbued = Self::Imbued>,
+        {
+            self.0.imbue_release_into(other)
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for badly_named_method_results::Reader<'a, T> {
+        type Ptr = _p::StructReader<'a, T>;
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::From<_p::StructReader<'a, T>>
+    for badly_named_method_results::Reader<'a, T> {
+        #[inline]
+        fn from(ptr: _p::StructReader<'a, T>) -> Self {
+            BadlyNamedMethodResults(ptr)
+        }
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<badly_named_method_results::Reader<'a, T>>
+    for _p::StructReader<'a, T> {
+        #[inline]
+        fn from(reader: badly_named_method_results::Reader<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructReader<'a, T>>
+    for badly_named_method_results::Reader<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructReader<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructReader
+    for badly_named_method_results::Reader<'a, T> {}
+    impl<'a, T: _p::rpc::Table> _p::ty::TypedPtr
+    for badly_named_method_results::Builder<'a, T> {
+        type Ptr = _p::StructBuilder<'a, T>;
+    }
+    impl<
+        'a,
+        T: _p::rpc::Table,
+    > core::convert::From<badly_named_method_results::Builder<'a, T>>
+    for _p::StructBuilder<'a, T> {
+        #[inline]
+        fn from(reader: badly_named_method_results::Builder<'a, T>) -> Self {
+            reader.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsRef<_p::StructBuilder<'a, T>>
+    for badly_named_method_results::Builder<'a, T> {
+        #[inline]
+        fn as_ref(&self) -> &_p::StructBuilder<'a, T> {
+            &self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> core::convert::AsMut<_p::StructBuilder<'a, T>>
+    for badly_named_method_results::Builder<'a, T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut _p::StructBuilder<'a, T> {
+            &mut self.0
+        }
+    }
+    impl<'a, T: _p::rpc::Table> _p::ty::StructBuilder
+    for badly_named_method_results::Builder<'a, T> {
+        unsafe fn from_ptr(ptr: Self::Ptr) -> Self {
+            Self(ptr)
+        }
+    }
+    impl _p::StructView for BadlyNamedMethodResults {
+        type Reader<'a, T: _p::rpc::Table> = badly_named_method_results::Reader<'a, T>;
+        type Builder<'a, T: _p::rpc::Table> = badly_named_method_results::Builder<'a, T>;
+    }
+    impl _p::ty::Struct for BadlyNamedMethodResults {
+        const SIZE: _p::StructSize = _p::StructSize {
+            data: 0u16,
+            ptrs: 0u16,
+        };
+    }
+    impl ::recapn::rpc::Pipelinable for BadlyNamedMethodResults {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = badly_named_method_results::Pipeline<
+            P,
+        >;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for badly_named_method_results::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
+    impl BadlyNamedMethodResults {}
+    impl<'p, T: _p::rpc::Table + 'p> badly_named_method_results::Reader<'p, T> {}
+    impl<'p, T: _p::rpc::Table + 'p> badly_named_method_results::Builder<'p, T> {}
+    pub mod badly_named_method_results {
+        use super::{__file, __imports, _p};
+        pub type Reader<'a, T = _p::rpc::Empty> = super::BadlyNamedMethodResults<
+            _p::StructReader<'a, T>,
+        >;
+        pub type Builder<'a, T = _p::rpc::Empty> = super::BadlyNamedMethodResults<
+            _p::StructBuilder<'a, T>,
+        >;
+        pub type Pipeline<P> = super::BadlyNamedMethodResults<
+            ::recapn::rpc::Pipeline<P>,
+        >;
     }
 }
 #[derive(Clone)]
@@ -25153,6 +43937,19 @@ impl _p::ty::Struct for TestImpliedFirstField {
         data: 1u16,
         ptrs: 3u16,
     };
+}
+impl ::recapn::rpc::Pipelinable for TestImpliedFirstField {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_implied_first_field::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_implied_first_field::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
 }
 impl TestImpliedFirstField {
     const TEXT_STRUCT: _p::Descriptor<
@@ -25316,6 +44113,27 @@ impl<'p, T: _p::rpc::Table + 'p> test_implied_first_field::Builder<'p, T> {
         }
     }
 }
+impl<P> test_implied_first_field::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn text_struct(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_implied_first_field::TextStruct, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+    pub fn int_group(
+        self,
+    ) -> ::recapn::rpc::PipelineOf<test_implied_first_field::IntGroup, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(self.0)
+    }
+}
 pub mod test_implied_first_field {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestImpliedFirstField<
@@ -25324,6 +44142,7 @@ pub mod test_implied_first_field {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestImpliedFirstField<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestImpliedFirstField<::recapn::rpc::Pipeline<P>>;
     #[derive(Clone)]
     pub struct TextStruct<T = _p::Family>(T);
     impl _p::ty::SchemaType for TextStruct {
@@ -25424,6 +44243,19 @@ pub mod test_implied_first_field {
             ptrs: 1u16,
         };
     }
+    impl ::recapn::rpc::Pipelinable for TextStruct {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = text_struct::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for text_struct::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
+        }
+    }
     impl TextStruct {
         const TEXT: _p::Descriptor<_p::Text> = _p::Descriptor::<_p::Text> {
             slot: 0u32,
@@ -25477,6 +44309,7 @@ pub mod test_implied_first_field {
         pub type Builder<'a, T = _p::rpc::Empty> = super::TextStruct<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::TextStruct<::recapn::rpc::Pipeline<P>>;
     }
     #[derive(Clone)]
     pub struct IntGroup<T = _p::Family>(T);
@@ -25574,8 +44407,25 @@ pub mod test_implied_first_field {
     }
     impl _p::FieldGroup for IntGroup {
         unsafe fn clear<'a, 'b, T: _p::rpc::Table>(s: &'a mut _p::StructBuilder<'b, T>) {
-            <u32 as _p::field::FieldType>::clear(s, &IntGroup::I);
-            <_p::Text as _p::field::FieldType>::clear(s, &IntGroup::STR);
+            unsafe {
+                <u32 as _p::field::FieldType>::clear(s, &IntGroup::I);
+            }
+            unsafe {
+                <_p::Text as _p::field::FieldType>::clear(s, &IntGroup::STR);
+            }
+        }
+    }
+    impl ::recapn::rpc::Pipelinable for IntGroup {
+        type Pipeline<P: ::recapn::rpc::Pipelined> = int_group::Pipeline<P>;
+    }
+    impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+    for int_group::Pipeline<P> {
+        type Pipeline = P;
+        fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+            Self(p)
+        }
+        fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+            self.0
         }
     }
     impl IntGroup {
@@ -25628,6 +44478,7 @@ pub mod test_implied_first_field {
         pub type Builder<'a, T = _p::rpc::Empty> = super::IntGroup<
             _p::StructBuilder<'a, T>,
         >;
+        pub type Pipeline<P> = super::IntGroup<::recapn::rpc::Pipeline<P>>;
     }
 }
 pub const TEST_IMPLIED_FIRST_FIELD: _p::ty::ConstPtr<
@@ -25752,6 +44603,19 @@ impl _p::ty::Struct for TestCycleANoCaps {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestCycleANoCaps {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_cycle_a_no_caps::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_cycle_a_no_caps::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestCycleANoCaps {
     const FOO: _p::Descriptor<_p::Struct<TestCycleBNoCaps>> = _p::Descriptor::<
         _p::Struct<TestCycleBNoCaps>,
@@ -25788,6 +44652,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_a_no_caps::Builder<'p, T> {
         }
     }
 }
+impl<P> test_cycle_a_no_caps::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn foo(self) -> ::recapn::rpc::PipelineOf<TestCycleBNoCaps, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_cycle_a_no_caps {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestCycleANoCaps<
@@ -25796,6 +44674,7 @@ pub mod test_cycle_a_no_caps {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestCycleANoCaps<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestCycleANoCaps<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestCycleBNoCaps<T = _p::Family>(T);
@@ -25896,6 +44775,19 @@ impl _p::ty::Struct for TestCycleBNoCaps {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestCycleBNoCaps {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_cycle_b_no_caps::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_cycle_b_no_caps::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestCycleBNoCaps {
     const FOO: _p::Descriptor<_p::List<_p::Struct<TestCycleANoCaps>>> = _p::Descriptor::<
         _p::List<_p::Struct<TestCycleANoCaps>>,
@@ -25968,6 +44860,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_b_no_caps::Builder<'p, T> {
         }
     }
 }
+impl<P> test_cycle_b_no_caps::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn bar(self) -> ::recapn::rpc::PipelineOf<TestAllTypes, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)),
+        )
+    }
+}
 pub mod test_cycle_b_no_caps {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestCycleBNoCaps<
@@ -25976,6 +44882,7 @@ pub mod test_cycle_b_no_caps {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestCycleBNoCaps<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestCycleBNoCaps<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestCycleAWithCaps<T = _p::Family>(T);
@@ -26076,6 +44983,19 @@ impl _p::ty::Struct for TestCycleAWithCaps {
         ptrs: 1u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestCycleAWithCaps {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_cycle_a_with_caps::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_cycle_a_with_caps::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestCycleAWithCaps {
     const FOO: _p::Descriptor<_p::Struct<TestCycleBWithCaps>> = _p::Descriptor::<
         _p::Struct<TestCycleBWithCaps>,
@@ -26112,6 +45032,20 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_a_with_caps::Builder<'p, T> {
         }
     }
 }
+impl<P> test_cycle_a_with_caps::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn foo(self) -> ::recapn::rpc::PipelineOf<TestCycleBWithCaps, P> {
+        ::recapn::rpc::TypedPipeline::from_pipeline(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(0u16)),
+        )
+    }
+}
 pub mod test_cycle_a_with_caps {
     use super::{__file, __imports, _p};
     pub type Reader<'a, T = _p::rpc::Empty> = super::TestCycleAWithCaps<
@@ -26120,6 +45054,7 @@ pub mod test_cycle_a_with_caps {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestCycleAWithCaps<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestCycleAWithCaps<::recapn::rpc::Pipeline<P>>;
 }
 #[derive(Clone)]
 pub struct TestCycleBWithCaps<T = _p::Family>(T);
@@ -26220,6 +45155,19 @@ impl _p::ty::Struct for TestCycleBWithCaps {
         ptrs: 2u16,
     };
 }
+impl ::recapn::rpc::Pipelinable for TestCycleBWithCaps {
+    type Pipeline<P: ::recapn::rpc::Pipelined> = test_cycle_b_with_caps::Pipeline<P>;
+}
+impl<P: ::recapn::rpc::Pipelined> ::recapn::rpc::TypedPipeline
+for test_cycle_b_with_caps::Pipeline<P> {
+    type Pipeline = P;
+    fn from_pipeline(p: ::recapn::rpc::Pipeline<Self::Pipeline>) -> Self {
+        Self(p)
+    }
+    fn into_inner(self) -> ::recapn::rpc::Pipeline<Self::Pipeline> {
+        self.0
+    }
+}
 impl TestCycleBWithCaps {
     const FOO: _p::Descriptor<_p::List<_p::Struct<TestCycleAWithCaps>>> = _p::Descriptor::<
         _p::List<_p::Struct<TestCycleAWithCaps>>,
@@ -26227,7 +45175,9 @@ impl TestCycleBWithCaps {
         slot: 0u32,
         default: ::core::option::Option::None,
     };
-    const BAR: _p::Descriptor<_p::AnyPtr> = _p::Descriptor::<_p::AnyPtr> {
+    const BAR: _p::Descriptor<_p::Capability<TestInterface>> = _p::Descriptor::<
+        _p::Capability<TestInterface>,
+    > {
         slot: 1u32,
         default: ::core::option::Option::None,
     };
@@ -26244,12 +45194,11 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_b_with_caps::Reader<'p, T> {
         }
     }
     #[inline]
-    pub fn bar(&self) -> _p::Accessor<'_, 'p, T, _p::AnyPtr> {
+    pub fn bar(&self) -> _p::Accessor<'_, 'p, T, _p::Capability<TestInterface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                &self.0,
-                &TestCycleBWithCaps::BAR,
-            )
+            <_p::Capability<
+                TestInterface,
+            > as _p::field::FieldType>::accessor(&self.0, &TestCycleBWithCaps::BAR)
         }
     }
 }
@@ -26265,12 +45214,11 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_b_with_caps::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn bar(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::AnyPtr> {
+    pub fn bar(&mut self) -> _p::AccessorMut<'_, 'p, T, _p::Capability<TestInterface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                &mut self.0,
-                &TestCycleBWithCaps::BAR,
-            )
+            <_p::Capability<
+                TestInterface,
+            > as _p::field::FieldType>::accessor(&mut self.0, &TestCycleBWithCaps::BAR)
         }
     }
     #[inline]
@@ -26284,13 +45232,26 @@ impl<'p, T: _p::rpc::Table + 'p> test_cycle_b_with_caps::Builder<'p, T> {
         }
     }
     #[inline]
-    pub fn into_bar(self) -> _p::AccessorOwned<'p, T, _p::AnyPtr> {
+    pub fn into_bar(self) -> _p::AccessorOwned<'p, T, _p::Capability<TestInterface>> {
         unsafe {
-            <_p::AnyPtr as _p::field::FieldType>::accessor(
-                self.0,
-                &TestCycleBWithCaps::BAR,
-            )
+            <_p::Capability<
+                TestInterface,
+            > as _p::field::FieldType>::accessor(self.0, &TestCycleBWithCaps::BAR)
         }
+    }
+}
+impl<P> test_cycle_b_with_caps::Pipeline<P>
+where
+    P: ::recapn::rpc::Pipelined<Cap = ::recapn_rpc::client::Client>,
+    P: ::recapn::rpc::PipelineBuilder<
+        ::recapn::any::AnyPtr,
+        Operation = ::recapn_rpc::pipeline::PipelineOp,
+    >,
+{
+    pub fn bar(self) -> TestInterface {
+        ::recapn::ty::Capability::from_client(
+            self.0.push(::recapn_rpc::pipeline::PipelineOp::PtrField(1u16)).into_cap(),
+        )
     }
 }
 pub mod test_cycle_b_with_caps {
@@ -26301,4 +45262,5 @@ pub mod test_cycle_b_with_caps {
     pub type Builder<'a, T = _p::rpc::Empty> = super::TestCycleBWithCaps<
         _p::StructBuilder<'a, T>,
     >;
+    pub type Pipeline<P> = super::TestCycleBWithCaps<::recapn::rpc::Pipeline<P>>;
 }

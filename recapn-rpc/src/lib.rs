@@ -12,15 +12,30 @@
 //! or any number of threads, or any combination of the above.
 
 use std::borrow::Cow;
+use std::fmt::Display;
 
 pub(crate) mod chan;
 pub mod client;
-pub mod connection;
+pub(crate) mod connection;
 #[rustfmt::skip]
-pub mod generated;
+pub(crate) mod generated;
 pub mod pipeline;
 pub mod server;
 pub mod table;
+
+pub mod io {
+    pub mod stream;
+}
+
+pub mod twoparty;
+
+pub use connection::{
+    IncomingMessage, Connection, ConnectionOptions, MessageFactory, MessageOutbound,
+    OutboundMessage, OwnedIncomingMessage,
+};
+
+pub use chan::LocalMessage;
+pub use client::Client;
 
 pub(crate) use generated::capnp_rpc_capnp as rpc_capnp;
 pub use rpc_capnp::exception::Type as ErrorKind;
@@ -74,6 +89,25 @@ impl Error {
 impl From<recapn::Error> for Error {
     fn from(value: recapn::Error) -> Self {
         Error::failed(value.to_string())
+    }
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Failed => "failed",
+            Self::Disconnected => "disconnected",
+            Self::Overloaded => "overloaded",
+            Self::Unimplemented => "unimplemented",
+        })
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.kind.fmt(f)?;
+        f.write_str(": ")?;
+        f.write_str(&self.description)
     }
 }
 

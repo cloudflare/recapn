@@ -1,0 +1,14 @@
+[package]
+name = "calculator"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.50", features = ["full"] }
+recapn = { path = "../../recapn" }
+recapn-channel = { path = "../../recapn-channel" }
+recapn-rpc = { path = "../../recapn-rpc" }
+
+[build-dependencies]
+recapnc = { path = "../../recapnc" }

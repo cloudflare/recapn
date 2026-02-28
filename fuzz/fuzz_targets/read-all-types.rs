@@ -11,7 +11,7 @@ use recapn::list::Fallible;
 use recapn::message::{Reader, ReaderOptions};
 use recapn::ReaderOf;
 
-fn traverse(r: &ReaderOf<TestAllTypes>) -> recapn::Result<()> {
+fn traverse(r: &ReaderOf<'_, TestAllTypes>) -> recapn::Result<()> {
     macro_rules! read_data {
         ($($ident:ident,)*) => {
             $(let _ = r.$ident();)*

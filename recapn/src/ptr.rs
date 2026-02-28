@@ -3120,7 +3120,7 @@ impl<'a> ObjectBuilder<'a> {
         let segment_start = self.start().as_segment_ptr();
         let segment_end = self.end();
 
-        segment_start <= start && start <= end && end <= segment_end
+        segment_start <= start && end <= segment_end
     }
 
     #[inline]

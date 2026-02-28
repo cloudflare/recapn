@@ -15,15 +15,14 @@ use syn::punctuated::Punctuated;
 use syn::PathSegment;
 
 use crate::quotes::{
-    FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedItem,
-    GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich,
+    FieldDescriptor, GeneratedConst, GeneratedEnum, GeneratedField, GeneratedFile, GeneratedInterface, GeneratedItem, GeneratedPipelineOp, GeneratedRootFile, GeneratedStruct, GeneratedVariant, GeneratedWhich, PipelineType
 };
 use crate::schema::{
     schema_capnp, AnnotationSchema, ConstSchema, EnumSchema, FieldType, FileSchema, Id,
     InterfaceSchema, NamedNestedItem, NestedItem, Schema, SchemaError, SchemaLoader, StructSchema,
     Type, TypeKind,
 };
-use crate::{Error, Result};
+use crate::{Error, IncludeRpc, Result};
 
 pub mod ident;
 
@@ -44,68 +43,61 @@ impl Eq for ModScope {}
 
 type TypeScope = Scope<ModScope>;
 
-#[derive(Debug)]
-struct TypeInfo {
-    /// The identifier for the type itself.
-    pub type_ident: syn::Ident,
-    /// The scope the type is defined in.
-    pub scope: TypeScope,
-}
+/// Resolve a path to a type from the given reference scope.
+///
+/// For example in the case where we want to refer to A from B, B is the ref scope we're
+/// resolving from.
+fn resolve_path(
+    type_ident: &syn::Ident,
+    type_scope: &TypeScope,
+    ref_scope: &TypeScope,
+) -> syn::Path {
+    if ref_scope == type_scope {
+        // We're referencing this type from the same scope, so we can just use the type identifier.
+        return syn::Path::from(type_ident.clone());
+    }
 
-impl TypeInfo {
-    /// Resolve a path to this type from the given reference scope.
-    ///
-    /// For example in the case where we want to refer to A from B, B is the ref scope we're
-    /// resolving from.
-    pub fn resolve_path(&self, ref_scope: &TypeScope) -> syn::Path {
-        let Self { type_ident, scope } = self;
-        if ref_scope == scope {
-            // We're referencing this type from the same scope, so we can just use the type identifier.
-            return syn::Path::from(type_ident.clone());
+    let mut segments: Punctuated<PathSegment, _> = Punctuated::new();
+    let mut mod_path = type_scope.types.as_slice();
+    if ref_scope.file == type_scope.file {
+        // First, check if we're attempting to refer to a type *in* the parent scope.
+        if let Some((_, ref_parent_types)) = ref_scope.types.split_last() {
+            if mod_path == ref_parent_types {
+                // It's the parent scope! So we can use `super` directly instead of `__file`
+                return syn::parse_quote!(super::#type_ident);
+            }
         }
 
-        let mut segments: Punctuated<PathSegment, _> = Punctuated::new();
-        let mut mod_path = scope.types.as_slice();
-        if ref_scope.file == scope.file {
-            // First, check if we're attempting to refer to a type *in* the parent scope.
-            if let Some((_, ref_parent_types)) = ref_scope.types.split_last() {
-                if mod_path == ref_parent_types {
-                    // It's the parent scope! So we can use `super` directly instead of `__file`
-                    return syn::parse_quote!(super::#type_ident);
-                }
-            }
+        // Next, check if we're referring to something *from* a parent scope.
+        // In that case, we can simply refer to the type starting from what module we're in.
+        if let Some(suffix) = mod_path.strip_prefix(ref_scope.types.as_slice()) {
+            mod_path = suffix;
 
-            // Next, check if we're referring to something *from* a parent scope.
-            // In that case, we can simply refer to the type starting from what module we're in.
-            if let Some(suffix) = mod_path.strip_prefix(ref_scope.types.as_slice()) {
-                mod_path = suffix;
-
-                // todo(someday): cousin scopes? In set A(B(C), D(E)), refer to C from E
-                // using super::b::C instead of __file::a::b::c. Might not be worth it.
-            } else {
-                // If none of those work, we can can always just use the full path from the
-                // `__file` import. We're referencing this type from the same file, so we can
-                // refer to it with the full path using the `__file` import.
-                segments.push(syn::parse_quote!(__file));
-            }
+            // todo(someday): cousin scopes? In set A(B(C), D(E)), refer to C from E
+            // using super::b::C instead of __file::a::b::c. Might not be worth it.
         } else {
-            // We're referencing this type from a different file, so we refer to it with the full path
-            // including file module using the `__imports` import.
-            segments.push(syn::parse_quote!(__imports));
-            segments.push(PathSegment::from(scope.file.mod_ident.clone()));
+            // If none of those work, we can can always just use the full path from the
+            // `__file` import. We're referencing this type from the same file, so we can
+            // refer to it with the full path using the `__file` import.
+            segments.push(syn::parse_quote!(__file));
         }
+    } else {
+        // We're referencing this type from a different file, so we refer to it with the full path
+        // including file module using the `__imports` import.
+        segments.push(syn::parse_quote!(__imports));
+        segments.push(PathSegment::from(type_scope.file.mod_ident.clone()));
+    }
 
-        segments.extend(
-            mod_path
-                .iter()
-                .map(|s| PathSegment::from(s.mod_ident.clone())),
-        );
-        segments.push(PathSegment::from(type_ident.clone()));
+    segments.extend(
+        mod_path
+            .iter()
+            .map(|s| PathSegment::from(s.mod_ident.clone())),
+    );
+    segments.push(PathSegment::from(type_ident.clone()));
 
-        syn::Path {
-            leading_colon: None,
-            segments,
-        }
+    syn::Path {
+        leading_colon: None,
+        segments,
     }
 }
 
@@ -117,13 +109,15 @@ struct FileInfo {
 
 #[derive(Debug)]
 struct StructInfo {
-    pub type_info: TypeInfo,
+    pub scope: TypeScope,
+    pub struct_ident: syn::Ident,
     pub mod_ident: syn::Ident,
 }
 
 #[derive(Debug)]
 struct EnumInfo {
-    pub type_info: TypeInfo,
+    pub scope: TypeScope,
+    pub enum_ident: syn::Ident,
     pub enumerants: Vec<syn::Ident>,
 }
 
@@ -134,7 +128,13 @@ struct ConstInfo {
 }
 
 #[derive(Debug)]
-struct InterfaceInfo {}
+struct InterfaceInfo {
+    pub scope: TypeScope,
+    pub client_ident: syn::Ident,
+    pub server_ident: syn::Ident,
+    pub dispatch_ident: syn::Ident,
+    pub mod_ident: syn::Ident,
+}
 
 #[derive(Debug)]
 struct AnnotationInfo {}
@@ -181,6 +181,14 @@ impl NodeInfo {
             panic!("expected const node info")
         }
     }
+
+    pub fn unwrap_interface(&self) -> &InterfaceInfo {
+        if let Self::Interface(info) = self {
+            info
+        } else {
+            panic!("expeceted interface node info")
+        }
+    }
 }
 
 type NodeInfoMap = HashMap<u64, NodeInfo>;
@@ -190,6 +198,7 @@ pub enum NameContext {
     Node(Id),
     Field { type_id: Id, index: u32 },
     Enumerant { type_id: Id, index: u32 },
+    Method { type_id: Id, index: u32 },
 }
 
 impl fmt::Display for NameContext {
@@ -201,6 +210,9 @@ impl fmt::Display for NameContext {
             }
             Self::Enumerant { type_id, index } => {
                 write!(f, "enumerant @{} in enum @{:0<#16x}", index, type_id)
+            }
+            Self::Method { type_id, index } => {
+                write!(f, "method @{} in interface @{:0<#16x}", index, type_id)
             }
         }
     }
@@ -217,11 +229,15 @@ pub enum GeneratorError {
     EmptyName,
 }
 
+struct NodeValidation {
+    uses_rpc: bool,
+}
+
 fn validate_file(
     schema: &FileSchema<'_>,
     nodes: &mut NodeInfoMap,
     identifiers: &mut ScopedIdentifierSet<ModScope>,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
@@ -246,6 +262,7 @@ fn validate_file(
 
     let mut scope = Scope::file(ModScope { id, mod_ident });
 
+    let mut file_uses_rpc = false;
     for nested in schema.nested_items() {
         let nested = match nested {
             Ok(n) => n,
@@ -254,10 +271,11 @@ fn validate_file(
             Err(Error::Schema(SchemaError::MissingNode(_))) => continue,
             res @ Err(_) => res?,
         };
-        validate_item(nested, nodes, identifiers, &mut scope)?;
+        let NodeValidation { uses_rpc } = validate_item(nested, nodes, identifiers, &mut scope)?;
+        file_uses_rpc |= uses_rpc;
     }
 
-    Ok(())
+    Ok(NodeValidation { uses_rpc: file_uses_rpc })
 }
 
 fn validate_item(
@@ -265,7 +283,7 @@ fn validate_item(
     nodes: &mut NodeInfoMap,
     identifiers: &mut ScopedIdentifierSet<ModScope>,
     scope: &mut TypeScope,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let name = node
         .name
         .as_str()
@@ -292,20 +310,18 @@ fn validate_struct(
     nodes: &mut NodeInfoMap,
     identifiers: &mut ScopedIdentifierSet<ModScope>,
     scope: &mut TypeScope,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
     };
 
-    let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+    let struct_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
     let mod_ident = identifiers.make_unique(Some(scope.clone()), AsSnakeCase(name))?;
 
     let node_info = StructInfo {
-        type_info: TypeInfo {
-            type_ident,
-            scope: scope.clone(),
-        },
+        scope: scope.clone(),
+        struct_ident,
         mod_ident: mod_ident.clone(),
     };
 
@@ -319,30 +335,49 @@ fn validate_struct(
         let _ = identifiers.make_unique(Some(scope.clone()), "Which")?;
     }
 
+    // And these reserved names.
+    let _ = identifiers.make_unique(Some(scope.clone()), "Reader")?;
+    let _ = identifiers.make_unique(Some(scope.clone()), "Builder")?;
+    let _ = identifiers.make_unique(Some(scope.clone()), "Pipeline")?;
+
     for nested in schema.nested_items() {
         validate_item(nested?, nodes, identifiers, scope)?;
     }
 
-    // For some reason, groups are not considered nested nodes of structs. So we
-    // have to iter over all fields and find all the groups contained
+    let mut uses_rpc = false;
+
     for (idx, field) in schema.fields().enumerate() {
-        if let FieldType::Group(schema) = field.field_type()? {
-            let name = field
-                .name()
-                .as_str()
-                .map_err(|error| GeneratorError::InvalidName {
-                    context: NameContext::Field {
-                        type_id: id,
-                        index: idx as u32,
-                    },
-                    error,
-                })?;
-            validate_struct(&schema, name, nodes, identifiers, scope)?;
+        match field.field_type()? {
+            FieldType::Slot { field_type, .. } => match field_type.kind {
+                TypeKind::Interface { .. } |
+                TypeKind::AnyCapability => {
+                    uses_rpc = true;
+                },
+                _ => {
+                    // Assume that "any" types other than any capability are not RPC.
+                }
+            },
+            // For some reason, groups are not considered nested nodes of structs. So we
+            // have to iter over all fields and find all the groups contained
+            FieldType::Group(schema) => {
+                let name = field
+                    .name()
+                    .as_str()
+                    .map_err(|error| GeneratorError::InvalidName {
+                        context: NameContext::Field {
+                            type_id: id,
+                            index: idx as u32,
+                        },
+                        error,
+                    })?;
+                let validation = validate_struct(&schema, name, nodes, identifiers, scope)?;
+                uses_rpc |= validation.uses_rpc;
+            },
         }
     }
 
     scope.pop();
-    Ok(())
+    Ok(NodeValidation { uses_rpc })
 }
 
 fn validate_enum(
@@ -351,13 +386,13 @@ fn validate_enum(
     nodes: &mut NodeInfoMap,
     identifiers: &mut ScopedIdentifierSet<ModScope>,
     scope: &mut TypeScope,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
     };
 
-    let type_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+    let enum_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
 
     let enumerants = {
         let mut idents = IdentifierSet::new();
@@ -379,33 +414,79 @@ fn validate_enum(
     };
 
     entry.insert(NodeInfo::Enum(EnumInfo {
+        scope: scope.clone(),
+        enum_ident,
         enumerants,
-        type_info: TypeInfo {
-            type_ident,
-            scope: scope.clone(),
-        },
     }));
 
-    Ok(())
+    Ok(NodeValidation { uses_rpc: false })
 }
 
 fn validate_interface(
     schema: &InterfaceSchema<'_>,
-    _: &str,
+    name: &str,
     nodes: &mut NodeInfoMap,
-    _: &mut ScopedIdentifierSet<ModScope>,
-    _: &mut TypeScope,
-) -> Result<()> {
+    identifiers: &mut ScopedIdentifierSet<ModScope>,
+    scope: &mut TypeScope,
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
     };
 
-    entry.insert(NodeInfo::Interface(InterfaceInfo {}));
+    let client_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(name))?;
+    let server_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(format!("{name}Server")))?;
+    let dispatch_ident = identifiers.make_unique(Some(scope.clone()), AsPascalCase(format!("{name}Dispatcher")))?;
+    let mod_ident = identifiers.make_unique(Some(scope.clone()), AsSnakeCase(name))?;
 
-    // do nothing for now
+    let node_info = InterfaceInfo {
+        scope: scope.clone(),
+        client_ident,
+        server_ident,
+        dispatch_ident,
+        mod_ident: mod_ident.clone(),
+    };
 
-    Ok(())
+    entry.insert(NodeInfo::Interface(node_info));
+
+    scope.push(ModScope { id, mod_ident });
+
+    for nested in schema.nested_items() {
+        validate_item(nested?, nodes, identifiers, scope)?;
+    }
+
+    // Again, autogenerated method structs are not nested members of interfaces, so
+    // we have to generate them.
+    for (idx, method) in schema.info.methods().into_iter().enumerate() {
+        let method_name = method
+            .name()
+            .as_str()
+            .map_err(|error| GeneratorError::InvalidName {
+                context: NameContext::Field {
+                    type_id: id,
+                    index: idx as u32,
+                },
+                error,
+            })?;
+        let param_schema = schema
+            .loader()
+            .try_schema::<StructSchema<'_>>(method.param_struct_type())?;
+        if param_schema.node.scope_id() == 0 {
+            let param_name = format!("{method_name}Params");
+            validate_struct(&param_schema, &param_name, nodes, identifiers, scope)?;
+        }
+        let result_schema = schema
+            .loader()
+            .try_schema::<StructSchema<'_>>(method.result_struct_type())?;
+        if result_schema.node.scope_id() == 0 {
+            let result_name = format!("{method_name}Results");
+            validate_struct(&result_schema, &result_name, nodes, identifiers, scope)?;
+        }
+    }
+
+    scope.pop();
+
+    Ok(NodeValidation { uses_rpc: true })
 }
 
 fn validate_const(
@@ -414,7 +495,7 @@ fn validate_const(
     nodes: &mut NodeInfoMap,
     identifiers: &mut ScopedIdentifierSet<ModScope>,
     scope: &mut TypeScope,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
@@ -425,7 +506,7 @@ fn validate_const(
         ident: identifiers.make_unique(Some(scope.clone()), AsShoutySnakeCase(name))?,
     }));
 
-    Ok(())
+    Ok(NodeValidation { uses_rpc: false })
 }
 
 fn validate_annotation(
@@ -434,7 +515,7 @@ fn validate_annotation(
     nodes: &mut NodeInfoMap,
     _: &mut ScopedIdentifierSet<ModScope>,
     _: &mut TypeScope,
-) -> Result<()> {
+) -> Result<NodeValidation> {
     let id = schema.node.id();
     let Entry::Vacant(entry) = nodes.entry(id) else {
         return Err(SchemaError::DuplicateNode(id))?;
@@ -443,7 +524,7 @@ fn validate_annotation(
     entry.insert(NodeInfo::Annotation(AnnotationInfo {}));
 
     // do nothing for now
-    Ok(())
+    Ok(NodeValidation { uses_rpc: false })
 }
 
 macro_rules! quote_none {
@@ -466,10 +547,14 @@ enum TypeContext {
 pub struct GeneratorContext {
     loader: SchemaLoader,
     info: NodeInfoMap,
+    include_rpc: bool,
 }
 
 impl GeneratorContext {
-    pub fn new(request: &ReaderOf<'_, schema_capnp::CodeGeneratorRequest>) -> Result<Self> {
+    pub fn new(
+        request: &ReaderOf<'_, schema_capnp::CodeGeneratorRequest>,
+        include_rpc: IncludeRpc,
+    ) -> Result<Self> {
         let loader = {
             let mut loader = SchemaLoader::new();
             for node in request.nodes() {
@@ -480,11 +565,19 @@ impl GeneratorContext {
         let mut info = NodeInfoMap::new();
         let mut identifiers = ScopedIdentifierSet::new();
 
+        let mut files_use_rpc = false;
         for file in loader.files() {
-            validate_file(&file, &mut info, &mut identifiers)?;
+            let validation = validate_file(&file, &mut info, &mut identifiers)?;
+            files_use_rpc |= validation.uses_rpc;
         }
 
-        Ok(Self { loader, info })
+        let include_rpc = match include_rpc {
+            IncludeRpc::Automatic => files_use_rpc,
+            IncludeRpc::No => false,
+            IncludeRpc::Yes => true,
+        };
+
+        Ok(Self { loader, info, include_rpc })
     }
 
     fn find_info(&self, id: Id) -> Result<&NodeInfo> {
@@ -546,7 +639,11 @@ impl GeneratorContext {
                 let generated = self.generate_const(&schema, info.unwrap_const(), ctx)?;
                 Ok(Some(GeneratedItem::Const(generated)))
             }
-            NestedItem::Interface(_) => Ok(None),
+            NestedItem::Interface(schema) if self.include_rpc => {
+                let generated = self.generate_interface(&schema, info.unwrap_interface(), ctx)?;
+                Ok(Some(GeneratedItem::Interface(generated)))
+            },
+            NestedItem::Interface(_) |
             NestedItem::Annotation(_) => Ok(None),
         }
     }
@@ -568,11 +665,12 @@ impl GeneratorContext {
 
         let mut generated = GeneratedStruct {
             id: schema.node.id(),
-            ident: info.type_info.type_ident.clone(),
+            ident: info.struct_ident.clone(),
             mod_ident: info.mod_ident.clone(),
             type_params: Vec::new(),
             size,
             fields: Vec::new(),
+            pipeline_fields: Vec::new(),
             which: None,
             nested_items: Vec::new(),
         };
@@ -597,11 +695,19 @@ impl GeneratorContext {
             let generated_field = self.generate_field(
                 &field_type,
                 name,
-                info,
+                &info.scope,
+                &info.struct_ident,
                 &mut descriptor_idents,
                 &mut accessor_idents,
                 ctx,
             )?;
+            if self.include_rpc {
+                generated.pipeline_fields.extend(self.generate_pipeline_op(
+                    &field_type,
+                    &info.scope,
+                    generated_field.accessor_ident.clone(),
+                )?);
+            }
             generated.fields.push(generated_field);
         }
 
@@ -613,7 +719,7 @@ impl GeneratorContext {
             });
             // Create a scope used for resolving types from within the struct's mod scope.
             let struct_mod_scope = {
-                let mut struct_scope = info.type_info.scope.clone();
+                let mut struct_scope = info.scope.clone();
                 struct_scope.push(ModScope {
                     id: schema.node.id(),
                     mod_ident: info.mod_ident.clone(),
@@ -638,7 +744,8 @@ impl GeneratorContext {
                 let generated_field = self.generate_field(
                     &field_type,
                     name,
-                    info,
+                    &info.scope,
+                    &info.struct_ident,
                     &mut descriptor_idents,
                     &mut accessor_idents,
                     ctx,
@@ -678,10 +785,8 @@ impl GeneratorContext {
         &self,
         field_type: &FieldType<'_>,
         name: &str,
-        StructInfo {
-            type_info: TypeInfo { type_ident, scope },
-            ..
-        }: &StructInfo,
+        scope: &TypeScope,
+        struct_ident: &syn::Ident,
         descriptor_idents: &mut IdentifierSet,
         accessor_idents: &mut IdentifierSet,
         ctx: &mut FileContext,
@@ -733,13 +838,96 @@ impl GeneratorContext {
         };
 
         Ok(GeneratedField {
-            type_name: type_ident.clone(),
+            type_name: struct_ident.clone(),
             field_type: syn_type,
             own_accessor_ident,
             accessor_ident,
             descriptor_ident,
             descriptor,
         })
+    }
+
+    fn generate_pipeline_op(
+        &self,
+        field_type: &FieldType<'_>,
+        scope: &TypeScope,
+        name: syn::Ident,
+    ) -> Result<Option<GeneratedPipelineOp>> {
+        let return_type;
+        let pipelined;
+        match field_type {
+            FieldType::Slot { offset, field_type, .. } => {
+                if field_type.is_list() || field_type.is_data_field() {
+                    return Ok(None)
+                }
+
+                let slot = *offset as u16;
+
+                match field_type.kind {
+                    TypeKind::AnyList | TypeKind::Data | TypeKind::Text => return Ok(None),
+                    TypeKind::AnyCapability | TypeKind::Interface { .. } => {
+                        pipelined = PipelineType::Capability(slot);
+                    }
+                    TypeKind::Struct { .. } |
+                    TypeKind::AnyPointer |
+                    TypeKind::AnyStruct |
+                    TypeKind::ScopeBound { .. } |
+                    TypeKind::ImplicitMethodParameter { .. } => {
+                        pipelined = PipelineType::Field(slot);
+                    }
+                    _ => unreachable!(),
+                }
+
+                match &field_type.kind {
+                    TypeKind::Interface { schema, .. } => {
+                        return_type = syn::TypePath {
+                            qself: None, path: self.resolve_interface_type(scope, schema)?
+                        }.into();
+                    }
+                    TypeKind::AnyCapability => {
+                        return_type = syn::parse_quote!(::recapn_rpc::client::Client);
+                    },
+                    TypeKind::Struct { schema, .. } => {
+                        let path = self.resolve_struct_type(scope, schema)?;
+                        return_type = syn::parse_quote!(::recapn::rpc::PipelineOf<#path, P>);
+                    }
+                    TypeKind::AnyPointer |
+                    TypeKind::AnyStruct |
+                    TypeKind::ScopeBound { .. } |
+                    TypeKind::ImplicitMethodParameter { .. } => {
+                        return_type = syn::parse_quote!(::recapn::rpc::PipelineOf<::recapn::any::AnyPtr, P>);
+                    }
+                    _ => unreachable!(),
+                }
+            },
+            FieldType::Group(group) => {
+                let path = self.resolve_struct_type(scope, group)?;
+                return_type = syn::parse_quote!(::recapn::rpc::PipelineOf<#path, P>);
+                pipelined = PipelineType::Group;
+            },
+        }
+
+        Ok(Some(GeneratedPipelineOp { field_name: name, return_type, pipelined }))
+    }
+
+    fn resolve_interface_type(
+        &self,
+        scope: &TypeScope,
+        schema: &InterfaceSchema<'_>,
+    ) -> Result<syn::Path> {
+        let interface_type = self.find_info(schema.node.id())?.unwrap_interface();
+        let path = resolve_path(&interface_type.client_ident, &interface_type.scope, scope);
+        Ok(path)
+    }
+
+    fn resolve_struct_type(
+        &self,
+        scope: &TypeScope,
+        schema: &StructSchema<'_>,
+    ) -> Result<syn::Path> {
+        let struct_type = self.find_info(schema.node.id())?.unwrap_struct();
+        let path = resolve_path(&struct_type.struct_ident, &struct_type.scope, scope);
+        Ok(path)
     }
 
     fn resolve_field_type(
@@ -750,8 +938,7 @@ impl GeneratorContext {
     ) -> Result<Box<syn::Type>> {
         Ok(match field_type {
             FieldType::Group(group) => {
-                let group_type = &self.find_info(group.node.id())?.unwrap_struct().type_info;
-                let path = group_type.resolve_path(scope);
+                let path = self.resolve_struct_type(scope, group)?;
                 Box::new(syn::parse_quote!(_p::Group<#path>))
             }
             FieldType::Slot { field_type, .. } => {
@@ -781,12 +968,12 @@ impl GeneratorContext {
             TypeKind::Float32 => syn::parse_quote!(f32),
             TypeKind::Float64 => syn::parse_quote!(f64),
             TypeKind::Enum { schema, .. } => {
-                let type_info = &self.find_info(schema.node.id())?.unwrap_enum().type_info;
+                let type_info = &self.find_info(schema.node.id())?.unwrap_enum();
                 if type_info.scope.file != scope.file {
                     ctx.required_imports.insert(type_info.scope.file.id);
                 }
 
-                let path = type_info.resolve_path(scope);
+                let path = resolve_path(&type_info.enum_ident, &type_info.scope, scope);
                 if ty_ctx == TypeContext::Const && !info.is_list() {
                     syn::parse_quote!(#path)
                 } else {
@@ -796,19 +983,27 @@ impl GeneratorContext {
             TypeKind::Data => syn::parse_quote!(_p::Data),
             TypeKind::Text => syn::parse_quote!(_p::Text),
             TypeKind::Struct { schema, .. } => {
-                let type_info = &self.find_info(schema.node.id())?.unwrap_struct().type_info;
+                let type_info = &self.find_info(schema.node.id())?.unwrap_struct();
                 if type_info.scope.file != scope.file {
                     ctx.required_imports.insert(type_info.scope.file.id);
                 }
 
-                let path = type_info.resolve_path(scope);
+                let path = resolve_path(&type_info.struct_ident, &type_info.scope, scope);
                 syn::parse_quote!(_p::Struct<#path>)
             }
-            TypeKind::Interface { .. } => syn::parse_quote!(_p::AnyPtr), // TODO
+            TypeKind::Interface { schema, .. } => {
+                let type_info = &self.find_info(schema.node.id())?.unwrap_interface();
+                if type_info.scope.file != scope.file {
+                    ctx.required_imports.insert(type_info.scope.file.id);
+                }
+
+                let path = resolve_path(&type_info.client_ident, &type_info.scope, scope);
+                syn::parse_quote!(_p::Capability<#path>)
+            }
             TypeKind::AnyPointer => syn::parse_quote!(_p::AnyPtr),
             TypeKind::AnyStruct => syn::parse_quote!(_p::AnyStruct),
             TypeKind::AnyList => syn::parse_quote!(_p::AnyList),
-            TypeKind::AnyCapability => syn::parse_quote!(_p::AnyPtr), // TODO
+            TypeKind::AnyCapability => syn::parse_quote!(_p::Capability<::recapn_rpc::client::Client>),
             TypeKind::ScopeBound { .. } => syn::parse_quote!(_p::AnyPtr), // TODO
             TypeKind::ImplicitMethodParameter { .. } => syn::parse_quote!(_p::AnyPtr), // TODO
         };
@@ -845,7 +1040,7 @@ impl GeneratorContext {
             Float64 => syn::parse_quote!(0.0f64),
             Enum { schema, .. } => {
                 let info = self.find_info(schema.node.id())?.unwrap_enum();
-                let type_name = info.type_info.resolve_path(scope);
+                let type_name = resolve_path(&info.enum_ident, &info.scope, scope);
                 let enumerant = &info.enumerants[0];
 
                 syn::parse_quote!(#type_name::#enumerant)
@@ -1036,7 +1231,7 @@ impl GeneratorContext {
                 let value = value.r#enum().get().unwrap_or(0);
                 let info = self.find_info(schema.node.id())?.unwrap_enum();
 
-                let type_path = info.type_info.resolve_path(scope);
+                let type_path = resolve_path(&info.enum_ident, &info.scope, scope);
                 let enumerant = &info.enumerants[value as usize];
 
                 syn::parse_quote!(#type_path::#enumerant)
@@ -1051,14 +1246,15 @@ impl GeneratorContext {
         &self,
         schema: &EnumSchema<'_>,
         EnumInfo {
-            type_info: TypeInfo { type_ident, .. },
+            enum_ident,
             enumerants,
+            ..
         }: &EnumInfo,
         _: &mut FileContext,
     ) -> Result<GeneratedEnum> {
         Ok(GeneratedEnum {
             id: schema.node.id(),
-            name: type_ident.clone(),
+            name: enum_ident.clone(),
             enumerants: enumerants.clone(),
         })
     }
@@ -1126,6 +1322,122 @@ impl GeneratorContext {
         };
 
         Ok(expr)
+    }
+
+    fn generate_interface(
+        &self,
+        schema: &InterfaceSchema<'_>,
+        info: &InterfaceInfo,
+        ctx: &mut FileContext,
+    ) -> Result<GeneratedInterface> {
+        let interface_id = schema.node.id();
+        let interface_str = schema.node().display_name()
+            .get()
+            .as_str()
+            .map_err(|error| GeneratorError::InvalidName {
+                context: NameContext::Node(interface_id),
+                error,
+            })?;
+
+        let mut generated = GeneratedInterface {
+            name: String::from(interface_str),
+            mod_ident: info.mod_ident.clone(),
+            client_ident: info.client_ident.clone(),
+            client_methods: Vec::new(),
+            server_ident: info.server_ident.clone(),
+            server_supertraits: Vec::new(),
+            server_methods: Vec::new(),
+            dispatch_ident: info.dispatch_ident.clone(),
+            dispatch_interfaces: Vec::new(),
+            nested_items: Vec::new(),
+        };
+
+        for nested in schema.nested_items() {
+            let nested = nested?;
+            if let Some(item) = self.generate_item(nested.id, nested.item, ctx)? {
+                generated.nested_items.push(item);
+            }
+        }
+
+        let mut method_idents = IdentifierSet::new();
+
+        for (idx, method) in schema.info.methods().into_iter().enumerate() {
+            let method_id = idx as u16;
+            let name_str = method.name()
+                .get()
+                .as_str()
+                .map_err(|error| GeneratorError::InvalidName {
+                    context: NameContext::Method {
+                        type_id: interface_id,
+                        index: method_id as u32,
+                    },
+                    error,
+                })?;
+            let name_ident = method_idents.make_unique(AsSnakeCase(name_str))?;
+
+            let param_type_id = method.param_struct_type();
+            let param_schema: StructSchema<'_> = schema.loader().try_schema(param_type_id)?;
+            let param_info = self.find_info(param_type_id)?.unwrap_struct();
+            let param_path = resolve_path(&param_info.struct_ident, &param_info.scope, &info.scope);
+
+            let result_type_id = method.result_struct_type();
+            let result_schema: StructSchema<'_> = schema.loader().try_schema(result_type_id)?;
+            let result_info = self.find_info(result_type_id)?.unwrap_struct();
+            let result_path = resolve_path(&result_info.struct_ident, &result_info.scope, &info.scope);
+
+            let req_type;
+            let req_func;
+            let ctx_type;
+            let ctx_func;
+
+            // The streaming type ID
+            if result_type_id == 0x995f9a3377c0b16e {
+                req_type = quote!(::recapn_rpc::client::StreamingRequest<#param_path>);
+                req_func = quote!(streaming_call);
+                ctx_type = quote!(::recapn_rpc::server::StreamContext<#param_path>);
+                ctx_func = quote!(into_stream_context);
+            } else {
+                req_type = quote!(::recapn_rpc::client::Request<#param_path, #result_path>);
+                req_func = quote!(call);
+                ctx_type = quote!(::recapn_rpc::server::CallContext<#param_path, #result_path>);
+                ctx_func = quote!(into_call_context);
+            }
+
+            generated.client_methods.push(syn::parse_quote! {
+                pub fn #name_ident(&self) -> #req_type {
+                    self.0.#req_func(#interface_id, #method_id)
+                }
+            });
+            generated.server_methods.push({
+                let err_msg = format!("'{interface_str}.{name_str}' is not implemented for this type");
+                syn::parse_quote! {
+                    fn #name_ident(&mut self, ctx: #ctx_type) -> ::recapn_rpc::server::CallResult {
+                        ctx.response.error(::recapn_rpc::Error::unimplemented(#err_msg))
+                    }
+                }
+            });
+            generated.dispatch_interfaces.push(syn::parse_quote! {
+                (#interface_id, #method_id) => self.0.#name_ident(request.#ctx_func()).into(),
+            });
+            if param_schema.node().scope_id() == 0 {
+                generated.nested_items.push({
+                    let item = self.generate_struct(&param_schema, param_info, ctx)?;
+                    GeneratedItem::Struct(item)
+                });
+            }
+            if result_schema.node().scope_id() == 0 {
+                generated.nested_items.push({
+                    let item = self.generate_struct(&result_schema, result_info, ctx)?;
+                    GeneratedItem::Struct(item)
+                });
+            }
+        }
+
+        generated.dispatch_interfaces.push(syn::parse_quote! {
+            (#interface_id, _) => request.unimplemented_method(Self::NAME),
+        });
+
+        Ok(generated)
     }
 }
 
