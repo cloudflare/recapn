@@ -2765,6 +2765,80 @@ impl<T: MessageOutbound> Connection<T> {
         self.state.disconnect.as_ref()
     }
 
+    pub fn poll_tasks(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Error> {
+        use std::task::{Poll::*, ready};
+        if let Some(err) = self.state.disconnect.clone() {
+            return Ready(err)
+        }
+
+        let (_, result) = ready!(self.state.tasks.poll_next(cx));
+        let result = self.state.handle_joined_task(&mut self.outbound, result);
+
+        match result {
+            Ok(()) => {
+                cx.waker().wake_by_ref();
+                Pending
+            },
+            Err(Fatal(err) | Recoverable(err)) => Ready(self.close(err)),
+        }
+    }
+
+    pub fn poll_events(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Error> {
+        use std::task::{Poll::*, ready};
+        if let Some(err) = self.state.disconnect.clone() {
+            return Ready(err)
+        }
+
+        let next = ready!(self.state.conn_events.poll_recv(cx))
+            .expect("connection events channel closed prematurely");
+        let result = self.state.handle_conn_event(&mut self.outbound, next);
+
+        match result {
+            Ok(()) => {
+                cx.waker().wake_by_ref();
+                Pending
+            },
+            Err(Fatal(err) | Recoverable(err)) => Ready(self.close(err)),
+        }
+    }
+
+    pub fn poll_channels(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Error> {
+        use std::task::{Poll::*, ready};
+        if let Some(err) = self.state.disconnect.clone() {
+            return Ready(err)
+        }
+
+        let msg = ready!(self.state.channels.poll_recv(cx));
+        let result = match msg {
+            chan::SetRecvResult::Closed { receiver } =>
+                self.state.handle_channel_close(&mut self.outbound, receiver),
+            chan::SetRecvResult::Item {
+                item: chan::Item::Request(request),
+                receiver,
+                sender,
+            } => {
+                let target = CapTarget::from_channel(receiver.chan()).expect("invalid target");
+                self.state.send_call(&mut self.outbound, target, sender, request)
+            },
+            chan::SetRecvResult::Item {
+                item: chan::Item::Event(event),
+                receiver,
+                sender,
+            } => {
+                let target = CapTarget::from_channel(receiver.chan()).expect("invalid target");
+                self.state.handle_channel_event(&mut self.outbound, target, sender, event.into_inner())
+            },
+        };
+
+        match result {
+            Ok(()) => {
+                cx.waker().wake_by_ref();
+                Pending
+            },
+            Err(Fatal(err) | Recoverable(err)) => Ready(self.close(err)),
+        }
+    }
+
     /// Handles an internal event or outgoing message, then returns. If an error is
     /// returned, the connection has closed.
     ///
@@ -2907,6 +2981,28 @@ impl<T: MessageOutbound> Connection<T> {
     /// if this fails.
     pub fn close(&mut self, err: Error) -> Error {
         self.state.close(&mut self.outbound, err)
+    }
+}
+
+/// A consumed closed connection. This allows you to handle processing vestigial events that may
+/// be received after the connection is closed.
+pub struct ClosedConnection {
+    err: Error,
+    conn_events: EventReceiver,
+}
+
+impl ClosedConnection {
+    pub fn error(&self) -> &Error {
+        &self.err
+    }
+
+    pub async fn cleanup(mut self) {
+        while let Some(event) = self.conn_events.recv().await {
+            match event {
+                ConnectionEvent::PipelineStarted { channel, .. }
+                    => channel.close(self.err.clone()),
+            }
+        }
     }
 }
 

@@ -311,10 +311,63 @@ unsafe impl<T, F> Link for TaskInSet<T, F> {
     }
 }
 
+impl<T, F> Clone for TaskInSet<T, F> {
+    fn clone(&self) -> Self {
+        Self { ptr: self.ptr }
+    }
+}
+
+impl<T, F> TaskInSet<T, F> {
+    unsafe fn into_inner(self) -> Arc<TaskInner<T, F>> {
+        Arc::from_raw(self.ptr.as_ptr().cast_const())
+    }
+    /// Get the ready flag on the task. This must be done only if the mutex is being held on the
+    /// set this task is in.
+    unsafe fn is_ready(&self) -> bool {
+        unsafe {
+            *self.ptr.as_ref().ready.get()
+        }
+    }
+    /// Clear the ready flag on the task. This must be done only if the mutex is being held on the
+    /// set this task is in.
+    unsafe fn clear_ready(&self) {
+        unsafe {
+            *self.ptr.as_ref().ready.get() = false;
+        }
+    }
+}
+
 struct GuardedTaskSet<T, F> {
     idle: LinkedList<TaskInSet<T, F>, TaskInner<T, F>>,
     ready: LinkedList<TaskInSet<T, F>, TaskInner<T, F>>,
     waker: Option<Waker>,
+}
+
+struct PopReady<T, F> {
+    task: Option<TaskInSet<T, F>>,
+    has_ready: bool,
+}
+
+impl<T, F> GuardedTaskSet<T, F> {
+    /// Pop the next ready task in the set, returning a reference to the task in the set.
+    /// The ready task is pushed into the idle list and the ready flag is cleared.
+    fn pop_ready(&mut self) -> PopReady<T, F> {
+        PopReady {
+            task: {
+                let task = self.ready.pop_front();
+                if let Some(task) = &task {
+                    unsafe { task.clear_ready() };
+                    // Push the task back into the idle list immediately. If it polls ready we'll
+                    // remove it.
+                    // Note: it could be moved back into the ready list when we call the future's
+                    // poll since it might immediately wake the waker.
+                    self.idle.push_back(task.clone());
+                }
+                task
+            },
+            has_ready: !self.ready.is_empty(),
+        }
+    }
 }
 
 struct SharedTaskSet<T, F> {
@@ -393,54 +446,13 @@ impl<T, F> SharedTaskSet<T, F> {
 }
 
 impl<T, F: Future> SharedTaskSet<T, F> {
-    fn poll_join<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<Option<(DataRef<T, F>, F::Output)>> {
-        let waker = cx.waker();
-        let mut guarded = self.guarded.lock();
-
-        macro_rules! update_waker {
-            () => {
-                match guarded.waker.as_mut() {
-                    Some(slot) => slot.clone_from(waker),
-                    None => guarded.waker = Some(waker.clone()),
-                }
-            };
-        }
-
-        let Some(task) = guarded.ready.pop_front() else {
-            return if guarded.idle.is_empty() {
-                Poll::Ready(None)
-            } else {
-                update_waker!();
-                Poll::Pending
-            }
-        };
-
-        // If there's already more stuff ready, wake the new waker now so that we don't
-        // have to wake it later.
-        if !guarded.ready.is_empty() {
-            waker.wake_by_ref();
-            guarded.waker = None;
-        } else {
-            update_waker!();
-        }
-
-        let task_ptr = task.ptr;
-        let task_ref = unsafe { task_ptr.as_ref() };
-
-        unsafe {
-            *task_ref.ready.get() = false;
-        }
-        // Push the task back into the idle list immediately. If it polls ready we'll remove it.
-        // Note: it could be moved back into the ready list when we call the future's poll since
-        // it might immediately wake the waker.
-        guarded.idle.push_back(task);
-
-        // Drop the guard at this point so that when we call the future we don't deadlock if it
-        // calls back into us to wake.
-        drop(guarded);
-
+    fn poll_task(
+        self: &Arc<Self>,
+        task: TaskInSet<T, F>,
+    ) -> Poll<(DataRef<T, F>, F::Output)> {
+        let task_ref = unsafe { task.ptr.as_ref() };
         let task_waker = {
-            let ptr = task_ptr.as_ptr().cast_const();
+            let ptr = task.ptr.as_ptr().cast_const();
             unsafe {
                 Arc::increment_strong_count(ptr);
                 Waker::from_raw(RawWaker::new(ptr.cast::<()>(), task_vtable::<T, F>()))
@@ -451,24 +463,24 @@ impl<T, F: Future> SharedTaskSet<T, F> {
 
         let future = unsafe {
             // terrible no good very bad
-            Pin::new_unchecked(&mut **(*addr_of_mut!((*task_ptr.as_ptr()).future)).get())
+            Pin::new_unchecked(&mut **(*addr_of_mut!((*task.ptr.as_ptr()).future)).get())
         };
 
         let poll_guard = scopeguard::guard((), |()| {
             // If poll panics, we need to remove the task from the set and drop it.
             let mut guarded = self.guarded.lock();
-            let is_ready = unsafe { *task_ref.ready.get() };
+            let is_ready = unsafe { task.is_ready() };
             let list = if is_ready {
                 &mut guarded.ready
             } else {
                 &mut guarded.idle
             };
             unsafe {
-                list.remove(NonNull::from_ref(task_ref)).unwrap();
+                list.remove(task.ptr).unwrap();
             }
             task_ref.parent.clear();
 
-            let task = unsafe { Arc::from_raw(task_ref) };
+            let task = unsafe { task.into_inner() };
             drop(DataTask::from_inner(task));
         });
 
@@ -505,7 +517,33 @@ impl<T, F: Future> SharedTaskSet<T, F> {
             task_ref.drop_future();
         }
 
-        Poll::Ready(Some((data_ref, output)))
+        Poll::Ready((data_ref, output))
+    }
+    fn poll_next<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<(DataRef<T, F>, F::Output)> {
+        let waker = cx.waker();
+        let mut guarded = self.guarded.lock();
+
+        let PopReady { task, has_ready } = guarded.pop_ready();
+        // The set may be empty, but we don't care, we want to be notified the next time a task
+        // is inserted.
+        match guarded.waker.as_mut() {
+            Some(slot) => slot.clone_from(waker),
+            None => guarded.waker = Some(waker.clone()),
+        }
+
+        if has_ready {
+            waker.wake_by_ref();
+        }
+
+        let Some(task) = task else {
+            return Poll::Pending
+        };
+
+        // Drop the guard at this point so that when we call the future we don't deadlock if it
+        // calls back into us to wake.
+        drop(guarded);
+
+        self.poll_task(task)
     }
 }
 
@@ -568,14 +606,18 @@ impl<T, F: Future> DataTaskSet<T, F> {
     /// This function is cancel safe. If the returned future is dropped it is guaranteed that
     /// no futures will be lost.
     pub async fn join_next(&mut self) -> Option<(DataRef<T, F>, F::Output)> {
-        poll_fn(|cx| self.poll_next(cx)).await
+        if self.is_empty() {
+            return None
+        }
+
+        Some(poll_fn(|cx| self.poll_next(cx)).await)
     }
 
     /// Poll the task set. If a future returns Ready, this returns a `DataRef` for the task along
     /// with the future's output.
-    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<(DataRef<T, F>, F::Output)>> {
-        let poll = self.shared.poll_join(cx);
-        if matches!(poll, Poll::Ready(Some(_))) {
+    pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<(DataRef<T, F>, F::Output)> {
+        let poll = self.shared.poll_next(cx);
+        if matches!(poll, Poll::Ready(_)) {
             self.len -= 1;
         }
         poll

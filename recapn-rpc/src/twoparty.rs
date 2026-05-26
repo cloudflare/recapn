@@ -1,20 +1,27 @@
+use std::future::poll_fn;
 use std::pin::pin;
 
 use std::io::{self, IoSlice};
+use std::sync::Arc;
 
 use recapn::io::StreamOptions;
 use recapn::io::stream::StreamTable;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::sync::mpsc::{self, Sender, UnboundedSender};
+use tokio::sync::SetOnce;
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::task::JoinSet;
 
 use crate::{Client, Connection, ConnectionOptions, LocalMessage, MessageFactory, MessageOutbound, OutboundMessage};
 
 #[derive(Clone)]
-pub struct CloseSignal(Sender<crate::Result<()>>);
+pub struct CloseSignal(Arc<SetOnce<crate::Error>>);
 
 impl CloseSignal {
-    pub fn close(self, result: crate::Result<()>) {
-        let _ = self.0.send(result);
+    pub fn close(self, result: crate::Error) {
+        let _ = self.0.set(result);
+    }
+    pub async fn get(&self) -> &crate::Error {
+        self.0.wait().await
     }
 }
 
@@ -58,6 +65,41 @@ async fn write_message_async<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
+struct Outbound {
+    channel: UnboundedSender<OutboundMessage>,
+}
+
+impl MessageFactory for Outbound {
+    fn new_message(&mut self) -> LocalMessage {
+        Box::new(recapn::message::Message::global())
+    }
+    fn new_estimated(&mut self, len: recapn::alloc::AllocLen) -> LocalMessage {
+        Box::new(recapn::message::Message::new(
+            recapn::alloc::Growing::new(len, recapn::alloc::Global),
+        ))
+    }
+}
+
+impl MessageOutbound for Outbound {
+    fn send(&mut self, msg: OutboundMessage) {
+        let _ = self.channel.send(msg);
+    }
+}
+
+struct SharedConnection(parking_lot::Mutex<Connection<Outbound>>);
+
+impl SharedConnection {
+    async fn poll_tasks(&self) -> crate::Error {
+        poll_fn(|cx| self.0.lock().poll_tasks(cx)).await
+    }
+    async fn poll_events(&self) -> crate::Error {
+        poll_fn(|cx| self.0.lock().poll_events(cx)).await
+    }
+    async fn poll_channels(&self) -> crate::Error {
+        poll_fn(|cx| self.0.lock().poll_channels(cx)).await
+    }
+}
+
 /// Creates a simple client-server connection.
 /// 
 /// This spawns 2 tasks:
@@ -74,85 +116,73 @@ where
     R: AsyncRead + Send + 'static,
     W: AsyncWrite + Send + 'static,
 {
-    struct Outbound {
-        channel: UnboundedSender<OutboundMessage>,
-    }
-
-    impl MessageFactory for Outbound {
-        fn new_message(&mut self) -> LocalMessage {
-            Box::new(recapn::message::Message::global())
-        }
-        fn new_estimated(&mut self, len: recapn::alloc::AllocLen) -> LocalMessage {
-            Box::new(recapn::message::Message::new(
-                recapn::alloc::Growing::new(len, recapn::alloc::Global),
-            ))
-        }
-    }
-
-    impl MessageOutbound for Outbound {
-        fn send(&mut self, msg: OutboundMessage) {
-            let _ = self.channel.send(msg);
-        }
-    }
-
-    let (close_send, close_recv) = mpsc::channel(1);
-    let close_signal = CloseSignal(close_send);
+    let mut tasks = JoinSet::new();
+    let close_signal = CloseSignal(Arc::new(SetOnce::new()));
 
     let (out_send, out_recv) = mpsc::unbounded_channel();
-    let write_close_signal = close_signal.clone();
-    tokio::spawn(async move {
-        let close_signal = write_close_signal;
+    let write_task = tokio::spawn(async move {
         let mut write = pin!(write);
         let mut out_recv = out_recv;
         while let Some(next) = out_recv.recv().await {
             if let Err(err) = write_message_async(&mut write, next).await {
-                close_signal.close(Err(crate::Error::disconnected(format!("write error: {err}"))));
-                return
+                return Err(crate::Error::disconnected(format!("write error: {err}")))
             }
         }
+
+        Ok(())
     });
     let outbound = Outbound {
         channel: out_send,
     };
+
     let mut connection = Connection::new(outbound, bootstrap, options);
     let bootstrap = connection.bootstrap();
 
-    tokio::spawn(async move {
-        let read = pin!(read);
-        let mut message_stream = crate::io::stream::ReadMessageBuf::new(read, stream_options);
+    let connection = std::sync::Arc::new(SharedConnection(parking_lot::Mutex::new(connection)));
+    tasks.spawn({
+        let connection = connection.clone();
+        async move {
+            dbg!(connection.poll_channels().await)
+        }
+    });
+    tasks.spawn({
+        let connection = connection.clone();
+        async move {
+            dbg!(connection.poll_events().await)
+        }
+    });
+    tasks.spawn({
+        let connection = connection.clone();
+        async move {
+            dbg!(connection.poll_tasks().await)
+        }
+    });
 
-        let mut connection = connection;
-        let mut close_recv = close_recv;
+    let read_task = tokio::spawn({
+        let connection = connection.clone();
+        async move {
+            let read = pin!(read);
+            let mut message_stream = crate::io::stream::ReadMessageBuf::new(read, stream_options);
 
-        loop {
-            tokio::select! {
-                Some(res) = close_recv.recv() => {
-                    if let Err(err) = res {
-                        let _ = connection.close(err);
-                    }
-                }
-                next = message_stream.read() => {
-                    match next {
-                        Ok(Some(msg)) => {
-                            if connection.handle_message(msg).is_ok() {
-                                continue
-                            }
-                        }
-                        Ok(None) => {},
-                        Err(err) => {
-                            let _ = connection.close(
-                                crate::Error::disconnected(format!("read error: {err}"))
-                            );
-                        }
-                    }
-                }
-                res = connection.handle_event() => {
-                    if res.is_ok() {
-                        continue
-                    }
+            loop {
+                match message_stream.read().await {
+                    Ok(Some(msg)) => connection.0.lock().handle_message(msg)?,
+                    Ok(None) => break Ok(()),
+                    Err(err) => break Err(crate::Error::disconnected(format!("read error: {err}"))),
                 }
             }
-            break
+        }
+    });
+
+    tokio::spawn({
+        let close_signal = close_signal.clone();
+        async move {
+            tokio::select! {
+                err = close_signal.get() => {
+                    tasks.abort_all();
+                    todo!("closed")
+                }
+            }
         }
     });
 

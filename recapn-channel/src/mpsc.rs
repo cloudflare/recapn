@@ -789,10 +789,6 @@ impl<C: Chan> GuardedChannelSet<C> {
         Some(Receiver { shared: ManuallyDrop::new(channel) })
     }
 
-    fn has_idle(&self) -> bool {
-        !self.idle.is_empty()
-    }
-
     /// Pop the ready list until it yields an item or a closed channel.
     fn pop_ready(&mut self) -> Option<(NonNull<SharedChannel<C>>, Option<ItemWithSender<C>>)> {
         loop {
@@ -899,20 +895,16 @@ impl<C: Chan> SharedChannelSet<C> {
         receivers
     }
 
-    fn poll_recv<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<Option<SetRecvResult<'a, C>>> {
+    fn poll_recv<'a>(self: &'a Arc<Self>, cx: &mut Context<'_>) -> Poll<SetRecvResult<'a, C>> {
         let mut guarded = self.guarded.lock();
         let Some((channel, item)) = guarded.pop_ready() else {
-            return if guarded.has_idle() {
-                let cx_waker = cx.waker();
-                if let Some(w) = &mut guarded.waker {
-                    w.clone_from(cx_waker);
-                } else {
-                    guarded.waker = Some(cx_waker.clone());
-                };
-                Poll::Pending
+            let cx_waker = cx.waker();
+            if let Some(w) = &mut guarded.waker {
+                w.clone_from(cx_waker);
             } else {
-                Poll::Ready(None)
+                guarded.waker = Some(cx_waker.clone());
             };
+            return Poll::Pending
         };
         let result = match item {
             Some(ItemWithSender { item, sender }) => SetRecvResult::Item {
@@ -932,7 +924,7 @@ impl<C: Chan> SharedChannelSet<C> {
             }
         };
 
-        Poll::Ready(Some(result))
+        Poll::Ready(result)
     }
 
     fn try_recv(self: &Arc<Self>) -> Option<SetRecvResult<'_, C>> {
@@ -1687,6 +1679,7 @@ pub enum SetRecvResult<'a, C: Chan> {
 /// A set of receivers that can all be received from simultaneously.
 pub struct ReceiverSet<C: Chan> {
     shared: Arc<SharedChannelSet<C>>,
+    len: usize,
 }
 
 impl<C: Chan> ReceiverSet<C> {
@@ -1700,6 +1693,7 @@ impl<C: Chan> ReceiverSet<C> {
                     waker: None,
                 })
             }),
+            len: 0,
         }
     }
 
@@ -1708,7 +1702,18 @@ impl<C: Chan> ReceiverSet<C> {
         let channel = recv.into_inner();
         let key = ReceiverKey { shared: Arc::downgrade(&channel) };
         self.shared.insert(channel);
+        self.len += 1;
         key
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     #[inline]
@@ -1718,6 +1723,7 @@ impl<C: Chan> ReceiverSet<C> {
             return None
         }
 
+        self.len -= 1;
         Some(Receiver { shared: ManuallyDrop::new(channel) })
     }
 
@@ -1727,6 +1733,7 @@ impl<C: Chan> ReceiverSet<C> {
             return None
         }
 
+        self.len -= 1;
         Some(Receiver { shared: key.shared.clone() })
     }
 
@@ -1737,13 +1744,16 @@ impl<C: Chan> ReceiverSet<C> {
             return None
         }
 
+        self.len -= 1;
         Some(Receiver { shared: ManuallyDrop::new(channel) })
     }
 
     /// Returns all receivers in the set, clearing the set.
     #[inline]
     pub fn remove_all(&mut self) -> Vec<Receiver<C>> {
-        self.shared.remove_all()
+        let vec = self.shared.remove_all();
+        self.len = 0;
+        vec
     }
 
     /// Receive the next value for any channel in this set. If there are no channels in this set,
@@ -1765,7 +1775,14 @@ impl<C: Chan> ReceiverSet<C> {
                 let mut ptr = this.ptr.expect("future already consumed");
                 let ptr = unsafe { ptr.as_mut() };
 
-                let result = ptr.poll_recv(cx);
+                let result = {
+                    if ptr.is_empty() {
+                        Poll::Ready(None)
+                    } else {
+                        ptr.poll_recv(cx).map(Some)
+                    }
+                };
+
                 if result.is_ready() {
                     this.ptr = None;
                 }
@@ -1778,14 +1795,22 @@ impl<C: Chan> ReceiverSet<C> {
     }
 
     #[inline]
-    pub fn poll_recv<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<Option<SetRecvResult<'a, C>>> {
-        self.shared.poll_recv(cx)
+    pub fn poll_recv<'a>(&'a mut self, cx: &mut Context<'_>) -> Poll<SetRecvResult<'a, C>> {
+        let result = self.shared.poll_recv(cx);
+        if let Poll::Ready(SetRecvResult::Closed { .. }) = &result {
+            self.len -= 1;
+        }
+        result
     }
 
     /// Tries to receive the next value for this set.
     #[inline]
     pub fn try_recv(&mut self) -> Option<SetRecvResult<'_, C>> {
-        self.shared.try_recv()
+        let result = self.shared.try_recv();
+        if let Some(SetRecvResult::Closed { .. }) = &result {
+            self.len -= 1;
+        }
+        result
     }
 }
 
